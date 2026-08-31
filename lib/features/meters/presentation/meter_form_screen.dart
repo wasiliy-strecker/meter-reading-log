@@ -1,0 +1,298 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../app/app_providers.dart';
+import '../domain/meter.dart';
+
+class MeterFormScreen extends ConsumerWidget {
+  const MeterFormScreen({super.key, this.meterId});
+
+  final String? meterId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final id = meterId;
+    if (id == null) {
+      return const _MeterForm();
+    }
+    return ref
+        .watch(meterByIdProvider(id))
+        .when(
+          loading: () =>
+              const Scaffold(body: Center(child: CircularProgressIndicator())),
+          error: (_, _) => const Scaffold(
+            body: Center(child: Text('Zähler konnte nicht geladen werden.')),
+          ),
+          data: (meter) => meter == null
+              ? const Scaffold(
+                  body: Center(child: Text('Zähler nicht gefunden.')),
+                )
+              : _MeterForm(meter: meter),
+        );
+  }
+}
+
+class _MeterForm extends ConsumerStatefulWidget {
+  const _MeterForm({this.meter});
+
+  final Meter? meter;
+
+  @override
+  ConsumerState<_MeterForm> createState() => _MeterFormState();
+}
+
+class _MeterFormState extends ConsumerState<_MeterForm> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _label;
+  late final TextEditingController _number;
+  late final TextEditingController _location;
+  late final TextEditingController _unit;
+  late MeterType _type;
+  late bool _reminderEnabled;
+  late ReminderInterval _interval;
+  late int _day;
+  late int _month;
+  late TimeOfDay _time;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final meter = widget.meter;
+    _type = meter?.type ?? MeterType.electricity;
+    _label = TextEditingController(text: meter?.label ?? '');
+    _number = TextEditingController(text: meter?.meterNumber ?? '');
+    _location = TextEditingController(text: meter?.location ?? '');
+    _unit = TextEditingController(text: meter?.unit ?? _type.defaultUnit);
+    final reminder = meter?.reminder;
+    _reminderEnabled = reminder != null;
+    _interval = reminder?.interval ?? ReminderInterval.monthly;
+    _day = reminder?.day ?? DateTime.now().day;
+    _month = reminder?.month ?? DateTime.now().month;
+    _time = TimeOfDay(hour: reminder?.hour ?? 9, minute: reminder?.minute ?? 0);
+  }
+
+  @override
+  void dispose() {
+    _label.dispose();
+    _number.dispose();
+    _location.dispose();
+    _unit.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final editing = widget.meter != null;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(editing ? 'Zähler bearbeiten' : 'Zähler anlegen'),
+      ),
+      body: Form(
+        key: _formKey,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+          children: [
+            DropdownButtonFormField<MeterType>(
+              initialValue: _type,
+              decoration: const InputDecoration(labelText: 'Zählerart'),
+              items: [
+                for (final type in MeterType.values)
+                  DropdownMenuItem(value: type, child: Text(type.label)),
+              ],
+              onChanged: (value) {
+                if (value == null) return;
+                setState(() {
+                  final oldDefault = _type.defaultUnit;
+                  _type = value;
+                  if (_unit.text.isEmpty || _unit.text == oldDefault) {
+                    _unit.text = value.defaultUnit;
+                  }
+                });
+              },
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _label,
+              decoration: const InputDecoration(
+                labelText: 'Bezeichnung *',
+                hintText: 'z. B. Strom Hauptzähler',
+              ),
+              textInputAction: TextInputAction.next,
+              validator: (value) => value == null || value.trim().isEmpty
+                  ? 'Bitte eine Bezeichnung eingeben.'
+                  : null,
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _number,
+              decoration: const InputDecoration(labelText: 'Zählernummer'),
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _location,
+              decoration: const InputDecoration(
+                labelText: 'Standort',
+                hintText: 'z. B. Keller',
+              ),
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _unit,
+              decoration: const InputDecoration(labelText: 'Einheit *'),
+              validator: (value) => value == null || value.trim().isEmpty
+                  ? 'Bitte eine Einheit eingeben.'
+                  : null,
+            ),
+            const SizedBox(height: 22),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  children: [
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Ableseerinnerung'),
+                      subtitle: const Text(
+                        'Optional und nur lokal auf diesem Gerät',
+                      ),
+                      value: _reminderEnabled,
+                      onChanged: (value) =>
+                          setState(() => _reminderEnabled = value),
+                    ),
+                    if (_reminderEnabled) ...[
+                      const Divider(),
+                      DropdownButtonFormField<ReminderInterval>(
+                        initialValue: _interval,
+                        decoration: const InputDecoration(
+                          labelText: 'Intervall',
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: ReminderInterval.monthly,
+                            child: Text('Monatlich'),
+                          ),
+                          DropdownMenuItem(
+                            value: ReminderInterval.yearly,
+                            child: Text('Jährlich'),
+                          ),
+                        ],
+                        onChanged: (value) =>
+                            setState(() => _interval = value ?? _interval),
+                      ),
+                      const SizedBox(height: 12),
+                      if (_interval == ReminderInterval.yearly)
+                        DropdownButtonFormField<int>(
+                          initialValue: _month,
+                          decoration: const InputDecoration(labelText: 'Monat'),
+                          items: [
+                            for (var month = 1; month <= 12; month++)
+                              DropdownMenuItem(
+                                value: month,
+                                child: Text(month.toString()),
+                              ),
+                          ],
+                          onChanged: (value) =>
+                              setState(() => _month = value ?? _month),
+                        ),
+                      if (_interval == ReminderInterval.yearly)
+                        const SizedBox(height: 12),
+                      DropdownButtonFormField<int>(
+                        initialValue: _day,
+                        decoration: const InputDecoration(labelText: 'Tag'),
+                        items: [
+                          for (var day = 1; day <= 28; day++)
+                            DropdownMenuItem(value: day, child: Text('$day.')),
+                        ],
+                        onChanged: (value) =>
+                            setState(() => _day = value ?? _day),
+                      ),
+                      const SizedBox(height: 12),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Uhrzeit'),
+                        subtitle: Text(_time.format(context)),
+                        trailing: const Icon(Icons.schedule),
+                        onTap: () async {
+                          final value = await showTimePicker(
+                            context: context,
+                            initialTime: _time,
+                          );
+                          if (value != null) setState(() => _time = value);
+                        },
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              onPressed: _saving ? null : _save,
+              icon: _saving
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.save_outlined),
+              label: Text(
+                editing ? 'Änderungen speichern' : 'Zähler speichern',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _saving = true);
+    final reminder = _reminderEnabled
+        ? ReadingReminderSchedule(
+            interval: _interval,
+            day: _day,
+            month: _interval == ReminderInterval.yearly ? _month : null,
+            hour: _time.hour,
+            minute: _time.minute,
+          )
+        : null;
+    try {
+      final service = ref.read(meterServiceProvider);
+      final existing = widget.meter;
+      late final Meter meter;
+      if (existing == null) {
+        meter = await service.create(
+          label: _label.text,
+          type: _type,
+          unit: _unit.text,
+          meterNumber: _number.text,
+          location: _location.text,
+          reminder: reminder,
+        );
+      } else {
+        meter = existing.copyWith(
+          label: _label.text.trim(),
+          type: _type,
+          unit: _unit.text.trim(),
+          meterNumber: _number.text.trim(),
+          location: _location.text.trim(),
+          reminder: reminder,
+          clearReminder: reminder == null,
+        );
+        await service.update(meter);
+      }
+      if (!mounted) return;
+      context.goNamed('meterDetail', pathParameters: {'id': meter.id});
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Speichern fehlgeschlagen: $error')),
+      );
+      setState(() => _saving = false);
+    }
+  }
+}
