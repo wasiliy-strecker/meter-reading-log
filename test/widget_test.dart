@@ -5,6 +5,8 @@ import 'package:meter_reading_log/app/app.dart';
 import 'package:meter_reading_log/app/app_providers.dart';
 import 'package:meter_reading_log/core/files/meter_photo_repository.dart';
 import 'package:meter_reading_log/features/meters/domain/meter.dart';
+import 'package:meter_reading_log/features/meters/domain/meter_reading.dart';
+import 'package:meter_reading_log/features/meters/domain/reading_value.dart';
 
 import 'support/fakes.dart';
 
@@ -175,16 +177,79 @@ void main() {
     expect(find.text(confirmation), findsWidgets);
     expect(find.text('Ablesen / Fotografieren'), findsOneWidget);
   });
+
+  testWidgets('dashboard searches, sorts and shows last edited dates', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(430, 1200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final meters = MemoryMeterRepository();
+    final readings = MemoryReadingRepository();
+    final alpha = _meter(
+      id: 'alpha',
+      label: 'Alpha Wasser',
+      type: MeterType.water,
+      location: 'Bad',
+      updatedAt: DateTime.utc(2026, 9, 1, 8),
+    );
+    final beta = _meter(
+      id: 'beta',
+      label: 'Beta Strom',
+      type: MeterType.electricity,
+      location: 'Keller',
+      updatedAt: DateTime.utc(2026, 8, 30, 8),
+    );
+    meters.items.addAll({alpha.id: alpha, beta.id: beta});
+    readings.items['reading_beta'] = _reading(
+      meter: beta,
+      updatedAt: DateTime.utc(2026, 9, 2, 12),
+    );
+
+    await tester.pumpWidget(_testApp(meters: meters, readings: readings));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Dashboard'), findsOneWidget);
+    expect(find.text('Zähler suchen'), findsOneWidget);
+    expect(find.text('Zuletzt bearbeitet'), findsOneWidget);
+    expect(find.textContaining('Zuletzt bearbeitet:'), findsNWidgets(2));
+    expect(
+      tester.getTopLeft(find.text('Beta Strom')).dy,
+      lessThan(tester.getTopLeft(find.text('Alpha Wasser')).dy),
+    );
+
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Zähler suchen'),
+      'bad',
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('1 Treffer'), findsOneWidget);
+    expect(find.text('Alpha Wasser'), findsOneWidget);
+    expect(find.text('Beta Strom'), findsNothing);
+
+    await tester.tap(find.byTooltip('Suche löschen'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Zuletzt bearbeitet'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Name A–Z'));
+    await tester.pumpAndSettle();
+    expect(
+      tester.getTopLeft(find.text('Alpha Wasser')).dy,
+      lessThan(tester.getTopLeft(find.text('Beta Strom')).dy),
+    );
+  });
 }
 
-Widget _testApp({MemoryMeterRepository? meters}) {
+Widget _testApp({
+  MemoryMeterRepository? meters,
+  MemoryReadingRepository? readings,
+}) {
   return ProviderScope(
     overrides: [
       meterRepositoryProvider.overrideWithValue(
         meters ?? MemoryMeterRepository(),
       ),
       meterReadingRepositoryProvider.overrideWithValue(
-        MemoryReadingRepository(),
+        readings ?? MemoryReadingRepository(),
       ),
       evidenceExportRepositoryProvider.overrideWithValue(
         MemoryEvidenceExportRepository(),
@@ -197,5 +262,43 @@ Widget _testApp({MemoryMeterRepository? meters}) {
       ),
     ],
     child: const MeterReadingLogApp(),
+  );
+}
+
+Meter _meter({
+  required String id,
+  required String label,
+  required MeterType type,
+  required String location,
+  required DateTime updatedAt,
+}) {
+  return Meter(
+    id: id,
+    label: label,
+    type: type,
+    unit: type == MeterType.water ? 'm³' : 'kWh',
+    meterNumber: '${id}_number',
+    location: location,
+    createdAt: DateTime.utc(2026, 8, 1),
+    updatedAt: updatedAt,
+  );
+}
+
+MeterReading _reading({required Meter meter, required DateTime updatedAt}) {
+  return MeterReading(
+    id: 'reading_${meter.id}',
+    meterId: meter.id,
+    meter: MeterSnapshot.fromMeter(meter),
+    value: ReadingValue.tryParse('123,4')!,
+    capturedAt: DateTime.utc(2026, 9, 2, 10),
+    timezoneOffsetMinutes: 120,
+    storedAt: updatedAt,
+    updatedAt: updatedAt,
+    source: ReadingSource.camera,
+    photoPath: '/tmp/photo.jpg',
+    photoSha256: 'a' * 64,
+    ocrRawText: '123,4',
+    ocrCandidate: '123,4',
+    manifestSha256: 'b' * 64,
   );
 }

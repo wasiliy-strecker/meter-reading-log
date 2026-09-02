@@ -86,22 +86,16 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
                     ),
                   ),
                 ),
-                if (readings.isNotEmpty)
-                  TextButton.icon(
-                    onPressed: _exporting
-                        ? null
-                        : () => _exportHistory(readings),
-                    icon: _exporting
-                        ? const SizedBox.square(
-                            dimension: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.picture_as_pdf_outlined),
-                    label: const Text('PDF'),
-                  ),
               ],
             ),
             const SizedBox(height: 8),
+            if (readings.isNotEmpty) ...[
+              _HistoryPdfAction(
+                exporting: _exporting,
+                onPressed: () => _exportHistory(readings),
+              ),
+              const SizedBox(height: 12),
+            ],
             if (readings.isEmpty)
               const _EmptyReadings()
             else
@@ -150,6 +144,7 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
   Future<void> _exportHistory(List<MeterReading> readings) async {
     setState(() => _exporting = true);
     try {
+      await WidgetsBinding.instance.endOfFrame;
       final repository = ref.read(meterReadingRepositoryProvider);
       final revisions = <String, List<ReadingRevision>>{};
       for (final reading in readings) {
@@ -198,6 +193,68 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
     if (!confirmed) return;
     await ref.read(meterServiceProvider).delete(meter.id);
     if (mounted) context.goNamed('home');
+  }
+}
+
+class _HistoryPdfAction extends StatelessWidget {
+  const _HistoryPdfAction({required this.exporting, required this.onPressed});
+
+  final bool exporting;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Card(
+      color: colors.secondaryContainer.withValues(alpha: 0.55),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.picture_as_pdf_outlined, color: colors.primary),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'PDF-Nachweis des Verlaufs',
+                        style: TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Erstellt eine lokal prüfbare PDF mit allen Ablesungen, Fotos, Korrekturen und SHA-256-Prüfsummen.',
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (exporting) ...[
+              const SizedBox(height: 14),
+              const LinearProgressIndicator(),
+            ],
+            const SizedBox(height: 14),
+            FilledButton.icon(
+              onPressed: exporting ? null : onPressed,
+              icon: exporting
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.picture_as_pdf_outlined),
+              label: Text(
+                exporting ? 'PDF wird erstellt …' : 'Verlauf als PDF erstellen',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
