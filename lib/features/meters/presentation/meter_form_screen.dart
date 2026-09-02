@@ -47,8 +47,8 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
   late final TextEditingController _label;
   late final TextEditingController _number;
   late final TextEditingController _location;
-  late final TextEditingController _unit;
   late MeterType _type;
+  late String _unit;
   late bool _reminderEnabled;
   late ReminderInterval _interval;
   late int _day;
@@ -64,7 +64,10 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
     _label = TextEditingController(text: meter?.label ?? '');
     _number = TextEditingController(text: meter?.meterNumber ?? '');
     _location = TextEditingController(text: meter?.location ?? '');
-    _unit = TextEditingController(text: meter?.unit ?? _type.defaultUnit);
+    final savedUnit = meter?.unit.trim();
+    _unit = savedUnit == null || savedUnit.isEmpty
+        ? _type.defaultUnit
+        : savedUnit;
     final reminder = meter?.reminder;
     _reminderEnabled = reminder != null;
     _interval = reminder?.interval ?? ReminderInterval.monthly;
@@ -78,7 +81,6 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
     _label.dispose();
     _number.dispose();
     _location.dispose();
-    _unit.dispose();
     super.dispose();
   }
 
@@ -104,11 +106,8 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
               onChanged: (value) {
                 if (value == null) return;
                 setState(() {
-                  final oldDefault = _type.defaultUnit;
                   _type = value;
-                  if (_unit.text.isEmpty || _unit.text == oldDefault) {
-                    _unit.text = value.defaultUnit;
-                  }
+                  _unit = value.defaultUnit;
                 });
               },
             ),
@@ -140,12 +139,17 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
               textInputAction: TextInputAction.next,
             ),
             const SizedBox(height: 14),
-            TextFormField(
-              controller: _unit,
+            DropdownButtonFormField<String>(
+              key: ValueKey('meter-unit-${_type.name}-$_unit'),
+              initialValue: _unit,
               decoration: const InputDecoration(labelText: 'Einheit *'),
-              validator: (value) => value == null || value.trim().isEmpty
-                  ? 'Bitte eine Einheit eingeben.'
-                  : null,
+              items: [
+                for (final unit in _unitOptions)
+                  DropdownMenuItem(value: unit, child: Text(unit)),
+              ],
+              onChanged: (value) {
+                if (value != null) setState(() => _unit = value);
+              },
             ),
             const SizedBox(height: 22),
             Card(
@@ -268,7 +272,7 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
         meter = await service.create(
           label: _label.text,
           type: _type,
-          unit: _unit.text,
+          unit: _unit,
           meterNumber: _number.text,
           location: _location.text,
           reminder: reminder,
@@ -277,7 +281,7 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
         meter = existing.copyWith(
           label: _label.text.trim(),
           type: _type,
-          unit: _unit.text.trim(),
+          unit: _unit,
           meterNumber: _number.text.trim(),
           location: _location.text.trim(),
           reminder: reminder,
@@ -286,7 +290,21 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
         await service.update(meter);
       }
       if (!mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
       context.goNamed('meterDetail', pathParameters: {'id': meter.id});
+      if (existing == null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          messenger
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Zähler gespeichert. Das Ablesen des Zählerstands folgt im nächsten Schritt.',
+                ),
+              ),
+            );
+        });
+      }
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -294,5 +312,11 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
       );
       setState(() => _saving = false);
     }
+  }
+
+  List<String> get _unitOptions {
+    final options = [..._type.availableUnits];
+    if (!options.contains(_unit)) options.add(_unit);
+    return options;
   }
 }

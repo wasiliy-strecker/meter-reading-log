@@ -94,7 +94,7 @@ class EncryptedBackupService {
   final MeterRepository meters;
   final MeterReadingRepository readings;
   final EvidenceExportRepository exports;
-  final LocalNotificationReminderRepository reminders;
+  final MeterReminderRepository reminders;
   final IntegrityService integrity;
   final int kdfIterations;
   final BackupDirectoryProvider _temporaryDirectoryProvider;

@@ -39,6 +39,10 @@ final integrityServiceProvider = Provider<IntegrityService>(
   (ref) => const IntegrityService(),
 );
 
+final meterReminderRepositoryProvider = Provider<MeterReminderRepository>(
+  (ref) => LocalNotificationReminderRepository.instance,
+);
+
 final meterPhotoCaptureRepositoryProvider =
     Provider<MeterPhotoCaptureRepository>(
       (ref) =>
@@ -58,7 +62,7 @@ final meterServiceProvider = Provider<MeterService>(
     readings: ref.watch(meterReadingRepositoryProvider),
     exports: ref.watch(evidenceExportRepositoryProvider),
     photos: ref.watch(meterPhotoCaptureRepositoryProvider),
-    reminders: LocalNotificationReminderRepository.instance,
+    reminders: ref.watch(meterReminderRepositoryProvider),
   ),
 );
 
@@ -82,7 +86,7 @@ final encryptedBackupServiceProvider = Provider<EncryptedBackupService>(
     meters: ref.watch(meterRepositoryProvider),
     readings: ref.watch(meterReadingRepositoryProvider),
     exports: ref.watch(evidenceExportRepositoryProvider),
-    reminders: LocalNotificationReminderRepository.instance,
+    reminders: ref.watch(meterReminderRepositoryProvider),
     integrity: ref.watch(integrityServiceProvider),
   ),
 );

@@ -9,7 +9,13 @@ import '../../features/meters/domain/meter.dart';
 
 enum ReminderPermissionStatus { granted, denied, unknown, unsupported }
 
-class LocalNotificationReminderRepository {
+abstract interface class MeterReminderRepository {
+  Future<void> schedule(Meter meter);
+
+  Future<void> cancel(String meterId);
+}
+
+class LocalNotificationReminderRepository implements MeterReminderRepository {
   LocalNotificationReminderRepository._();
 
   static final instance = LocalNotificationReminderRepository._();
@@ -86,6 +92,7 @@ class LocalNotificationReminderRepository {
     }
   }
 
+  @override
   Future<void> schedule(Meter meter) async {
     await initialize();
     await cancel(meter.id);
@@ -131,6 +138,7 @@ class LocalNotificationReminderRepository {
     }
   }
 
+  @override
   Future<void> cancel(String meterId) async {
     if (!_supportsNotifications) {
       return;
