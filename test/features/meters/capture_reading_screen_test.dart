@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -127,6 +129,89 @@ void main() {
       expect(find.text('Erkannte Werte'), findsOneWidget);
     },
   );
+
+  testWidgets('history PDF action shows immediate progress feedback', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(430, 1200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final meter = Meter(
+      id: 'meter_pdf',
+      label: 'Wasser Bad',
+      type: MeterType.water,
+      unit: 'm³',
+      createdAt: DateTime.utc(2026, 9, 1),
+      updatedAt: DateTime.utc(2026, 9, 1),
+    );
+    final meters = MemoryMeterRepository()..items[meter.id] = meter;
+    final readings = _PendingRevisionRepository();
+    readings.items['reading_pdf'] = MeterReading(
+      id: 'reading_pdf',
+      meterId: meter.id,
+      meter: MeterSnapshot.fromMeter(meter),
+      value: ReadingValue.tryParse('42,1')!,
+      capturedAt: DateTime.utc(2026, 9, 2, 10),
+      timezoneOffsetMinutes: 120,
+      storedAt: DateTime.utc(2026, 9, 2, 10),
+      updatedAt: DateTime.utc(2026, 9, 2, 10),
+      source: ReadingSource.camera,
+      photoPath: '/tmp/photo.jpg',
+      photoSha256: 'a' * 64,
+      ocrRawText: '42,1',
+      ocrCandidate: '42,1',
+      manifestSha256: 'b' * 64,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          meterRepositoryProvider.overrideWithValue(meters),
+          meterReadingRepositoryProvider.overrideWithValue(readings),
+          evidenceExportRepositoryProvider.overrideWithValue(
+            MemoryEvidenceExportRepository(),
+          ),
+          meterPhotoCaptureRepositoryProvider.overrideWithValue(
+            _FixedPhotoRepository(),
+          ),
+          meterOcrRepositoryProvider.overrideWithValue(
+            const _FixedOcrRepository(),
+          ),
+          meterReminderRepositoryProvider.overrideWithValue(
+            NoopMeterReminderRepository(),
+          ),
+        ],
+        child: const MeterReadingLogApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Wasser Bad'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Verlauf als PDF erstellen'),
+      250,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(find.text('PDF-Nachweis des Verlaufs'), findsOneWidget);
+    expect(
+      find.textContaining('allen Ablesungen, Fotos, Korrekturen'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Verlauf als PDF erstellen'));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('PDF wird erstellt …'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+  });
+}
+
+class _PendingRevisionRepository extends MemoryReadingRepository {
+  final _pending = Completer<List<ReadingRevision>>();
+
+  @override
+  Future<List<ReadingRevision>> loadRevisions(String readingId) {
+    return _pending.future;
+  }
 }
 
 class _FixedPhotoRepository implements MeterPhotoCaptureRepository {
