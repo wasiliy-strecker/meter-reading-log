@@ -24,6 +24,7 @@ void main() {
     expect(MeterType.values, contains(MeterType.other));
     expect(MeterType.gas.availableUnits, containsAll(['m³', 'kWh']));
     expect(MeterType.heat.availableUnits, containsAll(['kWh', 'MWh', 'GJ']));
+    expect(meterUnitDescription('GJ'), 'Gigajoule – Einheit für Wärmeenergie');
     expect(MeterType.oil.availableUnits, containsAll(['Liter', '%']));
   });
 }

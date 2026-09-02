@@ -3,9 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/app_providers.dart';
-import '../../../core/utils/formatters.dart';
 import '../domain/meter_reading.dart';
 import '../domain/reading_value.dart';
+import 'editable_reading_time_card.dart';
 
 class EditReadingScreen extends ConsumerWidget {
   const EditReadingScreen({super.key, required this.readingId});
@@ -76,6 +76,7 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
         .where(
           (item) =>
               item.id != widget.reading.id &&
+              item.meter.unit == widget.reading.meter.unit &&
               item.capturedAt.isBefore(_capturedAt.toUtc()),
         )
         .fold<MeterReading?>(
@@ -94,6 +95,7 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
       body: Form(
         key: _formKey,
         child: ListView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           children: [
             Card(
@@ -118,18 +120,13 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
                 decimal: true,
               ),
               onChanged: (_) => setState(() {}),
+              onTapOutside: (_) => FocusScope.of(context).unfocus(),
               validator: (value) => ReadingValue.tryParse(value ?? '') == null
                   ? 'Bitte einen gültigen Zählerstand eingeben.'
                   : null,
             ),
             const SizedBox(height: 12),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Aufnahmezeit'),
-              subtitle: Text(formatDateTime(_capturedAt)),
-              trailing: const Icon(Icons.edit_calendar_outlined),
-              onTap: _pickDate,
-            ),
+            EditableReadingTimeCard(value: _capturedAt, onPressed: _pickDate),
             if (isLower) ...[
               const SizedBox(height: 8),
               DropdownButtonFormField<LowerReadingReason>(
@@ -152,6 +149,7 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
               controller: _note,
               decoration: const InputDecoration(labelText: 'Notiz'),
               maxLines: 3,
+              onTapOutside: (_) => FocusScope.of(context).unfocus(),
             ),
             const SizedBox(height: 12),
             TextFormField(
@@ -161,6 +159,7 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
                 hintText: 'z. B. Tippfehler beim Bestätigen',
               ),
               maxLines: 2,
+              onTapOutside: (_) => FocusScope.of(context).unfocus(),
               validator: (value) => value == null || value.trim().isEmpty
                   ? 'Bitte den Korrekturgrund angeben.'
                   : null,
@@ -183,6 +182,7 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
   }
 
   Future<void> _pickDate() async {
+    FocusScope.of(context).unfocus();
     final date = await showDatePicker(
       context: context,
       initialDate: _capturedAt,

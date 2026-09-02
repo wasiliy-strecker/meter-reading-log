@@ -94,6 +94,7 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
       body: Form(
         key: _formKey,
         child: ListView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           children: [
             DropdownButtonFormField<MeterType>(

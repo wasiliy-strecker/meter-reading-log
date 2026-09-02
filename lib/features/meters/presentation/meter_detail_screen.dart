@@ -142,7 +142,7 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
           pathParameters: {'id': meter.id},
         ),
         icon: const Icon(Icons.add_a_photo_outlined),
-        label: const Text('Ablesen'),
+        label: const Text('Ablesen / Fotografieren'),
       ),
     );
   }
@@ -239,7 +239,7 @@ class _MeterHeader extends StatelessWidget {
             Text(
               latest == null
                   ? 'Noch kein Zählerstand'
-                  : '${latest.value.displayText} ${meter.unit}',
+                  : '${latest.value.displayText} ${latest.meter.unit}',
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                 color: color,
                 fontWeight: FontWeight.w900,
@@ -270,7 +270,9 @@ class _ReadingTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final delta = previous == null
+    final sameUnit =
+        previous == null || previous!.meter.unit == reading.meter.unit;
+    final delta = previous == null || !sameUnit
         ? null
         : reading.value.difference(previous!.value).germanFormatted;
     return Card(
@@ -290,6 +292,7 @@ class _ReadingTile extends StatelessWidget {
         ),
         subtitle: Text(
           '${formatDateTime(reading.capturedAt)}'
+          '${previous != null && !sameUnit ? ' · Einheit gewechselt' : ''}'
           '${delta == null ? '' : ' · Δ $delta ${reading.meter.unit}'}',
         ),
         trailing: const Icon(Icons.chevron_right),

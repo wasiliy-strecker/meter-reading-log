@@ -12,6 +12,7 @@ import '../../../core/utils/formatters.dart';
 import '../domain/meter.dart';
 import '../domain/meter_reading.dart';
 import '../domain/reading_value.dart';
+import 'editable_reading_time_card.dart';
 
 class CaptureReadingScreen extends ConsumerStatefulWidget {
   const CaptureReadingScreen({super.key, required this.meterId});
@@ -30,6 +31,7 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
   StoredMeterPhoto? _photo;
   MeterOcrResult? _ocr;
   String _selectedCandidate = '';
+  String? _selectedUnit;
   DateTime _capturedAt = DateTime.now();
   LowerReadingReason? _lowerReason;
   bool _working = false;
@@ -74,18 +76,20 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
   Widget _buildContent(Meter meter) {
     final readings =
         ref.watch(readingsForMeterProvider(meter.id)).value ?? const [];
+    final selectedUnit = _selectedUnit ?? meter.unit;
     final parsed = ReadingValue.tryParse(_value.text);
-    final previous = _previousFor(readings, _capturedAt);
+    final previous = _previousFor(readings, _capturedAt, selectedUnit);
     final isLower =
         parsed != null &&
         previous != null &&
         parsed.compareTo(previous.value) < 0;
 
     return Scaffold(
-      appBar: AppBar(title: Text('${meter.label} ablesen')),
+      appBar: AppBar(title: const Text('Ablesen / Fotografieren')),
       body: Form(
         key: _formKey,
         child: ListView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           children: [
             if (_photo == null) ...[
@@ -128,19 +132,18 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      '${_photo!.source.label} · Original SHA-256 ${shortHash(_photo!.sha256)}',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: _working ? null : _replacePhoto,
-                    child: const Text('Ersetzen'),
-                  ),
-                ],
+              Text(
+                '${_photo!.source.label} · Original SHA-256 ${shortHash(_photo!.sha256)}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _working ? null : _replacePhoto,
+                  icon: const Icon(Icons.change_circle_outlined),
+                  label: const Text('Neues Foto aufnehmen oder auswählen'),
+                ),
               ),
               const SizedBox(height: 12),
               if (_ocr != null && _ocr!.candidates.isNotEmpty) ...[
@@ -179,28 +182,49 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
                 ),
                 const SizedBox(height: 12),
               ],
+              DropdownButtonFormField<String>(
+                key: ValueKey('reading-unit-${meter.id}-$selectedUnit'),
+                initialValue: selectedUnit,
+                decoration: InputDecoration(
+                  labelText: 'Einheit des Zählerstands',
+                  helperText: meterUnitDescription(selectedUnit),
+                  prefixIcon: const Icon(Icons.straighten_outlined),
+                ),
+                items: [
+                  for (final unit in _unitOptions(meter, selectedUnit))
+                    DropdownMenuItem(value: unit, child: Text(unit)),
+                ],
+                onChanged: _working
+                    ? null
+                    : (value) {
+                        if (value == null) return;
+                        setState(() {
+                          _selectedUnit = value;
+                          _lowerReason = null;
+                        });
+                      },
+              ),
+              const SizedBox(height: 12),
               TextFormField(
                 controller: _value,
                 decoration: InputDecoration(
                   labelText: 'Bestätigter Zählerstand *',
-                  suffixText: meter.unit,
+                  suffixText: selectedUnit,
                   helperText: 'Bitte immer mit dem Foto vergleichen.',
                 ),
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
                 onChanged: (_) => setState(() {}),
+                onTapOutside: (_) => FocusScope.of(context).unfocus(),
                 validator: (value) => ReadingValue.tryParse(value ?? '') == null
                     ? 'Bitte einen gültigen Zählerstand eingeben.'
                     : null,
               ),
               const SizedBox(height: 12),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Aufnahmezeit'),
-                subtitle: Text(formatDateTime(_capturedAt)),
-                trailing: const Icon(Icons.edit_calendar_outlined),
-                onTap: _pickCapturedAt,
+              EditableReadingTimeCard(
+                value: _capturedAt,
+                onPressed: _pickCapturedAt,
               ),
               if (isLower) ...[
                 const SizedBox(height: 8),
@@ -209,7 +233,7 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
                   decoration: InputDecoration(
                     labelText: 'Grund für niedrigeren Stand *',
                     helperText:
-                        'Vorheriger Stand: ${previous.value.displayText} ${meter.unit}',
+                        'Vorheriger Stand: ${previous.value.displayText} $selectedUnit',
                   ),
                   items: [
                     for (final reason in LowerReadingReason.values)
@@ -232,6 +256,7 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
                   hintText: 'Optional, z. B. Wohnungsübergabe',
                 ),
                 maxLines: 3,
+                onTapOutside: (_) => FocusScope.of(context).unfocus(),
               ),
               const SizedBox(height: 22),
               FilledButton.icon(
@@ -251,10 +276,18 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
     );
   }
 
-  MeterReading? _previousFor(List<MeterReading> readings, DateTime capturedAt) {
+  MeterReading? _previousFor(
+    List<MeterReading> readings,
+    DateTime capturedAt,
+    String unit,
+  ) {
     final earlier =
         readings
-            .where((reading) => reading.capturedAt.isBefore(capturedAt.toUtc()))
+            .where(
+              (reading) =>
+                  reading.meter.unit == unit &&
+                  reading.capturedAt.isBefore(capturedAt.toUtc()),
+            )
             .toList()
           ..sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
     return earlier.firstOrNull;
@@ -311,6 +344,7 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
   }
 
   Future<void> _replacePhoto() async {
+    FocusScope.of(context).unfocus();
     final source = await showModalBottomSheet<ReadingSource>(
       context: context,
       builder: (context) => SafeArea(
@@ -335,6 +369,7 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
   }
 
   Future<void> _pickCapturedAt() async {
+    FocusScope.of(context).unfocus();
     final date = await showDatePicker(
       context: context,
       initialDate: _capturedAt,
@@ -363,12 +398,18 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
       return;
     }
     final value = ReadingValue.tryParse(_value.text)!;
+    final selectedUnit = _selectedUnit ?? meter.unit;
     setState(() => _working = true);
     try {
+      var meterForReading = meter;
+      if (selectedUnit != meter.unit) {
+        meterForReading = meter.copyWith(unit: selectedUnit);
+        await ref.read(meterServiceProvider).update(meterForReading);
+      }
       final reading = await ref
           .read(meterReadingServiceProvider)
           .create(
-            meter: meter,
+            meter: meterForReading,
             photo: _photo!,
             ocr: _ocr!,
             value: value,
@@ -377,6 +418,9 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
             note: _note.text,
             lowerReadingReason: _lowerReason,
           );
+      if (selectedUnit != meter.unit) {
+        ref.invalidate(meterByIdProvider(meter.id));
+      }
       _saved = true;
       if (!mounted) return;
       context.goNamed('readingDetail', pathParameters: {'id': reading.id});
@@ -388,6 +432,12 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
         setState(() => _working = false);
       }
     }
+  }
+
+  List<String> _unitOptions(Meter meter, String selectedUnit) {
+    final options = [...meter.type.availableUnits];
+    if (!options.contains(selectedUnit)) options.add(selectedUnit);
+    return options;
   }
 }
 

@@ -269,6 +269,8 @@ class EvidenceReportService {
             '${readings[index].value.displayText} ${readings[index].meter.unit}',
             index == 0
                 ? '–'
+                : readings[index].meter.unit != readings[index - 1].meter.unit
+                ? '– (Einheit gewechselt)'
                 : '${readings[index].value.difference(readings[index - 1].value).germanFormatted} ${readings[index].meter.unit}',
             readings[index].source.label,
           ],

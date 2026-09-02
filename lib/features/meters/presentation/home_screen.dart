@@ -118,7 +118,7 @@ class _MeterCard extends ConsumerWidget {
                     Text(
                       latest == null
                           ? 'Noch keine Ablesung'
-                          : '${latest.value.displayText} ${meter.unit}',
+                          : '${latest.value.displayText} ${latest.meter.unit}',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         color: color,
                         fontWeight: FontWeight.w800,

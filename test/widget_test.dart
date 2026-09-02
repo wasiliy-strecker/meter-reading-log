@@ -22,6 +22,10 @@ void main() {
     expect(find.text('Einheit *'), findsOneWidget);
     expect(find.byType(DropdownButtonFormField<String>), findsOneWidget);
     expect(find.text('Ableseerinnerung'), findsOneWidget);
+    expect(
+      tester.widget<ListView>(find.byType(ListView)).keyboardDismissBehavior,
+      ScrollViewKeyboardDismissBehavior.onDrag,
+    );
   });
 
   testWidgets('meter form offers expanded types and matching units', (
@@ -74,7 +78,7 @@ void main() {
 
     expect(meters.items.values.single.label, 'Strom Hauptzähler');
     expect(find.text(confirmation), findsWidgets);
-    expect(find.text('Ablesen'), findsOneWidget);
+    expect(find.text('Ablesen / Fotografieren'), findsOneWidget);
   });
 }
 
