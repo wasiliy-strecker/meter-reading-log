@@ -755,6 +755,28 @@ class $ReadingRecordsTable extends ReadingRecords
     type: DriftSqlType.double,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _photoAddedAtMillisMeta =
+      const VerificationMeta('photoAddedAtMillis');
+  @override
+  late final GeneratedColumn<int> photoAddedAtMillis = GeneratedColumn<int>(
+    'photo_added_at_millis',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _photoHistoryJsonMeta = const VerificationMeta(
+    'photoHistoryJson',
+  );
+  @override
+  late final GeneratedColumn<String> photoHistoryJson = GeneratedColumn<String>(
+    'photo_history_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
   static const VerificationMeta _lowerReadingReasonMeta =
       const VerificationMeta('lowerReadingReason');
   @override
@@ -805,6 +827,8 @@ class $ReadingRecordsTable extends ReadingRecords
     ocrRawText,
     ocrCandidate,
     ocrConfidence,
+    photoAddedAtMillis,
+    photoHistoryJson,
     lowerReadingReason,
     note,
     manifestSha256,
@@ -973,6 +997,24 @@ class $ReadingRecordsTable extends ReadingRecords
         ),
       );
     }
+    if (data.containsKey('photo_added_at_millis')) {
+      context.handle(
+        _photoAddedAtMillisMeta,
+        photoAddedAtMillis.isAcceptableOrUnknown(
+          data['photo_added_at_millis']!,
+          _photoAddedAtMillisMeta,
+        ),
+      );
+    }
+    if (data.containsKey('photo_history_json')) {
+      context.handle(
+        _photoHistoryJsonMeta,
+        photoHistoryJson.isAcceptableOrUnknown(
+          data['photo_history_json']!,
+          _photoHistoryJsonMeta,
+        ),
+      );
+    }
     if (data.containsKey('lower_reading_reason')) {
       context.handle(
         _lowerReadingReasonMeta,
@@ -1072,6 +1114,14 @@ class $ReadingRecordsTable extends ReadingRecords
         DriftSqlType.double,
         data['${effectivePrefix}ocr_confidence'],
       ),
+      photoAddedAtMillis: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}photo_added_at_millis'],
+      ),
+      photoHistoryJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}photo_history_json'],
+      )!,
       lowerReadingReason: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}lower_reading_reason'],
@@ -1111,6 +1161,8 @@ class StoredReadingRecord extends DataClass
   final String ocrRawText;
   final String ocrCandidate;
   final double? ocrConfidence;
+  final int? photoAddedAtMillis;
+  final String photoHistoryJson;
   final String? lowerReadingReason;
   final String note;
   final String manifestSha256;
@@ -1131,6 +1183,8 @@ class StoredReadingRecord extends DataClass
     required this.ocrRawText,
     required this.ocrCandidate,
     this.ocrConfidence,
+    this.photoAddedAtMillis,
+    required this.photoHistoryJson,
     this.lowerReadingReason,
     required this.note,
     required this.manifestSha256,
@@ -1156,6 +1210,10 @@ class StoredReadingRecord extends DataClass
     if (!nullToAbsent || ocrConfidence != null) {
       map['ocr_confidence'] = Variable<double>(ocrConfidence);
     }
+    if (!nullToAbsent || photoAddedAtMillis != null) {
+      map['photo_added_at_millis'] = Variable<int>(photoAddedAtMillis);
+    }
+    map['photo_history_json'] = Variable<String>(photoHistoryJson);
     if (!nullToAbsent || lowerReadingReason != null) {
       map['lower_reading_reason'] = Variable<String>(lowerReadingReason);
     }
@@ -1184,6 +1242,10 @@ class StoredReadingRecord extends DataClass
       ocrConfidence: ocrConfidence == null && nullToAbsent
           ? const Value.absent()
           : Value(ocrConfidence),
+      photoAddedAtMillis: photoAddedAtMillis == null && nullToAbsent
+          ? const Value.absent()
+          : Value(photoAddedAtMillis),
+      photoHistoryJson: Value(photoHistoryJson),
       lowerReadingReason: lowerReadingReason == null && nullToAbsent
           ? const Value.absent()
           : Value(lowerReadingReason),
@@ -1216,6 +1278,8 @@ class StoredReadingRecord extends DataClass
       ocrRawText: serializer.fromJson<String>(json['ocrRawText']),
       ocrCandidate: serializer.fromJson<String>(json['ocrCandidate']),
       ocrConfidence: serializer.fromJson<double?>(json['ocrConfidence']),
+      photoAddedAtMillis: serializer.fromJson<int?>(json['photoAddedAtMillis']),
+      photoHistoryJson: serializer.fromJson<String>(json['photoHistoryJson']),
       lowerReadingReason: serializer.fromJson<String?>(
         json['lowerReadingReason'],
       ),
@@ -1243,6 +1307,8 @@ class StoredReadingRecord extends DataClass
       'ocrRawText': serializer.toJson<String>(ocrRawText),
       'ocrCandidate': serializer.toJson<String>(ocrCandidate),
       'ocrConfidence': serializer.toJson<double?>(ocrConfidence),
+      'photoAddedAtMillis': serializer.toJson<int?>(photoAddedAtMillis),
+      'photoHistoryJson': serializer.toJson<String>(photoHistoryJson),
       'lowerReadingReason': serializer.toJson<String?>(lowerReadingReason),
       'note': serializer.toJson<String>(note),
       'manifestSha256': serializer.toJson<String>(manifestSha256),
@@ -1266,6 +1332,8 @@ class StoredReadingRecord extends DataClass
     String? ocrRawText,
     String? ocrCandidate,
     Value<double?> ocrConfidence = const Value.absent(),
+    Value<int?> photoAddedAtMillis = const Value.absent(),
+    String? photoHistoryJson,
     Value<String?> lowerReadingReason = const Value.absent(),
     String? note,
     String? manifestSha256,
@@ -1288,6 +1356,10 @@ class StoredReadingRecord extends DataClass
     ocrConfidence: ocrConfidence.present
         ? ocrConfidence.value
         : this.ocrConfidence,
+    photoAddedAtMillis: photoAddedAtMillis.present
+        ? photoAddedAtMillis.value
+        : this.photoAddedAtMillis,
+    photoHistoryJson: photoHistoryJson ?? this.photoHistoryJson,
     lowerReadingReason: lowerReadingReason.present
         ? lowerReadingReason.value
         : this.lowerReadingReason,
@@ -1336,6 +1408,12 @@ class StoredReadingRecord extends DataClass
       ocrConfidence: data.ocrConfidence.present
           ? data.ocrConfidence.value
           : this.ocrConfidence,
+      photoAddedAtMillis: data.photoAddedAtMillis.present
+          ? data.photoAddedAtMillis.value
+          : this.photoAddedAtMillis,
+      photoHistoryJson: data.photoHistoryJson.present
+          ? data.photoHistoryJson.value
+          : this.photoHistoryJson,
       lowerReadingReason: data.lowerReadingReason.present
           ? data.lowerReadingReason.value
           : this.lowerReadingReason,
@@ -1365,6 +1443,8 @@ class StoredReadingRecord extends DataClass
           ..write('ocrRawText: $ocrRawText, ')
           ..write('ocrCandidate: $ocrCandidate, ')
           ..write('ocrConfidence: $ocrConfidence, ')
+          ..write('photoAddedAtMillis: $photoAddedAtMillis, ')
+          ..write('photoHistoryJson: $photoHistoryJson, ')
           ..write('lowerReadingReason: $lowerReadingReason, ')
           ..write('note: $note, ')
           ..write('manifestSha256: $manifestSha256')
@@ -1373,7 +1453,7 @@ class StoredReadingRecord extends DataClass
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     meterId,
     meterSnapshotJson,
@@ -1390,10 +1470,12 @@ class StoredReadingRecord extends DataClass
     ocrRawText,
     ocrCandidate,
     ocrConfidence,
+    photoAddedAtMillis,
+    photoHistoryJson,
     lowerReadingReason,
     note,
     manifestSha256,
-  );
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1414,6 +1496,8 @@ class StoredReadingRecord extends DataClass
           other.ocrRawText == this.ocrRawText &&
           other.ocrCandidate == this.ocrCandidate &&
           other.ocrConfidence == this.ocrConfidence &&
+          other.photoAddedAtMillis == this.photoAddedAtMillis &&
+          other.photoHistoryJson == this.photoHistoryJson &&
           other.lowerReadingReason == this.lowerReadingReason &&
           other.note == this.note &&
           other.manifestSha256 == this.manifestSha256);
@@ -1436,6 +1520,8 @@ class ReadingRecordsCompanion extends UpdateCompanion<StoredReadingRecord> {
   final Value<String> ocrRawText;
   final Value<String> ocrCandidate;
   final Value<double?> ocrConfidence;
+  final Value<int?> photoAddedAtMillis;
+  final Value<String> photoHistoryJson;
   final Value<String?> lowerReadingReason;
   final Value<String> note;
   final Value<String> manifestSha256;
@@ -1457,6 +1543,8 @@ class ReadingRecordsCompanion extends UpdateCompanion<StoredReadingRecord> {
     this.ocrRawText = const Value.absent(),
     this.ocrCandidate = const Value.absent(),
     this.ocrConfidence = const Value.absent(),
+    this.photoAddedAtMillis = const Value.absent(),
+    this.photoHistoryJson = const Value.absent(),
     this.lowerReadingReason = const Value.absent(),
     this.note = const Value.absent(),
     this.manifestSha256 = const Value.absent(),
@@ -1479,6 +1567,8 @@ class ReadingRecordsCompanion extends UpdateCompanion<StoredReadingRecord> {
     this.ocrRawText = const Value.absent(),
     this.ocrCandidate = const Value.absent(),
     this.ocrConfidence = const Value.absent(),
+    this.photoAddedAtMillis = const Value.absent(),
+    this.photoHistoryJson = const Value.absent(),
     this.lowerReadingReason = const Value.absent(),
     this.note = const Value.absent(),
     required String manifestSha256,
@@ -1514,6 +1604,8 @@ class ReadingRecordsCompanion extends UpdateCompanion<StoredReadingRecord> {
     Expression<String>? ocrRawText,
     Expression<String>? ocrCandidate,
     Expression<double>? ocrConfidence,
+    Expression<int>? photoAddedAtMillis,
+    Expression<String>? photoHistoryJson,
     Expression<String>? lowerReadingReason,
     Expression<String>? note,
     Expression<String>? manifestSha256,
@@ -1537,6 +1629,9 @@ class ReadingRecordsCompanion extends UpdateCompanion<StoredReadingRecord> {
       if (ocrRawText != null) 'ocr_raw_text': ocrRawText,
       if (ocrCandidate != null) 'ocr_candidate': ocrCandidate,
       if (ocrConfidence != null) 'ocr_confidence': ocrConfidence,
+      if (photoAddedAtMillis != null)
+        'photo_added_at_millis': photoAddedAtMillis,
+      if (photoHistoryJson != null) 'photo_history_json': photoHistoryJson,
       if (lowerReadingReason != null)
         'lower_reading_reason': lowerReadingReason,
       if (note != null) 'note': note,
@@ -1562,6 +1657,8 @@ class ReadingRecordsCompanion extends UpdateCompanion<StoredReadingRecord> {
     Value<String>? ocrRawText,
     Value<String>? ocrCandidate,
     Value<double?>? ocrConfidence,
+    Value<int?>? photoAddedAtMillis,
+    Value<String>? photoHistoryJson,
     Value<String?>? lowerReadingReason,
     Value<String>? note,
     Value<String>? manifestSha256,
@@ -1585,6 +1682,8 @@ class ReadingRecordsCompanion extends UpdateCompanion<StoredReadingRecord> {
       ocrRawText: ocrRawText ?? this.ocrRawText,
       ocrCandidate: ocrCandidate ?? this.ocrCandidate,
       ocrConfidence: ocrConfidence ?? this.ocrConfidence,
+      photoAddedAtMillis: photoAddedAtMillis ?? this.photoAddedAtMillis,
+      photoHistoryJson: photoHistoryJson ?? this.photoHistoryJson,
       lowerReadingReason: lowerReadingReason ?? this.lowerReadingReason,
       note: note ?? this.note,
       manifestSha256: manifestSha256 ?? this.manifestSha256,
@@ -1645,6 +1744,12 @@ class ReadingRecordsCompanion extends UpdateCompanion<StoredReadingRecord> {
     if (ocrConfidence.present) {
       map['ocr_confidence'] = Variable<double>(ocrConfidence.value);
     }
+    if (photoAddedAtMillis.present) {
+      map['photo_added_at_millis'] = Variable<int>(photoAddedAtMillis.value);
+    }
+    if (photoHistoryJson.present) {
+      map['photo_history_json'] = Variable<String>(photoHistoryJson.value);
+    }
     if (lowerReadingReason.present) {
       map['lower_reading_reason'] = Variable<String>(lowerReadingReason.value);
     }
@@ -1679,6 +1784,8 @@ class ReadingRecordsCompanion extends UpdateCompanion<StoredReadingRecord> {
           ..write('ocrRawText: $ocrRawText, ')
           ..write('ocrCandidate: $ocrCandidate, ')
           ..write('ocrConfidence: $ocrConfidence, ')
+          ..write('photoAddedAtMillis: $photoAddedAtMillis, ')
+          ..write('photoHistoryJson: $photoHistoryJson, ')
           ..write('lowerReadingReason: $lowerReadingReason, ')
           ..write('note: $note, ')
           ..write('manifestSha256: $manifestSha256, ')
@@ -2968,6 +3075,8 @@ typedef $$ReadingRecordsTableCreateCompanionBuilder =
       Value<String> ocrRawText,
       Value<String> ocrCandidate,
       Value<double?> ocrConfidence,
+      Value<int?> photoAddedAtMillis,
+      Value<String> photoHistoryJson,
       Value<String?> lowerReadingReason,
       Value<String> note,
       required String manifestSha256,
@@ -2991,6 +3100,8 @@ typedef $$ReadingRecordsTableUpdateCompanionBuilder =
       Value<String> ocrRawText,
       Value<String> ocrCandidate,
       Value<double?> ocrConfidence,
+      Value<int?> photoAddedAtMillis,
+      Value<String> photoHistoryJson,
       Value<String?> lowerReadingReason,
       Value<String> note,
       Value<String> manifestSha256,
@@ -3083,6 +3194,16 @@ class $$ReadingRecordsTableFilterComposer
 
   ColumnFilters<double> get ocrConfidence => $composableBuilder(
     column: $table.ocrConfidence,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get photoAddedAtMillis => $composableBuilder(
+    column: $table.photoAddedAtMillis,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get photoHistoryJson => $composableBuilder(
+    column: $table.photoHistoryJson,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3191,6 +3312,16 @@ class $$ReadingRecordsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get photoAddedAtMillis => $composableBuilder(
+    column: $table.photoAddedAtMillis,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get photoHistoryJson => $composableBuilder(
+    column: $table.photoHistoryJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get lowerReadingReason => $composableBuilder(
     column: $table.lowerReadingReason,
     builder: (column) => ColumnOrderings(column),
@@ -3288,6 +3419,16 @@ class $$ReadingRecordsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<int> get photoAddedAtMillis => $composableBuilder(
+    column: $table.photoAddedAtMillis,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get photoHistoryJson => $composableBuilder(
+    column: $table.photoHistoryJson,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get lowerReadingReason => $composableBuilder(
     column: $table.lowerReadingReason,
     builder: (column) => column,
@@ -3355,6 +3496,8 @@ class $$ReadingRecordsTableTableManager
                 Value<String> ocrRawText = const Value.absent(),
                 Value<String> ocrCandidate = const Value.absent(),
                 Value<double?> ocrConfidence = const Value.absent(),
+                Value<int?> photoAddedAtMillis = const Value.absent(),
+                Value<String> photoHistoryJson = const Value.absent(),
                 Value<String?> lowerReadingReason = const Value.absent(),
                 Value<String> note = const Value.absent(),
                 Value<String> manifestSha256 = const Value.absent(),
@@ -3376,6 +3519,8 @@ class $$ReadingRecordsTableTableManager
                 ocrRawText: ocrRawText,
                 ocrCandidate: ocrCandidate,
                 ocrConfidence: ocrConfidence,
+                photoAddedAtMillis: photoAddedAtMillis,
+                photoHistoryJson: photoHistoryJson,
                 lowerReadingReason: lowerReadingReason,
                 note: note,
                 manifestSha256: manifestSha256,
@@ -3399,6 +3544,8 @@ class $$ReadingRecordsTableTableManager
                 Value<String> ocrRawText = const Value.absent(),
                 Value<String> ocrCandidate = const Value.absent(),
                 Value<double?> ocrConfidence = const Value.absent(),
+                Value<int?> photoAddedAtMillis = const Value.absent(),
+                Value<String> photoHistoryJson = const Value.absent(),
                 Value<String?> lowerReadingReason = const Value.absent(),
                 Value<String> note = const Value.absent(),
                 required String manifestSha256,
@@ -3420,6 +3567,8 @@ class $$ReadingRecordsTableTableManager
                 ocrRawText: ocrRawText,
                 ocrCandidate: ocrCandidate,
                 ocrConfidence: ocrConfidence,
+                photoAddedAtMillis: photoAddedAtMillis,
+                photoHistoryJson: photoHistoryJson,
                 lowerReadingReason: lowerReadingReason,
                 note: note,
                 manifestSha256: manifestSha256,

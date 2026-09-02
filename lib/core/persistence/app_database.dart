@@ -42,6 +42,8 @@ class ReadingRecords extends Table {
   TextColumn get ocrRawText => text().withDefault(const Constant(''))();
   TextColumn get ocrCandidate => text().withDefault(const Constant(''))();
   RealColumn get ocrConfidence => real().nullable()();
+  IntColumn get photoAddedAtMillis => integer().nullable()();
+  TextColumn get photoHistoryJson => text().withDefault(const Constant('[]'))();
   TextColumn get lowerReadingReason => text().nullable()();
   TextColumn get note => text().withDefault(const Constant(''))();
   TextColumn get manifestSha256 => text()();
@@ -94,7 +96,24 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.withExecutor(super.executor);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+    onCreate: (migrator) => migrator.createAll(),
+    onUpgrade: (migrator, from, to) async {
+      if (from < 2) {
+        await migrator.addColumn(
+          readingRecords,
+          readingRecords.photoAddedAtMillis,
+        );
+        await migrator.addColumn(
+          readingRecords,
+          readingRecords.photoHistoryJson,
+        );
+      }
+    },
+  );
 }
 
 QueryExecutor _openConnection() {

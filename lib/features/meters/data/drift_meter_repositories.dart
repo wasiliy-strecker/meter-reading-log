@@ -239,6 +239,14 @@ class DriftMeterReadingRepository implements MeterReadingRepository {
       ocrRawText: Value(reading.ocrRawText),
       ocrCandidate: Value(reading.ocrCandidate),
       ocrConfidence: Value(reading.ocrConfidence),
+      photoAddedAtMillis: Value(
+        reading.photoAddedAt?.toUtc().millisecondsSinceEpoch,
+      ),
+      photoHistoryJson: Value(
+        jsonEncode(
+          reading.photoHistory.map((version) => version.toJson()).toList(),
+        ),
+      ),
       lowerReadingReason: Value(reading.lowerReadingReason?.name),
       note: Value(reading.note),
       manifestSha256: reading.manifestSha256,
@@ -276,6 +284,19 @@ class DriftMeterReadingRepository implements MeterReadingRepository {
       ocrRawText: row.ocrRawText,
       ocrCandidate: row.ocrCandidate,
       ocrConfidence: row.ocrConfidence,
+      photoAddedAt: row.photoAddedAtMillis == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(
+              row.photoAddedAtMillis!,
+              isUtc: true,
+            ),
+      photoHistory: (jsonDecode(row.photoHistoryJson) as List)
+          .map(
+            (item) => ReadingPhotoVersion.fromJson(
+              Map<String, dynamic>.from(item as Map),
+            ),
+          )
+          .toList(growable: false),
       lowerReadingReason: row.lowerReadingReason == null
           ? null
           : LowerReadingReason.values.byName(row.lowerReadingReason!),

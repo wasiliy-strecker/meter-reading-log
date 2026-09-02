@@ -43,6 +43,9 @@ void main() {
 
     expect((await meters.findById(meter.id))?.label, 'Strom Keller');
     expect((await readings.findById(reading.id))?.value.displayText, '124,0');
+    final restored = (await readings.findById(reading.id))!;
+    expect(restored.photoHistory, hasLength(1));
+    expect(restored.photoHistory.single.sha256, 'c' * 64);
     final revisions = await readings.loadRevisions(reading.id);
     expect(revisions, hasLength(1));
     expect(revisions.single.reason, 'Tippfehler');
@@ -75,5 +78,18 @@ MeterReading _reading(Meter meter) => MeterReading(
   ocrRawText: '00123,4 kWh',
   ocrCandidate: '00123,4',
   ocrConfidence: 0.9,
+  photoAddedAt: DateTime.utc(2026, 8, 31, 10),
+  photoHistory: [
+    ReadingPhotoVersion(
+      id: 'photo_version_1',
+      path: '/tmp/older.jpg',
+      sha256: 'c' * 64,
+      source: ReadingSource.gallery,
+      addedAt: DateTime.utc(2026, 8, 30, 10),
+      ocrRawText: '122,0 kWh',
+      ocrCandidate: '122,0',
+      ocrConfidence: 0.8,
+    ),
+  ],
   manifestSha256: 'b' * 64,
 );
