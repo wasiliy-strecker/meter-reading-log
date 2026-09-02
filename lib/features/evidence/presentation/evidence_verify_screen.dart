@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/app_providers.dart';
+import '../../../core/integrity/integrity_copy.dart';
 import '../../../core/utils/formatters.dart';
 import '../../meters/application/meter_services.dart';
 
@@ -21,7 +22,7 @@ class _EvidenceVerifyScreenState extends ConsumerState<EvidenceVerifyScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('PDF prüfen')),
+      appBar: AppBar(title: const Text(pdfVerificationTitle)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -38,14 +39,19 @@ class _EvidenceVerifyScreenState extends ConsumerState<EvidenceVerifyScreen> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Gespeicherten Nachweis vergleichen',
+                    pdfVerificationTitle,
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    'Die App berechnet den SHA-256-Wert der ausgewählten PDF und vergleicht ihn mit den lokal gespeicherten Exportdatensätzen.',
+                  const Text(pdfVerificationText),
+                  const SizedBox(height: 8),
+                  Text(
+                    privateDocumentationText,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ],
               ),
@@ -108,20 +114,20 @@ class _ResultCard extends StatelessWidget {
       EvidenceVerificationStatus.unchanged => (
         Icons.verified_outlined,
         const Color(0xFF087F5B),
-        'Unverändert',
-        'Der PDF-Hash stimmt mit dem lokal gespeicherten Export überein.',
+        pdfMatchesTitle,
+        pdfMatchesText,
       ),
       EvidenceVerificationStatus.changed => (
         Icons.warning_amber_outlined,
         Theme.of(context).colorScheme.error,
-        'Datei verändert',
-        'Der Dateiname ist bekannt, aber der PDF-Hash stimmt nicht mehr überein.',
+        pdfChangedTitle,
+        pdfChangedText,
       ),
       EvidenceVerificationStatus.unknown => (
         Icons.help_outline,
         Theme.of(context).colorScheme.tertiary,
-        'Unbekannter Export',
-        'Zu dieser PDF ist auf diesem Gerät kein Exportdatensatz gespeichert.',
+        pdfUnknownTitle,
+        pdfUnknownText,
       ),
     };
     return Card(
@@ -150,9 +156,26 @@ class _ResultCard extends StatelessWidget {
               Text('Export: ${result.record!.fileName}'),
               Text('Erstellt: ${formatDateTime(result.record!.createdAt)}'),
             ],
-            const SizedBox(height: 12),
-            const Text('Berechneter SHA-256:'),
-            SelectableText(result.sha256),
+            const SizedBox(height: 4),
+            Theme(
+              data: Theme.of(
+                context,
+              ).copyWith(dividerColor: Colors.transparent),
+              child: ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                childrenPadding: const EdgeInsets.only(bottom: 4),
+                leading: const Icon(Icons.fingerprint),
+                title: const Text('Technischen PDF-Prüfwert anzeigen'),
+                children: [
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: SelectableText(
+                      'Prüfwert der PDF (SHA-256)\n${result.sha256}',
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),

@@ -9,7 +9,6 @@ import 'package:go_router/go_router.dart';
 import '../../../app/app_providers.dart';
 import '../../../core/files/meter_photo_repository.dart';
 import '../../../core/ocr/meter_ocr_repository.dart';
-import '../../../core/utils/formatters.dart';
 import '../domain/meter_reading.dart';
 import '../domain/reading_value.dart';
 import 'editable_reading_time_card.dart';
@@ -222,7 +221,7 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
             _PhotoPreview(path: widget.reading.photoPath),
             const SizedBox(height: 8),
             Text(
-              '${widget.reading.source.label} · SHA-256 ${shortHash(widget.reading.photoSha256)}',
+              '${widget.reading.source.label} · bisheriges Foto',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             if (_replacementPhoto != null) ...[
@@ -238,7 +237,7 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
               _PhotoPreview(path: _replacementPhoto!.path),
               const SizedBox(height: 8),
               Text(
-                '${_replacementPhoto!.source.label} · SHA-256 ${shortHash(_replacementPhoto!.sha256)}',
+                '${_replacementPhoto!.source.label} · neues Foto',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 8),

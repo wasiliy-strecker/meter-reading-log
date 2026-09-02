@@ -193,7 +193,7 @@ void main() {
     );
     expect(find.text('PDF-Nachweis des Verlaufs'), findsOneWidget);
     expect(
-      find.textContaining('allen Ablesungen, Fotos, Korrekturen'),
+      find.textContaining('alle Ablesungen, Fotos und Korrekturen'),
       findsOneWidget,
     );
     await tester.tap(find.text('Verlauf als PDF erstellen'));

@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/app_providers.dart';
 import '../../../app/widgets/confirm_dialog.dart';
+import '../../../core/integrity/integrity_copy.dart';
 import '../../../core/utils/formatters.dart';
 import '../domain/meter.dart';
 import '../domain/meter_reading.dart';
@@ -121,12 +122,7 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
             label: const Text('Einzelnachweis als PDF'),
           ),
           const SizedBox(height: 10),
-          Text(
-            'Der PDF-Nachweis ist lokal manipulationsprüfbar. Er enthält keinen amtlichen Zeitstempel und keine qualifizierte elektronische Signatur.',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
+          const _PdfPurposeCard(),
         ],
       ),
     );
@@ -165,6 +161,46 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
     if (mounted) {
       context.goNamed('meterDetail', pathParameters: {'id': reading.meterId});
     }
+  }
+}
+
+class _PdfPurposeCard extends StatelessWidget {
+  const _PdfPurposeCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Card(
+      color: colors.secondaryContainer.withValues(alpha: 0.55),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.fact_check_outlined, color: colors.primary),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    pdfPurposeTitle,
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const Text(pdfPurposeText),
+            const SizedBox(height: 8),
+            Text(
+              privateDocumentationText,
+              style: TextStyle(color: colors.onSurfaceVariant),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -276,23 +312,50 @@ class _IntegrityCard extends StatelessWidget {
                   color: Theme.of(context).colorScheme.primary,
                 ),
                 const SizedBox(width: 8),
-                const Text(
-                  'Integritätsdaten',
-                  style: TextStyle(fontWeight: FontWeight.w800),
+                const Expanded(
+                  child: Text(
+                    integrityProtectionTitle,
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 10),
+            const Text(integrityBenefitText),
+            const SizedBox(height: 8),
             Text(
-              'SHA-256 ist ein digitaler Fingerabdruck. Schon eine Änderung am Foto oder Datensatz erzeugt einen anderen Wert. Er beweist jedoch nicht, wer das Foto wann aufgenommen hat.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              integrityLimitationText,
+              style: TextStyle(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
-            const SizedBox(height: 12),
-            SelectableText('Foto SHA-256\n${reading.photoSha256}'),
-            const SizedBox(height: 8),
-            SelectableText('Datensatz SHA-256\n${reading.manifestSha256}'),
+            const SizedBox(height: 4),
+            Theme(
+              data: Theme.of(
+                context,
+              ).copyWith(dividerColor: Colors.transparent),
+              child: ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                childrenPadding: const EdgeInsets.only(bottom: 4),
+                leading: const Icon(Icons.fingerprint),
+                title: const Text(technicalChecksTitle),
+                children: [
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: SelectableText(
+                      'Prüfwert des Fotos (SHA-256)\n${reading.photoSha256}',
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: SelectableText(
+                      'Prüfwert der Ablesung (SHA-256)\n${reading.manifestSha256}',
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -400,7 +463,9 @@ class _PhotoHistoryCard extends StatelessWidget {
             const SizedBox(height: 6),
             Align(
               alignment: Alignment.centerLeft,
-              child: SelectableText('Foto SHA-256\n${entry.$2.sha256}'),
+              child: SelectableText(
+                'Prüfwert des Fotos (SHA-256)\n${entry.$2.sha256}',
+              ),
             ),
           ],
         ],

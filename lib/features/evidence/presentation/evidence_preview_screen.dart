@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../core/integrity/integrity_copy.dart';
 import '../application/evidence_report_service.dart';
 
 class EvidencePreviewScreen extends StatelessWidget {
@@ -35,13 +36,25 @@ class EvidencePreviewScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    'PDF SHA-256: ${report.record.pdfSha256}',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall,
+                  Theme(
+                    data: Theme.of(
+                      context,
+                    ).copyWith(dividerColor: Colors.transparent),
+                    child: ExpansionTile(
+                      tilePadding: EdgeInsets.zero,
+                      childrenPadding: const EdgeInsets.only(bottom: 8),
+                      leading: const Icon(Icons.fingerprint),
+                      title: const Text('Technischen PDF-Prüfwert anzeigen'),
+                      children: [
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: SelectableText(
+                            'Prüfwert der PDF (SHA-256)\n${report.record.pdfSha256}',
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 10),
                   Row(
                     children: [
                       Expanded(
@@ -60,7 +73,8 @@ class EvidencePreviewScreen extends StatelessWidget {
                           onPressed: () => SharePlus.instance.share(
                             ShareParams(
                               title: 'Zählerstand-Nachweis',
-                              text: 'PDF SHA-256: ${report.record.pdfSha256}',
+                              text:
+                                  '$pdfPurposeTitle\nTechnischer Prüfwert der PDF (SHA-256): ${report.record.pdfSha256}',
                               files: [
                                 XFile(
                                   File(report.record.filePath).path,

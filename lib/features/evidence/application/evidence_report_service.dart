@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import '../../../core/integrity/integrity_copy.dart';
 import '../../../core/integrity/integrity_service.dart';
 import '../../../core/utils/id_generator.dart';
 import '../../meters/application/meter_services.dart';
@@ -81,7 +82,7 @@ class EvidenceReportService {
           ? 'Zählerstand-Nachweis'
           : 'Zählerstand-Verlauf',
       author: 'ZählerstandLog',
-      subject: 'Lokal erzeugter, manipulationsprüfbarer Zählerstand-Nachweis',
+      subject: 'Private Dokumentation eines Zählerstands',
     );
     final date = DateFormat('dd.MM.yyyy, HH:mm');
     final meter = readings.first.meter;
@@ -111,7 +112,7 @@ class EvidenceReportService {
         footer: (_) => pw.Padding(
           padding: const pw.EdgeInsets.only(top: 10),
           child: pw.Text(
-            'Lokal erzeugt · Kein amtlicher Zeitstempel und keine qualifizierte Signatur.',
+            pdfPrivateDocumentationText,
             style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
           ),
         ),
@@ -339,9 +340,12 @@ class EvidenceReportService {
         ],
       ),
       pw.SizedBox(height: 8),
-      pw.Text('Foto SHA-256: ${reading.photoSha256}', style: _hashStyle),
       pw.Text(
-        'Datensatz SHA-256: ${reading.manifestSha256}',
+        'Prüfwert des Fotos (SHA-256): ${reading.photoSha256}',
+        style: _hashStyle,
+      ),
+      pw.Text(
+        'Prüfwert der Ablesung (SHA-256): ${reading.manifestSha256}',
         style: _hashStyle,
       ),
       for (final entry in reading.photoHistory.indexed) ...[
@@ -359,7 +363,10 @@ class EvidenceReportService {
           '${entry.$2.source.label} · hinzugefügt ${date.format(entry.$2.addedAt.toLocal())}',
           style: const pw.TextStyle(fontSize: 9),
         ),
-        pw.Text('Foto SHA-256: ${entry.$2.sha256}', style: _hashStyle),
+        pw.Text(
+          'Prüfwert des Fotos (SHA-256): ${entry.$2.sha256}',
+          style: _hashStyle,
+        ),
       ],
       if (revisions.isNotEmpty) ...[
         pw.SizedBox(height: 10),
@@ -421,15 +428,18 @@ class EvidenceReportService {
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
           pw.Text(
-            'Integritätsangaben',
+            integrityProtectionTitle,
             style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
           ),
           pw.SizedBox(height: 4),
           pw.Text('Bericht erzeugt: ${date.format(generatedAt)}'),
-          pw.Text('Manifest SHA-256: $manifestSha', style: _hashStyle),
+          pw.Text(
+            'Prüfwert der enthaltenen Daten (SHA-256): $manifestSha',
+            style: _hashStyle,
+          ),
           pw.SizedBox(height: 6),
           pw.Text(
-            'SHA-256 ist ein digitaler Fingerabdruck. Schon eine Änderung am Foto oder Datensatz erzeugt einen anderen Wert. Er beweist jedoch nicht, wer das Foto wann aufgenommen hat. Die Prüfsummen ersetzen keinen amtlichen Zeitstempel und keine qualifizierte elektronische Signatur.',
+            '$pdfIntegrityExplanation $integrityLimitationText',
             style: const pw.TextStyle(fontSize: 9),
           ),
         ],

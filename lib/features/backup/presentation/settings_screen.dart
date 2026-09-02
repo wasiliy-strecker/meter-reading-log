@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../app/app_providers.dart';
+import '../../../core/integrity/integrity_copy.dart';
 import '../application/encrypted_backup_service.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -69,9 +70,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           Card(
             child: ListTile(
               leading: const Icon(Icons.fact_check_outlined),
-              title: const Text('PDF-Integrität prüfen'),
+              title: const Text(pdfVerificationTitle),
               subtitle: const Text(
-                'PDF SHA-256 mit lokalem Export vergleichen',
+                'Erkennen, ob eine von dieser App erstellte PDF verändert wurde',
               ),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.pushNamed('verify'),

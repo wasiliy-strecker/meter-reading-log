@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/app_providers.dart';
 import '../../../app/widgets/confirm_dialog.dart';
+import '../../../core/integrity/integrity_copy.dart';
 import '../../../core/utils/formatters.dart';
 import '../../evidence/application/evidence_report_service.dart';
 import '../../evidence/domain/evidence_export.dart';
@@ -226,9 +227,7 @@ class _HistoryPdfAction extends StatelessWidget {
                         style: TextStyle(fontWeight: FontWeight.w800),
                       ),
                       SizedBox(height: 4),
-                      Text(
-                        'Erstellt eine lokal prüfbare PDF mit allen Ablesungen, Fotos, Korrekturen und SHA-256-Prüfsummen.',
-                      ),
+                      Text(historyPdfPurposeText),
                     ],
                   ),
                 ),

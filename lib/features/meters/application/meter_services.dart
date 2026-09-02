@@ -165,7 +165,7 @@ class MeterReadingService {
       );
     }
     if (replacementPhoto != null && replacementOcr != null) {
-      changes['Foto SHA-256'] = ReadingChange(
+      changes['Prüfwert des Fotos (SHA-256)'] = ReadingChange(
         before: existing.photoSha256,
         after: replacementPhoto.sha256,
       );
