@@ -52,6 +52,18 @@ extension MeterTypeX on MeterType {
   String get defaultUnit => availableUnits.first;
 }
 
+String meterUnitDescription(String unit) => switch (unit) {
+  'kWh' => 'Kilowattstunde – Energieverbrauch oder Erzeugung',
+  'MWh' => 'Megawattstunde – entspricht 1.000 kWh',
+  'Wh' => 'Wattstunde – kleine Energiemenge',
+  'm³' => 'Kubikmeter – Volumen von Gas oder Wasser',
+  'Liter' => 'Liter – Volumen oder Tankinhalt',
+  'GJ' => 'Gigajoule – Einheit für Wärmeenergie',
+  '%' => 'Prozent – relativer Füllstand',
+  'Einheiten' => 'Abrechnungseinheiten ohne physikalische Maßeinheit',
+  _ => 'Gespeicherte Einheit dieses Zählers',
+};
+
 enum ReminderInterval { monthly, yearly }
 
 class ReadingReminderSchedule {

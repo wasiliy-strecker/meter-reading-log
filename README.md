@@ -12,6 +12,8 @@ PDF-Nachweise.
 - Strombezug, PV-Einspeisung, Gas, Wasser, Kalt-/Warmwasser, Wärme,
   Heizkostenverteiler, Heizöl und sonstige Zähler mit Nummer und Standort
 - passende Einheitenauswahl je Zählerart statt fehleranfälliger Freitexteingabe
+- Einheit kann beim Bestätigen einer Ablesung angepasst werden; historische
+  Ablesungen behalten ihre ursprüngliche Einheit
 - unveränderte Ablage des aufgenommenen Originalfotos im privaten App-Speicher
 - lokale ML-Kit-OCR mit Kandidatenauswahl und verpflichtender Bestätigung
 - exakte Dezimalwerte ohne Gleitkomma-Rundungsfehler
