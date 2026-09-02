@@ -9,6 +9,7 @@ import '../../../app/widgets/confirm_dialog.dart';
 import '../../../core/utils/formatters.dart';
 import '../domain/meter.dart';
 import '../domain/meter_reading.dart';
+import 'editable_reading_time_card.dart';
 
 class ReadingDetailScreen extends ConsumerStatefulWidget {
   const ReadingDetailScreen({super.key, required this.readingId});
@@ -90,6 +91,13 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
             ).textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w900),
           ),
           Text('${reading.meter.type.label} · ${reading.meter.label}'),
+          if (reading.wasFutureAtStorage) ...[
+            const SizedBox(height: 12),
+            const FutureReadingTimeNotice(
+              message:
+                  'Beim Speichern lag der angegebene Ablesezeitpunkt in der Zukunft. Der tatsächliche Speicherzeitpunkt bleibt separat erhalten.',
+            ),
+          ],
           const SizedBox(height: 18),
           _InfoCard(reading: reading),
           const SizedBox(height: 12),
@@ -171,7 +179,7 @@ class _InfoCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            _row('Aufnahmezeit', formatDateTime(reading.capturedAt)),
+            _row('Zeitpunkt der Ablesung', formatDateTime(reading.capturedAt)),
             _row('Quelle', reading.source.label),
             _row(
               'OCR-Kandidat',

@@ -186,8 +186,8 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
     final date = await showDatePicker(
       context: context,
       initialDate: _capturedAt,
-      firstDate: DateTime(2000),
-      lastDate: DateTime.now().add(const Duration(days: 1)),
+      firstDate: firstSelectableReadingDate,
+      lastDate: lastSelectableReadingDate,
     );
     if (date == null || !mounted) return;
     final time = await showTimePicker(
@@ -209,6 +209,8 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+    final confirmed = await confirmFutureReadingTime(context, _capturedAt);
+    if (!confirmed || !mounted) return;
     setState(() => _saving = true);
     try {
       final updated = await ref

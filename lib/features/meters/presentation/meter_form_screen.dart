@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/app_providers.dart';
 import '../domain/meter.dart';
+import 'meter_unit_field.dart';
 
 class MeterFormScreen extends ConsumerWidget {
   const MeterFormScreen({super.key, this.meterId});
@@ -140,17 +141,12 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
               textInputAction: TextInputAction.next,
             ),
             const SizedBox(height: 14),
-            DropdownButtonFormField<String>(
-              key: ValueKey('meter-unit-${_type.name}-$_unit'),
-              initialValue: _unit,
-              decoration: const InputDecoration(labelText: 'Einheit *'),
-              items: [
-                for (final unit in _unitOptions)
-                  DropdownMenuItem(value: unit, child: Text(unit)),
-              ],
-              onChanged: (value) {
-                if (value != null) setState(() => _unit = value);
-              },
+            MeterUnitField(
+              meterType: _type,
+              value: _unit,
+              labelText: 'Einheit *',
+              enabled: !_saving,
+              onChanged: (value) => setState(() => _unit = value),
             ),
             const SizedBox(height: 22),
             Card(
@@ -313,11 +309,5 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
       );
       setState(() => _saving = false);
     }
-  }
-
-  List<String> get _unitOptions {
-    final options = [..._type.availableUnits];
-    if (!options.contains(_unit)) options.add(_unit);
-    return options;
   }
 }

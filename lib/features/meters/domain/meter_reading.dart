@@ -65,6 +65,8 @@ class MeterReading {
     return parsed == null || parsed.compareTo(value) != 0;
   }
 
+  bool get wasFutureAtStorage => capturedAt.isAfter(storedAt);
+
   MeterReading copyWith({
     ReadingValue? value,
     DateTime? capturedAt,

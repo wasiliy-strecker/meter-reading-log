@@ -28,41 +28,193 @@ extension MeterTypeX on MeterType {
   };
 
   List<String> get availableUnits => switch (this) {
-    MeterType.electricity => const ['kWh', 'MWh', 'Wh'],
-    MeterType.electricityFeedIn => const ['kWh', 'MWh'],
-    MeterType.gas => const ['m³', 'kWh'],
-    MeterType.water ||
-    MeterType.coldWater ||
-    MeterType.hotWater => const ['m³', 'Liter'],
-    MeterType.heat => const ['kWh', 'MWh', 'GJ'],
-    MeterType.heatingCostAllocator => const ['Einheiten'],
-    MeterType.oil => const ['Liter', '%'],
-    MeterType.other => const [
-      'Einheiten',
+    MeterType.electricity => const ['kWh', 'MWh', 'Wh', 'GWh', 'kvarh', 'kVAh'],
+    MeterType.electricityFeedIn => const [
       'kWh',
       'MWh',
       'Wh',
-      'm³',
-      'Liter',
-      'GJ',
-      '%',
+      'GWh',
+      'kvarh',
+      'kVAh',
     ],
+    MeterType.gas => const ['m³', 'kWh', 'MWh', 'ft³'],
+    MeterType.water ||
+    MeterType.coldWater ||
+    MeterType.hotWater => const ['m³', 'Liter', 'ml'],
+    MeterType.heat => const ['kWh', 'MWh', 'Wh', 'MJ', 'GJ'],
+    MeterType.heatingCostAllocator => const ['Einheiten'],
+    MeterType.oil => const ['Liter', 'm³', '%', 'kg', 't'],
+    MeterType.other => meterUnitCatalogValues,
   };
 
   String get defaultUnit => availableUnits.first;
 }
 
-String meterUnitDescription(String unit) => switch (unit) {
-  'kWh' => 'Kilowattstunde – Energieverbrauch oder Erzeugung',
-  'MWh' => 'Megawattstunde – entspricht 1.000 kWh',
-  'Wh' => 'Wattstunde – kleine Energiemenge',
-  'm³' => 'Kubikmeter – Volumen von Gas oder Wasser',
-  'Liter' => 'Liter – Volumen oder Tankinhalt',
-  'GJ' => 'Gigajoule – Einheit für Wärmeenergie',
-  '%' => 'Prozent – relativer Füllstand',
-  'Einheiten' => 'Abrechnungseinheiten ohne physikalische Maßeinheit',
-  _ => 'Gespeicherte Einheit dieses Zählers',
-};
+enum MeterUnitCategory {
+  energy('Energie'),
+  electrical('Elektrische Spezialwerte'),
+  volume('Volumen'),
+  massAndLevel('Masse und Füllstand'),
+  general('Allgemein');
+
+  const MeterUnitCategory(this.label);
+
+  final String label;
+}
+
+class MeterUnitOption {
+  const MeterUnitOption({
+    required this.value,
+    required this.description,
+    required this.category,
+  });
+
+  final String value;
+  final String description;
+  final MeterUnitCategory category;
+}
+
+const meterUnitCatalog = <MeterUnitOption>[
+  MeterUnitOption(
+    value: 'Wh',
+    description: 'Wattstunde – kleine Energiemenge',
+    category: MeterUnitCategory.energy,
+  ),
+  MeterUnitOption(
+    value: 'kWh',
+    description: 'Kilowattstunde – Energieverbrauch oder Erzeugung',
+    category: MeterUnitCategory.energy,
+  ),
+  MeterUnitOption(
+    value: 'MWh',
+    description: 'Megawattstunde – entspricht 1.000 kWh',
+    category: MeterUnitCategory.energy,
+  ),
+  MeterUnitOption(
+    value: 'GWh',
+    description: 'Gigawattstunde – entspricht 1.000 MWh',
+    category: MeterUnitCategory.energy,
+  ),
+  MeterUnitOption(
+    value: 'kJ',
+    description: 'Kilojoule – kleine Wärme- oder Energiemenge',
+    category: MeterUnitCategory.energy,
+  ),
+  MeterUnitOption(
+    value: 'MJ',
+    description: 'Megajoule – Wärme- oder Energiemenge',
+    category: MeterUnitCategory.energy,
+  ),
+  MeterUnitOption(
+    value: 'GJ',
+    description: 'Gigajoule – Einheit für Wärmeenergie',
+    category: MeterUnitCategory.energy,
+  ),
+  MeterUnitOption(
+    value: 'varh',
+    description: 'Varstunde – elektrische Blindenergie',
+    category: MeterUnitCategory.electrical,
+  ),
+  MeterUnitOption(
+    value: 'kvarh',
+    description: 'Kilovarstunde – elektrische Blindenergie',
+    category: MeterUnitCategory.electrical,
+  ),
+  MeterUnitOption(
+    value: 'Mvarh',
+    description: 'Megavarstunde – elektrische Blindenergie',
+    category: MeterUnitCategory.electrical,
+  ),
+  MeterUnitOption(
+    value: 'VAh',
+    description: 'Voltampere-Stunde – elektrische Scheinenergie',
+    category: MeterUnitCategory.electrical,
+  ),
+  MeterUnitOption(
+    value: 'kVAh',
+    description: 'Kilovoltampere-Stunde – elektrische Scheinenergie',
+    category: MeterUnitCategory.electrical,
+  ),
+  MeterUnitOption(
+    value: 'MVAh',
+    description: 'Megavoltampere-Stunde – elektrische Scheinenergie',
+    category: MeterUnitCategory.electrical,
+  ),
+  MeterUnitOption(
+    value: 'ml',
+    description: 'Milliliter – kleine Flüssigkeitsmenge',
+    category: MeterUnitCategory.volume,
+  ),
+  MeterUnitOption(
+    value: 'Liter',
+    description: 'Liter – Volumen oder Tankinhalt',
+    category: MeterUnitCategory.volume,
+  ),
+  MeterUnitOption(
+    value: 'm³',
+    description: 'Kubikmeter – Volumen von Gas oder Wasser',
+    category: MeterUnitCategory.volume,
+  ),
+  MeterUnitOption(
+    value: 'ft³',
+    description: 'Kubikfuß – angloamerikanische Volumeneinheit',
+    category: MeterUnitCategory.volume,
+  ),
+  MeterUnitOption(
+    value: 'kg',
+    description: 'Kilogramm – Masse oder Vorratsmenge',
+    category: MeterUnitCategory.massAndLevel,
+  ),
+  MeterUnitOption(
+    value: 't',
+    description: 'Tonne – entspricht 1.000 kg',
+    category: MeterUnitCategory.massAndLevel,
+  ),
+  MeterUnitOption(
+    value: '%',
+    description: 'Prozent – relativer Füllstand',
+    category: MeterUnitCategory.massAndLevel,
+  ),
+  MeterUnitOption(
+    value: 'Einheiten',
+    description: 'Abrechnungseinheiten ohne physikalische Maßeinheit',
+    category: MeterUnitCategory.general,
+  ),
+  MeterUnitOption(
+    value: 'Impulse',
+    description: 'Gezählte elektrische oder mechanische Impulse',
+    category: MeterUnitCategory.general,
+  ),
+  MeterUnitOption(
+    value: 'Stück',
+    description: 'Gezählte Anzahl einzelner Elemente',
+    category: MeterUnitCategory.general,
+  ),
+  MeterUnitOption(
+    value: 'h',
+    description: 'Stunden – zum Beispiel für Betriebsstundenzähler',
+    category: MeterUnitCategory.general,
+  ),
+  MeterUnitOption(
+    value: 'km',
+    description: 'Kilometer – zurückgelegte Strecke',
+    category: MeterUnitCategory.general,
+  ),
+];
+
+final meterUnitCatalogValues = List<String>.unmodifiable(
+  meterUnitCatalog.map((option) => option.value),
+);
+
+MeterUnitOption? meterUnitOption(String unit) {
+  for (final option in meterUnitCatalog) {
+    if (option.value == unit) return option;
+  }
+  return null;
+}
+
+String meterUnitDescription(String unit) =>
+    meterUnitOption(unit)?.description ?? 'Eigene Einheit dieses Zählers';
 
 enum ReminderInterval { monthly, yearly }
 

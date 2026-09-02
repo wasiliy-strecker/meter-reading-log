@@ -22,9 +22,29 @@ void main() {
     expect(MeterType.values, contains(MeterType.heatingCostAllocator));
     expect(MeterType.values, contains(MeterType.oil));
     expect(MeterType.values, contains(MeterType.other));
+    expect(
+      MeterType.electricity.availableUnits,
+      containsAll(['Wh', 'kWh', 'MWh', 'GWh', 'kvarh', 'kVAh']),
+    );
     expect(MeterType.gas.availableUnits, containsAll(['m³', 'kWh']));
     expect(MeterType.heat.availableUnits, containsAll(['kWh', 'MWh', 'GJ']));
     expect(meterUnitDescription('GJ'), 'Gigajoule – Einheit für Wärmeenergie');
     expect(MeterType.oil.availableUnits, containsAll(['Liter', '%']));
   });
+
+  test(
+    'full unit catalog is unique, explained and available to other meters',
+    () {
+      final values = meterUnitCatalog.map((option) => option.value).toList();
+
+      expect(values.toSet(), hasLength(values.length));
+      expect(values, containsAll(['GWh', 'kvarh', 'kVAh', 'ft³', 'h', 'km']));
+      expect(MeterType.other.availableUnits, values);
+      for (final option in meterUnitCatalog) {
+        expect(option.description, isNotEmpty);
+        expect(meterUnitDescription(option.value), option.description);
+      }
+      expect(meterUnitDescription('Zyklen'), 'Eigene Einheit dieses Zählers');
+    },
+  );
 }

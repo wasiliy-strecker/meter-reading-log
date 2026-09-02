@@ -11,7 +11,8 @@ PDF-Nachweise.
 
 - Strombezug, PV-Einspeisung, Gas, Wasser, Kalt-/Warmwasser, Wärme,
   Heizkostenverteiler, Heizöl und sonstige Zähler mit Nummer und Standort
-- passende Einheitenauswahl je Zählerart statt fehleranfälliger Freitexteingabe
+- passende Einheitenauswahl je Zählerart, durchsuchbarer Gesamtkatalog und
+  optionale eigene Einheiten
 - Einheit kann beim Bestätigen einer Ablesung angepasst werden; historische
   Ablesungen behalten ihre ursprüngliche Einheit
 - unveränderte Ablage des aufgenommenen Originalfotos im privaten App-Speicher
@@ -19,6 +20,8 @@ PDF-Nachweise.
 - exakte Dezimalwerte ohne Gleitkomma-Rundungsfehler
 - chronologischer Verlauf mit Verbrauchsdifferenzen
 - begründete, append-only protokollierte Korrekturen
+- Ablesezeitpunkte bis Ende 2100 mit transparenter Kennzeichnung zukünftiger
+  Angaben in App und PDF
 - Einzel- und Verlaufs-PDFs mit Foto-, Datensatz- und Manifest-Prüfsummen
 - lokale Prüfung exportierter PDFs über den gespeicherten SHA-256-Wert
 - optionale monatliche oder jährliche Android-Erinnerungen
@@ -31,8 +34,9 @@ kanonischen Datenmanifests und jeder erzeugten PDF. Damit lassen sich spätere
 Änderungen gegenüber den lokal gespeicherten Exportdatensätzen erkennen.
 
 Das ist kein amtlicher Zeitstempel, keine qualifizierte elektronische Signatur
-und keine Garantie gerichtlicher Beweiskraft. Aufnahmezeit und Zeitzone stammen
-vom Gerät. Galerieimporte werden im Nachweis ausdrücklich als solche markiert.
+und keine Garantie gerichtlicher Beweiskraft. Ablesezeitpunkt und Zeitzone
+stammen vom Gerät. Galerieimporte werden im Nachweis ausdrücklich als solche
+markiert.
 
 ## Datenschutz
 
