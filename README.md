@@ -4,8 +4,8 @@
 
 ZählerstandLog ist eine Android-first Flutter-App für private Haushalte. Sie
 fotografiert Strom-, Gas- und Wasserzähler, erkennt mögliche Zählerstände lokal
-per OCR, speichert den bestätigten Verlauf und erzeugt manipulationsprüfbare
-PDF-Nachweise.
+per OCR, speichert den bestätigten Verlauf und erzeugt PDF-Nachweise, bei denen
+spätere Dateiänderungen erkannt werden können.
 
 ## Funktionen
 
@@ -22,21 +22,23 @@ PDF-Nachweise.
 - begründete, append-only protokollierte Korrekturen
 - Ablesezeitpunkte bis Ende 2100 mit transparenter Kennzeichnung zukünftiger
   Angaben in App und PDF
-- Einzel- und Verlaufs-PDFs mit Foto-, Datensatz- und Manifest-Prüfsummen
-- lokale Prüfung exportierter PDFs über den gespeicherten SHA-256-Wert
+- Einzel- und Verlaufs-PDFs mit Fotos, Korrekturen und technischen Prüfwerten
+- lokale Prüfung, ob eine von der App erstellte PDF später verändert wurde
 - optionale monatliche oder jährliche Android-Erinnerungen
 - passwortgeschütztes AES-256-GCM-Backup einschließlich Fotos und PDFs
 
 ## Aussagekraft der Nachweise
 
-Die App speichert den SHA-256-Wert des unveränderten Originalfotos, eines
-kanonischen Datenmanifests und jeder erzeugten PDF. Damit lassen sich spätere
-Änderungen gegenüber den lokal gespeicherten Exportdatensätzen erkennen.
+Die App merkt sich beim Erstellen technische Prüfwerte für Fotos, Ablesungen
+und PDFs. Ein solcher SHA-256-Prüfwert funktioniert wie ein digitaler
+Fingerabdruck: Wird der Inhalt später verändert, passt der Prüfwert nicht mehr.
+So können nachträgliche Änderungen erkannt werden.
 
-Das ist kein amtlicher Zeitstempel, keine qualifizierte elektronische Signatur
-und keine Garantie gerichtlicher Beweiskraft. Ablesezeitpunkt und Zeitzone
-stammen vom Gerät. Galerieimporte werden im Nachweis ausdrücklich als solche
-markiert.
+Die PDFs dienen der privaten Dokumentation. Die Prüfwerte bestätigen nicht,
+wann oder von wem ein Foto aufgenommen wurde. Sie sind keine amtliche
+Bestätigung, keine digitale Unterschrift und keine Garantie gerichtlicher
+Beweiskraft. Ablesezeitpunkt und Zeitzone stammen vom Gerät. Galerieimporte
+werden im Nachweis ausdrücklich als solche markiert.
 
 ## Datenschutz
 

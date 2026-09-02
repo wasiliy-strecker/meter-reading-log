@@ -50,7 +50,10 @@ void main() {
 
       final revisions = await repository.loadRevisions(existing.id);
       expect(revisions, hasLength(1));
-      expect(revisions.single.changes, contains('Foto SHA-256'));
+      expect(
+        revisions.single.changes,
+        contains('Prüfwert des Fotos (SHA-256)'),
+      );
       expect(revisions.single.changes, contains('OCR-Kandidat'));
 
       await service.delete(updated);

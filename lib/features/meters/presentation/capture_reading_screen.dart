@@ -8,7 +8,6 @@ import 'package:go_router/go_router.dart';
 import '../../../app/app_providers.dart';
 import '../../../core/files/meter_photo_repository.dart';
 import '../../../core/ocr/meter_ocr_repository.dart';
-import '../../../core/utils/formatters.dart';
 import '../domain/meter.dart';
 import '../domain/meter_reading.dart';
 import '../domain/reading_value.dart';
@@ -134,7 +133,7 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                '${_photo!.source.label} · Original SHA-256 ${shortHash(_photo!.sha256)}',
+                '${_photo!.source.label} · Foto lokal gespeichert',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 10),
