@@ -49,6 +49,15 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
+          Text(
+            reading.photoHistory.isEmpty
+                ? 'Nachweisfoto'
+                : 'Aktuelles Nachweisfoto',
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 8),
           ClipRRect(
             borderRadius: BorderRadius.circular(18),
             child: AspectRatio(
@@ -63,6 +72,10 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
               ),
             ),
           ),
+          if (reading.photoHistory.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _PhotoHistoryCard(versions: reading.photoHistory),
+          ],
           const SizedBox(height: 16),
           Text(
             '${reading.value.displayText} ${reading.meter.unit}',
@@ -145,7 +158,7 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
       context,
       title: 'Ablesung löschen?',
       message:
-          'Ablesung, Originalfoto und Änderungsprotokoll werden dauerhaft gelöscht. Bereits erzeugte PDF-Nachweise bleiben als eigenständige Dateien erhalten.',
+          'Ablesung, alle Foto-Versionen und das Änderungsprotokoll werden dauerhaft gelöscht. Bereits erzeugte PDF-Nachweise bleiben als eigenständige Dateien erhalten.',
     );
     if (!confirmed) return;
     await ref.read(meterReadingServiceProvider).delete(reading);
@@ -270,6 +283,13 @@ class _IntegrityCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 10),
+            Text(
+              'SHA-256 ist ein digitaler Fingerabdruck. Schon eine Änderung am Foto oder Datensatz erzeugt einen anderen Wert. Er beweist jedoch nicht, wer das Foto wann aufgenommen hat.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 12),
             SelectableText('Foto SHA-256\n${reading.photoSha256}'),
             const SizedBox(height: 8),
             SelectableText('Datensatz SHA-256\n${reading.manifestSha256}'),
@@ -313,13 +333,77 @@ class _RevisionCard extends StatelessWidget {
                       ),
                       for (final change in revision.changes.entries)
                         Text(
-                          '${change.key}: „${change.value.before}“ → „${change.value.after}“',
+                          '${change.key}: „${_displayValue(change.key, change.value.before)}“ → „${_displayValue(change.key, change.value.after)}“',
                         ),
                     ],
                   ),
                 ),
           ],
         ),
+      ),
+    );
+  }
+
+  String _displayValue(String key, String value) {
+    if (key.contains('SHA-256') && value.length > 12) return shortHash(value);
+    return value;
+  }
+}
+
+class _PhotoHistoryCard extends StatelessWidget {
+  const _PhotoHistoryCard({required this.versions});
+
+  final List<ReadingPhotoVersion> versions;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ExpansionTile(
+        leading: const Icon(Icons.photo_library_outlined),
+        title: Text('Frühere Fotos (${versions.length})'),
+        subtitle: const Text('Originale bleiben unverändert erhalten'),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        children: [
+          for (final entry in versions.indexed) ...[
+            const Divider(),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                entry.$1 == 0
+                    ? 'Ursprüngliches Foto'
+                    : 'Frühere Foto-Version ${entry.$1 + 1}',
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: AspectRatio(
+                aspectRatio: 4 / 3,
+                child: Image.file(
+                  File(entry.$2.path),
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, _, _) => const ColoredBox(
+                    color: Colors.black12,
+                    child: Center(child: Icon(Icons.broken_image_outlined)),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                '${entry.$2.source.label} · hinzugefügt ${formatDateTime(entry.$2.addedAt)}',
+              ),
+            ),
+            const SizedBox(height: 6),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: SelectableText('Foto SHA-256\n${entry.$2.sha256}'),
+            ),
+          ],
+        ],
       ),
     );
   }

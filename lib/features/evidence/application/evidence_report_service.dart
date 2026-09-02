@@ -219,10 +219,7 @@ class EvidenceReportService {
     Map<String, List<ReadingRevision>> revisions,
   ) async {
     final normalizedReadings = readings.map((reading) {
-      final value = reading.toJson()
-        ..remove('photoPath')
-        ..remove('manifestSha256');
-      return value;
+      return integrity.normalizedReadingData(reading);
     }).toList();
     final normalizedRevisions = <String, Object?>{
       for (final reading in readings)
@@ -232,7 +229,7 @@ class EvidenceReportService {
     };
     return integrity.sha256Text(
       integrity.canonicalJson({
-        'schema': 'meter_reading_evidence_v1',
+        'schema': 'meter_reading_evidence_v2',
         'readings': normalizedReadings,
         'revisions': normalizedRevisions,
       }),
@@ -297,6 +294,13 @@ class EvidenceReportService {
           style: pw.TextStyle(fontSize: 15, fontWeight: pw.FontWeight.bold),
         ),
       if (includeHeading) pw.SizedBox(height: 8),
+      pw.Text(
+        reading.photoHistory.isEmpty
+            ? 'Nachweisfoto'
+            : 'Aktuelles Nachweisfoto',
+        style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+      ),
+      pw.SizedBox(height: 6),
       _photo(reading.photoPath),
       pw.SizedBox(height: 10),
       pw.TableHelper.fromTextArray(
@@ -311,6 +315,10 @@ class EvidenceReportService {
             '${date.format(reading.capturedAt.toLocal())} (${_offset(reading.timezoneOffsetMinutes)})',
           ],
           ['Gespeichert', date.format(reading.storedAt.toLocal())],
+          [
+            'Aktuelles Foto hinzugefügt',
+            date.format(reading.effectivePhotoAddedAt.toLocal()),
+          ],
           if (futureReadingEvidenceNotice(reading) case final notice?)
             ['Hinweis', notice],
           ['Quelle', reading.source.label],
@@ -336,6 +344,23 @@ class EvidenceReportService {
         'Datensatz SHA-256: ${reading.manifestSha256}',
         style: _hashStyle,
       ),
+      for (final entry in reading.photoHistory.indexed) ...[
+        pw.SizedBox(height: 14),
+        pw.Text(
+          entry.$1 == 0
+              ? 'Ursprüngliches Foto'
+              : 'Frühere Foto-Version ${entry.$1 + 1}',
+          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+        ),
+        pw.SizedBox(height: 6),
+        _photo(entry.$2.path),
+        pw.SizedBox(height: 6),
+        pw.Text(
+          '${entry.$2.source.label} · hinzugefügt ${date.format(entry.$2.addedAt.toLocal())}',
+          style: const pw.TextStyle(fontSize: 9),
+        ),
+        pw.Text('Foto SHA-256: ${entry.$2.sha256}', style: _hashStyle),
+      ],
       if (revisions.isNotEmpty) ...[
         pw.SizedBox(height: 10),
         pw.Text(
@@ -404,7 +429,7 @@ class EvidenceReportService {
           pw.Text('Manifest SHA-256: $manifestSha', style: _hashStyle),
           pw.SizedBox(height: 6),
           pw.Text(
-            'Die Prüfsummen machen nachträgliche Änderungen gegenüber den lokal gespeicherten Originalen erkennbar. Sie belegen weder die Echtheit des Ablesezeitpunkts noch ersetzen sie einen amtlichen Zeitstempel oder eine qualifizierte elektronische Signatur.',
+            'SHA-256 ist ein digitaler Fingerabdruck. Schon eine Änderung am Foto oder Datensatz erzeugt einen anderen Wert. Er beweist jedoch nicht, wer das Foto wann aufgenommen hat. Die Prüfsummen ersetzen keinen amtlichen Zeitstempel und keine qualifizierte elektronische Signatur.',
             style: const pw.TextStyle(fontSize: 9),
           ),
         ],

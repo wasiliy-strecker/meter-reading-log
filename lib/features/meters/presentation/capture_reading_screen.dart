@@ -29,6 +29,7 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
   final _formKey = GlobalKey<FormState>();
   final _value = TextEditingController();
   final _note = TextEditingController();
+  late final MeterPhotoCaptureRepository _photos;
   StoredMeterPhoto? _photo;
   MeterOcrResult? _ocr;
   String _selectedCandidate = '';
@@ -41,15 +42,14 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
   @override
   void initState() {
     super.initState();
+    _photos = ref.read(meterPhotoCaptureRepositoryProvider);
     WidgetsBinding.instance.addPostFrameCallback((_) => _recoverLostCapture());
   }
 
   @override
   void dispose() {
     if (!_saved && _photo != null) {
-      unawaited(
-        ref.read(meterPhotoCaptureRepositoryProvider).delete(_photo!.path),
-      );
+      unawaited(_photos.delete(_photo!.path));
     }
     _value.dispose();
     _note.dispose();

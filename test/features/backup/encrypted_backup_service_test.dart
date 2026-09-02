@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -19,15 +20,33 @@ void main() {
     addTearDown(() => temp.delete(recursive: true));
     const integrity = IntegrityService();
     final photo = File('${temp.path}/photo.jpg')..writeAsStringSync('photo');
+    final olderPhoto = File('${temp.path}/older-photo.jpg')
+      ..writeAsStringSync('older photo');
     final pdf = File('${temp.path}/proof.pdf')..writeAsStringSync('%PDF proof');
     final photoHash = await integrity.sha256Bytes(await photo.readAsBytes());
+    final olderPhotoHash = await integrity.sha256Bytes(
+      await olderPhoto.readAsBytes(),
+    );
     final pdfHash = await integrity.sha256Bytes(await pdf.readAsBytes());
 
     final sourceMeters = MemoryMeterRepository();
     final sourceReadings = MemoryReadingRepository();
     final sourceExports = MemoryEvidenceExportRepository();
     final meter = _meter();
-    final reading = _reading(meter, photo.path, photoHash);
+    final reading = _reading(meter, photo.path, photoHash).copyWith(
+      photoHistory: [
+        ReadingPhotoVersion(
+          id: 'photo_version_1',
+          path: olderPhoto.path,
+          sha256: olderPhotoHash,
+          source: ReadingSource.camera,
+          addedAt: DateTime.utc(2026, 8, 30, 10),
+          ocrRawText: '41,9',
+          ocrCandidate: '41,9',
+          ocrConfidence: 0.8,
+        ),
+      ],
+    );
     await sourceMeters.save(meter);
     await sourceReadings.save(reading);
     await sourceReadings.saveRevision(
@@ -65,6 +84,16 @@ void main() {
     final backup = await source.create('sicheres-passwort');
     expect(await File(backup.path).exists(), isTrue);
     expect(backup.preview.readingCount, 1);
+    final legacyEnvelope = Map<String, dynamic>.from(
+      jsonDecode(await File(backup.path).readAsString()) as Map,
+    )..['schemaVersion'] = 1;
+    final legacyPath =
+        '${temp.path}/legacy.${EncryptedBackupService.extension}';
+    await File(legacyPath).writeAsString(jsonEncode(legacyEnvelope));
+    expect(
+      (await source.inspect(legacyPath, 'sicheres-passwort')).readingCount,
+      1,
+    );
 
     final targetRoot = Directory('${temp.path}/restored')..createSync();
     final targetMeters = MemoryMeterRepository();
@@ -91,6 +120,13 @@ void main() {
       ).exists(),
       isTrue,
     );
+    final restoredReading = (await targetReadings.findById(reading.id))!;
+    expect(restoredReading.photoHistory, hasLength(1));
+    expect(
+      await File(restoredReading.photoHistory.single.path).exists(),
+      isTrue,
+    );
+    expect(restoredReading.photoHistory.single.sha256, olderPhotoHash);
 
     await expectLater(
       target.inspect(backup.path, 'falsches-passwort'),

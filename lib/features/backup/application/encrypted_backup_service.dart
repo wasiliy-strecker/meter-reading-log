@@ -88,7 +88,7 @@ class EncryptedBackupService {
 
   static const extension = 'zslbackup';
   static const _format = 'meter_reading_log_backup';
-  static const _version = 1;
+  static const _version = 2;
   static const _minimumPasswordLength = 10;
 
   final MeterRepository meters;
@@ -127,6 +127,17 @@ class EncryptedBackupService {
         );
       }
       files.add(portable);
+      for (final version in reading.photoHistory) {
+        final archived = await _portableFile(
+          kind: 'photoVersion',
+          ownerId: version.id,
+          path: version.path,
+        );
+        if (archived['sha256'] != version.sha256) {
+          throw BackupException(BackupFailure.integrityMismatch, version.path);
+        }
+        files.add(archived);
+      }
     }
     for (final export in allExports) {
       final portable = await _portableFile(
@@ -229,7 +240,28 @@ class EncryptedBackupService {
         portable,
         Directory(p.join(documents.path, 'meter_photos')),
       );
-      reading = reading.copyWith(photoPath: restoredPath);
+      final restoredHistory = <ReadingPhotoVersion>[];
+      for (final version in reading.photoHistory) {
+        final archived = files['photoVersion:${version.id}'];
+        if (archived == null) {
+          throw BackupException(BackupFailure.invalidFormat, version.id);
+        }
+        if (archived['sha256'] != version.sha256) {
+          throw BackupException(BackupFailure.integrityMismatch, version.id);
+        }
+        restoredHistory.add(
+          version.copyWith(
+            path: await _restoreFile(
+              archived,
+              Directory(p.join(documents.path, 'meter_photos')),
+            ),
+          ),
+        );
+      }
+      reading = reading.copyWith(
+        photoPath: restoredPath,
+        photoHistory: restoredHistory,
+      );
       await readings.save(reading);
       final rawRevisions = revisionsMap[reading.id] as List? ?? const [];
       for (final rawRevision in rawRevisions) {
@@ -359,8 +391,11 @@ class EncryptedBackupService {
     } on Object {
       throw const BackupException(BackupFailure.invalidFormat);
     }
+    final schemaVersion = (envelope['schemaVersion'] as num?)?.toInt();
     if (envelope['format'] != _format ||
-        (envelope['schemaVersion'] as num?)?.toInt() != _version) {
+        schemaVersion == null ||
+        schemaVersion < 1 ||
+        schemaVersion > _version) {
       throw const BackupException(BackupFailure.unsupportedVersion);
     }
     try {

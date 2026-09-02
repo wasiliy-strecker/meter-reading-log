@@ -16,13 +16,30 @@ void main() {
     final temp = await Directory.systemTemp.createTemp('evidence_test_');
     addTearDown(() => temp.delete(recursive: true));
     final photo = File('${temp.path}/photo.jpg');
+    final olderPhoto = File('${temp.path}/older-photo.jpg');
     await photo.writeAsBytes(img.encodeJpg(img.Image(width: 20, height: 20)));
+    await olderPhoto.writeAsBytes(
+      img.encodeJpg(img.Image(width: 18, height: 18)),
+    );
     final repository = MemoryEvidenceExportRepository();
     final service = EvidenceReportService(
       exports: repository,
       documentsDirectoryProvider: () async => temp,
     );
-    final reading = _reading(photo.path);
+    final reading = _reading(photo.path).copyWith(
+      photoHistory: [
+        ReadingPhotoVersion(
+          id: 'photo_version_1',
+          path: olderPhoto.path,
+          sha256: 'c' * 64,
+          source: ReadingSource.gallery,
+          addedAt: DateTime.utc(2026, 8, 30, 10),
+          ocrRawText: '00122,9',
+          ocrCandidate: '00122,9',
+          ocrConfidence: 0.8,
+        ),
+      ],
+    );
 
     final report = await service.createSingle(
       reading: reading,

@@ -21,6 +21,63 @@ extension LowerReadingReasonX on LowerReadingReason {
   };
 }
 
+class ReadingPhotoVersion {
+  const ReadingPhotoVersion({
+    required this.id,
+    required this.path,
+    required this.sha256,
+    required this.source,
+    required this.addedAt,
+    required this.ocrRawText,
+    required this.ocrCandidate,
+    this.ocrConfidence,
+  });
+
+  final String id;
+  final String path;
+  final String sha256;
+  final ReadingSource source;
+  final DateTime addedAt;
+  final String ocrRawText;
+  final String ocrCandidate;
+  final double? ocrConfidence;
+
+  ReadingPhotoVersion copyWith({String? path}) => ReadingPhotoVersion(
+    id: id,
+    path: path ?? this.path,
+    sha256: sha256,
+    source: source,
+    addedAt: addedAt,
+    ocrRawText: ocrRawText,
+    ocrCandidate: ocrCandidate,
+    ocrConfidence: ocrConfidence,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'path': path,
+    'sha256': sha256,
+    'source': source.name,
+    'addedAt': addedAt.toUtc().toIso8601String(),
+    'ocrRawText': ocrRawText,
+    'ocrCandidate': ocrCandidate,
+    'ocrConfidence': ocrConfidence,
+  };
+
+  factory ReadingPhotoVersion.fromJson(Map<String, dynamic> json) {
+    return ReadingPhotoVersion(
+      id: json['id'] as String,
+      path: json['path'] as String,
+      sha256: json['sha256'] as String,
+      source: ReadingSource.values.byName(json['source'] as String),
+      addedAt: DateTime.parse(json['addedAt'] as String),
+      ocrRawText: json['ocrRawText'] as String? ?? '',
+      ocrCandidate: json['ocrCandidate'] as String? ?? '',
+      ocrConfidence: (json['ocrConfidence'] as num?)?.toDouble(),
+    );
+  }
+}
+
 class MeterReading {
   const MeterReading({
     required this.id,
@@ -38,6 +95,8 @@ class MeterReading {
     required this.ocrCandidate,
     required this.manifestSha256,
     this.ocrConfidence,
+    this.photoAddedAt,
+    this.photoHistory = const [],
     this.lowerReadingReason,
     this.note = '',
   });
@@ -56,6 +115,8 @@ class MeterReading {
   final String ocrRawText;
   final String ocrCandidate;
   final double? ocrConfidence;
+  final DateTime? photoAddedAt;
+  final List<ReadingPhotoVersion> photoHistory;
   final LowerReadingReason? lowerReadingReason;
   final String note;
   final String manifestSha256;
@@ -67,12 +128,43 @@ class MeterReading {
 
   bool get wasFutureAtStorage => capturedAt.isAfter(storedAt);
 
+  DateTime get effectivePhotoAddedAt => photoAddedAt ?? storedAt;
+
+  ReadingPhotoVersion get currentPhotoVersion => ReadingPhotoVersion(
+    id: '${id}_current_photo',
+    path: photoPath,
+    sha256: photoSha256,
+    source: source,
+    addedAt: effectivePhotoAddedAt,
+    ocrRawText: ocrRawText,
+    ocrCandidate: ocrCandidate,
+    ocrConfidence: ocrConfidence,
+  );
+
+  List<ReadingPhotoVersion> get allPhotoVersions => [
+    ...photoHistory,
+    currentPhotoVersion,
+  ];
+
+  Set<String> get allPhotoPaths => {
+    photoPath,
+    ...photoHistory.map((version) => version.path),
+  };
+
   MeterReading copyWith({
     ReadingValue? value,
     DateTime? capturedAt,
     int? timezoneOffsetMinutes,
     DateTime? updatedAt,
+    ReadingSource? source,
     String? photoPath,
+    String? photoSha256,
+    String? ocrRawText,
+    String? ocrCandidate,
+    double? ocrConfidence,
+    bool clearOcrConfidence = false,
+    DateTime? photoAddedAt,
+    List<ReadingPhotoVersion>? photoHistory,
     LowerReadingReason? lowerReadingReason,
     bool clearLowerReadingReason = false,
     String? note,
@@ -88,12 +180,16 @@ class MeterReading {
           timezoneOffsetMinutes ?? this.timezoneOffsetMinutes,
       storedAt: storedAt,
       updatedAt: updatedAt ?? this.updatedAt,
-      source: source,
+      source: source ?? this.source,
       photoPath: photoPath ?? this.photoPath,
-      photoSha256: photoSha256,
-      ocrRawText: ocrRawText,
-      ocrCandidate: ocrCandidate,
-      ocrConfidence: ocrConfidence,
+      photoSha256: photoSha256 ?? this.photoSha256,
+      ocrRawText: ocrRawText ?? this.ocrRawText,
+      ocrCandidate: ocrCandidate ?? this.ocrCandidate,
+      ocrConfidence: clearOcrConfidence
+          ? null
+          : ocrConfidence ?? this.ocrConfidence,
+      photoAddedAt: photoAddedAt ?? this.photoAddedAt,
+      photoHistory: photoHistory ?? this.photoHistory,
       lowerReadingReason: clearLowerReadingReason
           ? null
           : lowerReadingReason ?? this.lowerReadingReason,
@@ -117,6 +213,8 @@ class MeterReading {
     'ocrRawText': ocrRawText,
     'ocrCandidate': ocrCandidate,
     'ocrConfidence': ocrConfidence,
+    'photoAddedAt': photoAddedAt?.toUtc().toIso8601String(),
+    'photoHistory': photoHistory.map((version) => version.toJson()).toList(),
     'lowerReadingReason': lowerReadingReason?.name,
     'note': note,
     'manifestSha256': manifestSha256,
@@ -143,6 +241,18 @@ class MeterReading {
       ocrRawText: json['ocrRawText'] as String? ?? '',
       ocrCandidate: json['ocrCandidate'] as String? ?? '',
       ocrConfidence: (json['ocrConfidence'] as num?)?.toDouble(),
+      photoAddedAt: json['photoAddedAt'] == null
+          ? null
+          : DateTime.parse(json['photoAddedAt'] as String),
+      photoHistory:
+          (json['photoHistory'] as List?)
+              ?.map(
+                (item) => ReadingPhotoVersion.fromJson(
+                  Map<String, dynamic>.from(item as Map),
+                ),
+              )
+              .toList(growable: false) ??
+          const [],
       lowerReadingReason: lowerReason == null
           ? null
           : LowerReadingReason.values.byName(lowerReason),

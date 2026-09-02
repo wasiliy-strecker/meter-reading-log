@@ -1,8 +1,15 @@
+import 'dart:async';
+
+import 'package:universal_io/io.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/app_providers.dart';
+import '../../../core/files/meter_photo_repository.dart';
+import '../../../core/ocr/meter_ocr_repository.dart';
+import '../../../core/utils/formatters.dart';
 import '../domain/meter_reading.dart';
 import '../domain/reading_value.dart';
 import 'editable_reading_time_card.dart';
@@ -45,21 +52,34 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
   late final TextEditingController _value;
   late final TextEditingController _note;
   final _reason = TextEditingController();
+  late final MeterPhotoCaptureRepository _photos;
+  late final MeterOcrRepository _ocrRepository;
   late DateTime _capturedAt;
   LowerReadingReason? _lowerReason;
+  StoredMeterPhoto? _replacementPhoto;
+  MeterOcrResult? _replacementOcr;
+  String _selectedCandidate = '';
+  bool _processingPhoto = false;
   bool _saving = false;
+  bool _saved = false;
 
   @override
   void initState() {
     super.initState();
+    _photos = ref.read(meterPhotoCaptureRepositoryProvider);
+    _ocrRepository = ref.read(meterOcrRepositoryProvider);
     _value = TextEditingController(text: widget.reading.value.displayText);
     _note = TextEditingController(text: widget.reading.note);
     _capturedAt = widget.reading.capturedAt.toLocal();
     _lowerReason = widget.reading.lowerReadingReason;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _recoverLostCapture());
   }
 
   @override
   void dispose() {
+    if (!_saved && _replacementPhoto != null) {
+      unawaited(_photos.delete(_replacementPhoto!.path));
+    }
     _value.dispose();
     _note.dispose();
     _reason.dispose();
@@ -109,6 +129,8 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
                 ),
               ),
             ),
+            const SizedBox(height: 14),
+            _buildPhotoCorrection(context),
             const SizedBox(height: 14),
             TextFormField(
               controller: _value,
@@ -166,7 +188,7 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
             ),
             const SizedBox(height: 22),
             FilledButton.icon(
-              onPressed: _saving ? null : _save,
+              onPressed: _saving || _processingPhoto ? null : _save,
               icon: _saving
                   ? const SizedBox.square(
                       dimension: 18,
@@ -179,6 +201,212 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
         ),
       ),
     );
+  }
+
+  Widget _buildPhotoCorrection(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Aktuelles Nachweisfoto',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 10),
+            _PhotoPreview(path: widget.reading.photoPath),
+            const SizedBox(height: 8),
+            Text(
+              '${widget.reading.source.label} · SHA-256 ${shortHash(widget.reading.photoSha256)}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            if (_replacementPhoto != null) ...[
+              const SizedBox(height: 16),
+              Text(
+                'Neues Foto für die Korrektur',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: colors.primary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              _PhotoPreview(path: _replacementPhoto!.path),
+              const SizedBox(height: 8),
+              Text(
+                '${_replacementPhoto!.source.label} · SHA-256 ${shortHash(_replacementPhoto!.sha256)}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: colors.secondaryContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.history_outlined, size: 20),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Das bisherige Foto bleibt als frühere Version erhalten. Der Ablesezeitpunkt wird durch das neue Foto nicht automatisch geändert.',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (_replacementOcr != null &&
+                  _replacementOcr!.candidates.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                const Text(
+                  'Erkannte Werte',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final candidate in _replacementOcr!.candidates)
+                      ChoiceChip(
+                        label: Text(candidate.rawText),
+                        selected: _selectedCandidate == candidate.rawText,
+                        onSelected: (_) {
+                          setState(() {
+                            _selectedCandidate = candidate.rawText;
+                            _value.text = candidate.value.displayText;
+                          });
+                        },
+                      ),
+                  ],
+                ),
+              ] else if (_replacementOcr != null) ...[
+                const SizedBox(height: 12),
+                const Text(
+                  'Kein sicherer Wert erkannt. Bitte den Zählerstand manuell prüfen und eintragen.',
+                ),
+              ],
+            ],
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _processingPhoto ? null : _chooseReplacementSource,
+              icon: _processingPhoto
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.add_a_photo_outlined),
+              label: Text(
+                _replacementPhoto == null
+                    ? 'Neues Foto für Korrektur'
+                    : 'Anderes neues Foto wählen',
+              ),
+            ),
+            if (_processingPhoto) ...[
+              const SizedBox(height: 8),
+              const Center(child: Text('Foto wird lokal ausgewertet …')),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _chooseReplacementSource() async {
+    FocusScope.of(context).unfocus();
+    final source = await showModalBottomSheet<ReadingSource>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ListTile(
+              title: Text(
+                'Neues Nachweisfoto',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+              subtitle: Text('Quelle für das Korrekturfoto auswählen'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Neu fotografieren'),
+              onTap: () => Navigator.pop(context, ReadingSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Aus Galerie wählen'),
+              onTap: () => Navigator.pop(context, ReadingSource.gallery),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (source != null) await _captureReplacement(source);
+  }
+
+  Future<void> _captureReplacement(ReadingSource source) async {
+    setState(() => _processingPhoto = true);
+    try {
+      final photo = await _photos.capture(source);
+      if (photo != null && mounted) await _processReplacementPhoto(photo);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Foto konnte nicht verarbeitet werden: $error'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _processingPhoto = false);
+    }
+  }
+
+  Future<void> _recoverLostCapture() async {
+    try {
+      final photo = await _photos.recoverLostCapture();
+      if (photo != null && mounted) {
+        setState(() => _processingPhoto = true);
+        await _processReplacementPhoto(photo);
+      }
+    } on Object {
+      return;
+    } finally {
+      if (mounted) setState(() => _processingPhoto = false);
+    }
+  }
+
+  Future<void> _processReplacementPhoto(StoredMeterPhoto photo) async {
+    MeterOcrResult ocr;
+    try {
+      ocr = await _ocrRepository.recognize(photo.path);
+    } catch (_) {
+      await _photos.delete(photo.path);
+      rethrow;
+    }
+    final previousPending = _replacementPhoto;
+    final first = ocr.candidates.firstOrNull;
+    if (!mounted) {
+      await _photos.delete(photo.path);
+      return;
+    }
+    setState(() {
+      _replacementPhoto = photo;
+      _replacementOcr = ocr;
+      _selectedCandidate = first?.rawText ?? '';
+      if (first != null) _value.text = first.value.displayText;
+    });
+    if (previousPending != null && previousPending.path != photo.path) {
+      await _photos.delete(previousPending.path);
+    }
   }
 
   Future<void> _pickDate() async {
@@ -222,9 +450,13 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
             note: _note.text,
             reason: _reason.text,
             lowerReadingReason: _lowerReason,
+            replacementPhoto: _replacementPhoto,
+            replacementOcr: _replacementOcr,
+            replacementCandidate: _selectedCandidate,
           );
       ref.invalidate(readingByIdProvider(widget.reading.id));
       ref.invalidate(revisionsForReadingProvider(widget.reading.id));
+      _saved = true;
       if (mounted) {
         context.goNamed('readingDetail', pathParameters: {'id': updated.id});
       }
@@ -236,5 +468,29 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
         setState(() => _saving = false);
       }
     }
+  }
+}
+
+class _PhotoPreview extends StatelessWidget {
+  const _PhotoPreview({required this.path});
+
+  final String path;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: AspectRatio(
+        aspectRatio: 4 / 3,
+        child: Image.file(
+          File(path),
+          fit: BoxFit.contain,
+          errorBuilder: (_, _, _) => const ColoredBox(
+            color: Colors.black12,
+            child: Center(child: Icon(Icons.broken_image_outlined)),
+          ),
+        ),
+      ),
+    );
   }
 }

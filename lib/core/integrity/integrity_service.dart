@@ -18,22 +18,33 @@ class IntegrityService {
   }
 
   Future<String> readingManifestHash(MeterReading reading) {
-    final json = reading.toJson()
-      ..remove('manifestSha256')
-      ..remove('photoPath');
-    return sha256Text(canonicalJson(json));
+    return sha256Text(canonicalJson(normalizedReadingData(reading)));
   }
 
   Future<String> readingsManifestHash(List<MeterReading> readings) {
     final payload = readings
         .map((reading) {
-          final json = reading.toJson()
-            ..remove('manifestSha256')
-            ..remove('photoPath');
-          return json;
+          return normalizedReadingData(reading);
         })
         .toList(growable: false);
     return sha256Text(canonicalJson(payload));
+  }
+
+  Map<String, dynamic> normalizedReadingData(MeterReading reading) {
+    final json = reading.toJson()
+      ..remove('manifestSha256')
+      ..remove('photoPath');
+    final history = json['photoHistory'];
+    if (history is List) {
+      json['photoHistory'] = history
+          .map((item) {
+            final normalized = Map<String, dynamic>.from(item as Map)
+              ..remove('path');
+            return normalized;
+          })
+          .toList(growable: false);
+    }
+    return json;
   }
 
   String canonicalJson(Object? value) => jsonEncode(_canonicalize(value));

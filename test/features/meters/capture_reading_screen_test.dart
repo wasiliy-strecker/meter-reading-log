@@ -102,6 +102,29 @@ void main() {
         findsOneWidget,
       );
       expect(find.byType(PopupMenuButton<String>), findsNothing);
+
+      await tester.tap(find.text('Korrigieren'));
+      await tester.pumpAndSettle();
+      expect(find.text('Aktuelles Nachweisfoto'), findsOneWidget);
+      expect(find.text('Neues Foto für Korrektur'), findsOneWidget);
+      expect(
+        find.textContaining(
+          'Korrekturen überschreiben den ursprünglichen Eintrag nicht',
+        ),
+        findsOneWidget,
+      );
+
+      await tester.ensureVisible(find.text('Neues Foto für Korrektur'));
+      await tester.tap(find.text('Neues Foto für Korrektur'));
+      await tester.pumpAndSettle();
+      expect(find.text('Neues Nachweisfoto'), findsOneWidget);
+      await tester.tap(find.text('Aus Galerie wählen'));
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('Das bisherige Foto bleibt als frühere Version'),
+        findsOneWidget,
+      );
+      expect(find.text('Erkannte Werte'), findsOneWidget);
     },
   );
 }

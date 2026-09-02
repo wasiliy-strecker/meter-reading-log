@@ -61,7 +61,9 @@ class MeterService {
     final meterReadings = await readings.loadForMeter(meterId);
     final evidenceExports = await exports.loadForMeter(meterId);
     for (final reading in meterReadings) {
-      await photos.delete(reading.photoPath);
+      for (final path in reading.allPhotoPaths) {
+        await photos.delete(path);
+      }
       await readings.delete(reading.id);
     }
     for (final export in evidenceExports) {
@@ -113,6 +115,7 @@ class MeterReadingService {
       ocrRawText: ocr.rawText,
       ocrCandidate: selectedCandidate,
       ocrConfidence: ocr.confidence,
+      photoAddedAt: photo.capturedAt.toUtc(),
       lowerReadingReason: lowerReadingReason,
       note: note.trim(),
       manifestSha256: '',
@@ -131,7 +134,15 @@ class MeterReadingService {
     required String note,
     required String reason,
     LowerReadingReason? lowerReadingReason,
+    StoredMeterPhoto? replacementPhoto,
+    MeterOcrResult? replacementOcr,
+    String replacementCandidate = '',
   }) async {
+    if ((replacementPhoto == null) != (replacementOcr == null)) {
+      throw ArgumentError(
+        'Ersatzfoto und OCR-Ergebnis müssen gemeinsam angegeben werden.',
+      );
+    }
     final changedAt = DateTime.now().toUtc();
     final changes = <String, ReadingChange>{};
     if (existing.value.displayText != value.displayText ||
@@ -153,15 +164,56 @@ class MeterReadingService {
         after: note.trim(),
       );
     }
+    if (replacementPhoto != null && replacementOcr != null) {
+      changes['Foto SHA-256'] = ReadingChange(
+        before: existing.photoSha256,
+        after: replacementPhoto.sha256,
+      );
+      if (existing.source != replacementPhoto.source) {
+        changes['Fotoquelle'] = ReadingChange(
+          before: existing.source.label,
+          after: replacementPhoto.source.label,
+        );
+      }
+      if (existing.ocrCandidate != replacementCandidate) {
+        changes['OCR-Kandidat'] = ReadingChange(
+          before: existing.ocrCandidate,
+          after: replacementCandidate,
+        );
+      }
+    }
     if (changes.isEmpty) {
       return existing;
     }
 
+    final archivedPhotos = replacementPhoto == null
+        ? existing.photoHistory
+        : [
+            ...existing.photoHistory,
+            ReadingPhotoVersion(
+              id: newLocalId('photo_version'),
+              path: existing.photoPath,
+              sha256: existing.photoSha256,
+              source: existing.source,
+              addedAt: existing.effectivePhotoAddedAt,
+              ocrRawText: existing.ocrRawText,
+              ocrCandidate: existing.ocrCandidate,
+              ocrConfidence: existing.ocrConfidence,
+            ),
+          ];
     var updated = existing.copyWith(
       value: value,
       capturedAt: capturedAt.toUtc(),
       timezoneOffsetMinutes: capturedAt.timeZoneOffset.inMinutes,
       updatedAt: changedAt,
+      source: replacementPhoto?.source,
+      photoPath: replacementPhoto?.path,
+      photoSha256: replacementPhoto?.sha256,
+      ocrRawText: replacementOcr?.rawText,
+      ocrCandidate: replacementPhoto == null ? null : replacementCandidate,
+      ocrConfidence: replacementOcr?.confidence,
+      photoAddedAt: replacementPhoto == null ? null : changedAt,
+      photoHistory: archivedPhotos,
       note: note.trim(),
       lowerReadingReason: lowerReadingReason,
       clearLowerReadingReason: lowerReadingReason == null,
@@ -184,7 +236,9 @@ class MeterReadingService {
   }
 
   Future<void> delete(MeterReading reading) async {
-    await photos.delete(reading.photoPath);
+    for (final path in reading.allPhotoPaths) {
+      await photos.delete(path);
+    }
     await readings.delete(reading.id);
   }
 
