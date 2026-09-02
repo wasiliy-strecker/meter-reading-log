@@ -159,7 +159,11 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
     if (!confirmed) return;
     await ref.read(meterReadingServiceProvider).delete(reading);
     if (mounted) {
-      context.goNamed('meterDetail', pathParameters: {'id': reading.meterId});
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.goNamed('meterDetail', pathParameters: {'id': reading.meterId});
+      }
     }
   }
 }

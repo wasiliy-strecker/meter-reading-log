@@ -127,6 +127,33 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Erkannte Werte'), findsOneWidget);
+
+      await tester.scrollUntilVisible(
+        find.text('Grund der Korrektur *'),
+        300,
+        scrollable: find.byType(Scrollable).last,
+      );
+      final reasonField = find.widgetWithText(
+        TextFormField,
+        'Grund der Korrektur *',
+      );
+      await tester.enterText(reasonField, 'Neues Nachweisfoto');
+      final saveCorrection = find.text('Korrektur protokollieren');
+      await tester.ensureVisible(saveCorrection);
+      await tester.tap(saveCorrection);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ablesung'), findsOneWidget);
+      expect(readings.revisions.values.single, hasLength(1));
+
+      expect(await tester.binding.handlePopRoute(), isTrue);
+      await tester.pumpAndSettle();
+      expect(find.text('Verlauf'), findsOneWidget);
+      expect(find.text('Ablesen / Fotografieren'), findsOneWidget);
+
+      expect(await tester.binding.handlePopRoute(), isTrue);
+      await tester.pumpAndSettle();
+      expect(find.text('Dashboard'), findsOneWidget);
     },
   );
 

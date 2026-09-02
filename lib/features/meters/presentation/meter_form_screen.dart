@@ -301,8 +301,11 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
       }
       if (!mounted) return;
       final messenger = ScaffoldMessenger.of(context);
-      context.goNamed('meterDetail', pathParameters: {'id': meter.id});
       if (existing == null) {
+        context.pushReplacementNamed(
+          'meterDetail',
+          pathParameters: {'id': meter.id},
+        );
         WidgetsBinding.instance.addPostFrameCallback((_) {
           messenger
             ..hideCurrentSnackBar()
@@ -314,6 +317,13 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
               ),
             );
         });
+      } else {
+        ref.invalidate(meterByIdProvider(meter.id));
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.goNamed('meterDetail', pathParameters: {'id': meter.id});
+        }
       }
     } catch (error) {
       if (!mounted) return;

@@ -457,7 +457,11 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
       ref.invalidate(revisionsForReadingProvider(widget.reading.id));
       _saved = true;
       if (mounted) {
-        context.goNamed('readingDetail', pathParameters: {'id': updated.id});
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.goNamed('readingDetail', pathParameters: {'id': updated.id});
+        }
       }
     } catch (error) {
       if (mounted) {
