@@ -28,6 +28,30 @@ void main() {
     );
   });
 
+  testWidgets('reminder time uses a clearly clickable full-width button', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_testApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Zähler anlegen'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Ableseerinnerung'));
+    await tester.pumpAndSettle();
+    final timeButton = find.widgetWithText(OutlinedButton, 'Uhrzeit ändern');
+    expect(timeButton, findsOneWidget);
+    await tester.ensureVisible(timeButton);
+    await tester.pumpAndSettle();
+    expect(
+      tester.getSize(timeButton).width,
+      greaterThan(tester.getSize(find.text('Uhrzeit ändern')).width * 2),
+    );
+
+    await tester.tap(timeButton);
+    await tester.pumpAndSettle();
+    expect(find.byType(TimePickerDialog), findsOneWidget);
+  });
+
   testWidgets('meter form offers expanded types and matching units', (
     tester,
   ) async {

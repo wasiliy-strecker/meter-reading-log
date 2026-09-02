@@ -212,18 +212,31 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
                             setState(() => _day = value ?? _day),
                       ),
                       const SizedBox(height: 12),
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('Uhrzeit'),
-                        subtitle: Text(_time.format(context)),
-                        trailing: const Icon(Icons.schedule),
-                        onTap: () async {
-                          final value = await showTimePicker(
-                            context: context,
-                            initialTime: _time,
-                          );
-                          if (value != null) setState(() => _time = value);
-                        },
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Uhrzeit',
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(fontWeight: FontWeight.w800),
+                            ),
+                            Text(
+                              _time.format(context),
+                              style: Theme.of(context).textTheme.bodyLarge,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: _saving ? null : _pickReminderTime,
+                          icon: const Icon(Icons.schedule_outlined),
+                          label: const Text('Uhrzeit ändern'),
+                        ),
                       ),
                     ],
                   ],
@@ -309,5 +322,11 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
       );
       setState(() => _saving = false);
     }
+  }
+
+  Future<void> _pickReminderTime() async {
+    FocusScope.of(context).unfocus();
+    final value = await showTimePicker(context: context, initialTime: _time);
+    if (value != null && mounted) setState(() => _time = value);
   }
 }
