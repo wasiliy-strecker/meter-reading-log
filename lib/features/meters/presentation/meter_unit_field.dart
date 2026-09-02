@@ -239,12 +239,25 @@ class _CustomUnitDialogState extends State<_CustomUnitDialog> {
           onFieldSubmitted: (_) => _submit(),
         ),
       ),
+      actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Abbrechen'),
+        SizedBox(
+          width: double.infinity,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              FilledButton(
+                onPressed: _submit,
+                child: const Text('Übernehmen', textAlign: TextAlign.center),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Abbrechen', textAlign: TextAlign.center),
+              ),
+            ],
+          ),
         ),
-        FilledButton(onPressed: _submit, child: const Text('Übernehmen')),
       ],
     );
   }

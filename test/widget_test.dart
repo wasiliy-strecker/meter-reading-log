@@ -84,6 +84,18 @@ void main() {
     await tester.ensureVisible(find.text('Eigene Einheit eingeben'));
     await tester.tap(find.text('Eigene Einheit eingeben'));
     await tester.pumpAndSettle();
+    final submitButton = find.widgetWithText(FilledButton, 'Übernehmen');
+    final cancelButton = find.widgetWithText(OutlinedButton, 'Abbrechen');
+    expect(submitButton, findsOneWidget);
+    expect(cancelButton, findsOneWidget);
+    expect(
+      tester.getSize(submitButton).width,
+      tester.getSize(cancelButton).width,
+    );
+    expect(
+      tester.getTopLeft(submitButton).dy,
+      lessThan(tester.getTopLeft(cancelButton).dy),
+    );
     await tester.tap(find.text('Übernehmen'));
     await tester.pumpAndSettle();
     expect(find.text('Bitte eine Einheit eingeben.'), findsOneWidget);
