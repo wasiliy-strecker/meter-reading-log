@@ -254,20 +254,6 @@ class _InfoCard extends StatelessWidget {
           children: [
             _row('Zeitpunkt der Ablesung', formatDateTime(reading.capturedAt)),
             _row('Quelle', reading.source.label),
-            _row(
-              'OCR-Kandidat',
-              reading.ocrCandidate.isEmpty ? 'Keiner' : reading.ocrCandidate,
-            ),
-            _row(
-              'OCR-Konfidenz',
-              reading.ocrConfidence == null
-                  ? 'Nicht verfügbar'
-                  : '${(reading.ocrConfidence! * 100).round()} %',
-            ),
-            _row(
-              'Manuell abweichend',
-              reading.wasManuallyCorrected ? 'Ja' : 'Nein',
-            ),
             if (reading.lowerReadingReason != null)
               _row('Niedrigerer Stand', reading.lowerReadingReason!.label),
             if (reading.note.isNotEmpty) _row('Notiz', reading.note),
