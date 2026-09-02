@@ -38,9 +38,38 @@ void main() {
     final changed = await service.verify(report.record.filePath);
     expect(changed.status.name, 'changed');
   });
+
+  test('creates a PDF that includes future-at-storage evidence', () async {
+    final temp = await Directory.systemTemp.createTemp('future_evidence_test_');
+    addTearDown(() => temp.delete(recursive: true));
+    final photo = File('${temp.path}/photo.jpg');
+    await photo.writeAsBytes(img.encodeJpg(img.Image(width: 20, height: 20)));
+    final service = EvidenceReportService(
+      exports: MemoryEvidenceExportRepository(),
+      documentsDirectoryProvider: () async => temp,
+    );
+    final reading = _reading(
+      photo.path,
+      capturedAt: DateTime.utc(2100, 1, 1),
+      storedAt: DateTime.utc(2026, 9, 2),
+    );
+
+    final report = await service.createSingle(
+      reading: reading,
+      revisions: const [],
+    );
+
+    expect(report.bytes.take(4), [0x25, 0x50, 0x44, 0x46]);
+    expect(futureReadingEvidenceNotice(reading), isNotNull);
+  });
 }
 
-MeterReading _reading(String photoPath) {
+MeterReading _reading(
+  String photoPath, {
+  DateTime? capturedAt,
+  DateTime? storedAt,
+}) {
+  final persistedAt = storedAt ?? DateTime.utc(2026, 8, 31, 10);
   final meter = Meter(
     id: 'meter_1',
     label: 'Strom Keller',
@@ -54,10 +83,10 @@ MeterReading _reading(String photoPath) {
     meterId: meter.id,
     meter: MeterSnapshot.fromMeter(meter),
     value: ReadingValue.tryParse('00123,4')!,
-    capturedAt: DateTime.utc(2026, 8, 31, 10),
+    capturedAt: capturedAt ?? DateTime.utc(2026, 8, 31, 10),
     timezoneOffsetMinutes: 120,
-    storedAt: DateTime.utc(2026, 8, 31, 10),
-    updatedAt: DateTime.utc(2026, 8, 31, 10),
+    storedAt: persistedAt,
+    updatedAt: persistedAt,
     source: ReadingSource.camera,
     photoPath: photoPath,
     photoSha256: 'a' * 64,

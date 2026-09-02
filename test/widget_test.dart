@@ -55,6 +55,65 @@ void main() {
     expect(find.text('Liter'), findsOneWidget);
   });
 
+  testWidgets('meter form offers more units and persists a custom unit', (
+    tester,
+  ) async {
+    final meters = MemoryMeterRepository();
+    await tester.pumpWidget(_testApp(meters: meters));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Zähler anlegen'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    expect(find.text('GWh'), findsOneWidget);
+    expect(find.text('kvarh'), findsOneWidget);
+    expect(find.text('kVAh'), findsOneWidget);
+    await tester.tap(find.text('Weitere Einheit …'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Weitere Einheit auswählen'), findsOneWidget);
+    expect(find.text('Einheiten durchsuchen'), findsOneWidget);
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Einheiten durchsuchen'),
+      'Betriebsstunden',
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('h'), findsOneWidget);
+    expect(find.text('GWh'), findsNothing);
+    await tester.ensureVisible(find.text('Eigene Einheit eingeben'));
+    await tester.tap(find.text('Eigene Einheit eingeben'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Übernehmen'));
+    await tester.pumpAndSettle();
+    expect(find.text('Bitte eine Einheit eingeben.'), findsOneWidget);
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Einheit *'),
+      'Zyklen',
+    );
+    await tester.tap(find.text('Übernehmen'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Zyklen'), findsOneWidget);
+    expect(find.text('Eigene Einheit dieses Zählers'), findsOneWidget);
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Bezeichnung *'),
+      'Maschinenzähler',
+    );
+    await tester.ensureVisible(find.text('Zähler speichern'));
+    await tester.tap(find.text('Zähler speichern'));
+    const confirmation =
+        'Zähler gespeichert. Das Ablesen des Zählerstands folgt im nächsten Schritt.';
+    for (var attempt = 0; attempt < 30; attempt++) {
+      await tester.pump(const Duration(milliseconds: 100));
+      if (find.text(confirmation).evaluate().isNotEmpty) break;
+    }
+
+    expect(meters.items.values.single.unit, 'Zyklen');
+    expect(find.text(confirmation), findsWidgets);
+  });
+
   testWidgets('new meter confirms that reading follows next', (tester) async {
     final meters = MemoryMeterRepository();
     await tester.pumpWidget(_testApp(meters: meters));

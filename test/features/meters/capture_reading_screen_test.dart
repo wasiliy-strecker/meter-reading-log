@@ -74,6 +74,7 @@ void main() {
 
       await tester.tap(find.byType(DropdownButtonFormField<String>));
       await tester.pumpAndSettle();
+      expect(find.text('Weitere Einheit …'), findsOneWidget);
       await tester.tap(find.text('kWh').last);
       await tester.pumpAndSettle();
       expect(

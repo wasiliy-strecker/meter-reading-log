@@ -142,7 +142,7 @@ class MeterReadingService {
       );
     }
     if (existing.capturedAt.toLocal() != capturedAt) {
-      changes['Aufnahmezeit'] = ReadingChange(
+      changes['Zeitpunkt der Ablesung'] = ReadingChange(
         before: existing.capturedAt.toLocal().toIso8601String(),
         after: capturedAt.toIso8601String(),
       );

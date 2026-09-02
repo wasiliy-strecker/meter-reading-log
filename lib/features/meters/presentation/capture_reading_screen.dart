@@ -13,6 +13,7 @@ import '../domain/meter.dart';
 import '../domain/meter_reading.dart';
 import '../domain/reading_value.dart';
 import 'editable_reading_time_card.dart';
+import 'meter_unit_field.dart';
 
 class CaptureReadingScreen extends ConsumerStatefulWidget {
   const CaptureReadingScreen({super.key, required this.meterId});
@@ -182,27 +183,17 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
                 ),
                 const SizedBox(height: 12),
               ],
-              DropdownButtonFormField<String>(
-                key: ValueKey('reading-unit-${meter.id}-$selectedUnit'),
-                initialValue: selectedUnit,
-                decoration: InputDecoration(
-                  labelText: 'Einheit des Zählerstands',
-                  helperText: meterUnitDescription(selectedUnit),
-                  prefixIcon: const Icon(Icons.straighten_outlined),
-                ),
-                items: [
-                  for (final unit in _unitOptions(meter, selectedUnit))
-                    DropdownMenuItem(value: unit, child: Text(unit)),
-                ],
-                onChanged: _working
-                    ? null
-                    : (value) {
-                        if (value == null) return;
-                        setState(() {
-                          _selectedUnit = value;
-                          _lowerReason = null;
-                        });
-                      },
+              MeterUnitField(
+                meterType: meter.type,
+                value: selectedUnit,
+                labelText: 'Einheit des Zählerstands',
+                enabled: !_working,
+                onChanged: (value) {
+                  setState(() {
+                    _selectedUnit = value;
+                    _lowerReason = null;
+                  });
+                },
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -373,8 +364,8 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
     final date = await showDatePicker(
       context: context,
       initialDate: _capturedAt,
-      firstDate: DateTime(2000),
-      lastDate: DateTime.now().add(const Duration(days: 1)),
+      firstDate: firstSelectableReadingDate,
+      lastDate: lastSelectableReadingDate,
     );
     if (date == null || !mounted) return;
     final time = await showTimePicker(
@@ -397,6 +388,8 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
     if (!_formKey.currentState!.validate() || _photo == null || _ocr == null) {
       return;
     }
+    final confirmed = await confirmFutureReadingTime(context, _capturedAt);
+    if (!confirmed || !mounted) return;
     final value = ReadingValue.tryParse(_value.text)!;
     final selectedUnit = _selectedUnit ?? meter.unit;
     setState(() => _working = true);
@@ -432,12 +425,6 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
         setState(() => _working = false);
       }
     }
-  }
-
-  List<String> _unitOptions(Meter meter, String selectedUnit) {
-    final options = [...meter.type.availableUnits];
-    if (!options.contains(selectedUnit)) options.add(selectedUnit);
-    return options;
   }
 }
 

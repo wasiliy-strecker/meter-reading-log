@@ -25,6 +25,11 @@ class GeneratedEvidenceReport {
 
 typedef DocumentsDirectoryProvider = Future<Directory> Function();
 
+String? futureReadingEvidenceNotice(MeterReading reading) {
+  if (!reading.wasFutureAtStorage) return null;
+  return 'Beim Speichern lag der angegebene Ablesezeitpunkt in der Zukunft.';
+}
+
 class EvidenceReportService {
   EvidenceReportService({
     required this.exports,
@@ -258,14 +263,15 @@ class EvidenceReportService {
 
   pw.Widget _historyTable(List<MeterReading> readings, DateFormat date) {
     return pw.TableHelper.fromTextArray(
-      headers: const ['Aufnahme', 'Zählerstand', 'Differenz', 'Quelle'],
+      headers: const ['Ablesezeitpunkt', 'Zählerstand', 'Differenz', 'Quelle'],
       headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
       headerDecoration: pw.BoxDecoration(color: PdfColor.fromHex('#D7EEE9')),
       cellPadding: const pw.EdgeInsets.all(6),
       data: [
         for (var index = 0; index < readings.length; index++)
           [
-            date.format(readings[index].capturedAt.toLocal()),
+            '${date.format(readings[index].capturedAt.toLocal())}'
+                '${readings[index].wasFutureAtStorage ? '\nBei Speicherung zukünftig' : ''}',
             '${readings[index].value.displayText} ${readings[index].meter.unit}',
             index == 0
                 ? '–'
@@ -301,10 +307,12 @@ class EvidenceReportService {
             '${reading.value.displayText} ${reading.meter.unit}',
           ],
           [
-            'Aufnahmezeit',
+            'Zeitpunkt der Ablesung',
             '${date.format(reading.capturedAt.toLocal())} (${_offset(reading.timezoneOffsetMinutes)})',
           ],
           ['Gespeichert', date.format(reading.storedAt.toLocal())],
+          if (futureReadingEvidenceNotice(reading) case final notice?)
+            ['Hinweis', notice],
           ['Quelle', reading.source.label],
           [
             'OCR-Kandidat',
@@ -396,7 +404,7 @@ class EvidenceReportService {
           pw.Text('Manifest SHA-256: $manifestSha', style: _hashStyle),
           pw.SizedBox(height: 6),
           pw.Text(
-            'Die Prüfsummen machen nachträgliche Änderungen gegenüber den lokal gespeicherten Originalen erkennbar. Sie belegen weder die Echtheit des Aufnahmezeitpunkts noch ersetzen sie einen amtlichen Zeitstempel oder eine qualifizierte elektronische Signatur.',
+            'Die Prüfsummen machen nachträgliche Änderungen gegenüber den lokal gespeicherten Originalen erkennbar. Sie belegen weder die Echtheit des Ablesezeitpunkts noch ersetzen sie einen amtlichen Zeitstempel oder eine qualifizierte elektronische Signatur.',
             style: const pw.TextStyle(fontSize: 9),
           ),
         ],
