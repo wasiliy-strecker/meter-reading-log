@@ -24,7 +24,7 @@ class MeterService {
   final MeterReadingRepository readings;
   final EvidenceExportRepository exports;
   final MeterPhotoCaptureRepository photos;
-  final LocalNotificationReminderRepository reminders;
+  final MeterReminderRepository reminders;
 
   Future<Meter> create({
     required String label,

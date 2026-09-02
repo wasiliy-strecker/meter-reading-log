@@ -1,18 +1,55 @@
-enum MeterType { electricity, gas, water }
+enum MeterType {
+  electricity,
+  electricityFeedIn,
+  gas,
+  water,
+  coldWater,
+  hotWater,
+  heat,
+  heatingCostAllocator,
+  oil,
+  other,
+}
 
 extension MeterTypeX on MeterType {
   String get wireName => name;
 
   String get label => switch (this) {
-    MeterType.electricity => 'Strom',
+    MeterType.electricity => 'Strom (Bezug)',
+    MeterType.electricityFeedIn => 'Strom (Einspeisung / PV)',
     MeterType.gas => 'Gas',
-    MeterType.water => 'Wasser',
+    MeterType.water => 'Wasser (allgemein)',
+    MeterType.coldWater => 'Kaltwasser',
+    MeterType.hotWater => 'Warmwasser',
+    MeterType.heat => 'Wärme / Fernwärme',
+    MeterType.heatingCostAllocator => 'Heizkostenverteiler',
+    MeterType.oil => 'Heizöl / Tank',
+    MeterType.other => 'Sonstiger Zähler',
   };
 
-  String get defaultUnit => switch (this) {
-    MeterType.electricity => 'kWh',
-    MeterType.gas || MeterType.water => 'm³',
+  List<String> get availableUnits => switch (this) {
+    MeterType.electricity => const ['kWh', 'MWh', 'Wh'],
+    MeterType.electricityFeedIn => const ['kWh', 'MWh'],
+    MeterType.gas => const ['m³', 'kWh'],
+    MeterType.water ||
+    MeterType.coldWater ||
+    MeterType.hotWater => const ['m³', 'Liter'],
+    MeterType.heat => const ['kWh', 'MWh', 'GJ'],
+    MeterType.heatingCostAllocator => const ['Einheiten'],
+    MeterType.oil => const ['Liter', '%'],
+    MeterType.other => const [
+      'Einheiten',
+      'kWh',
+      'MWh',
+      'Wh',
+      'm³',
+      'Liter',
+      'GJ',
+      '%',
+    ],
   };
+
+  String get defaultUnit => availableUnits.first;
 }
 
 enum ReminderInterval { monthly, yearly }

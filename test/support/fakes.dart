@@ -4,6 +4,15 @@ import 'package:meter_reading_log/features/evidence/domain/evidence_export.dart'
 import 'package:meter_reading_log/features/meters/domain/meter.dart';
 import 'package:meter_reading_log/features/meters/domain/meter_reading.dart';
 import 'package:meter_reading_log/features/meters/domain/meter_repositories.dart';
+import 'package:meter_reading_log/core/reminders/local_notification_reminder_repository.dart';
+
+class NoopMeterReminderRepository implements MeterReminderRepository {
+  @override
+  Future<void> cancel(String meterId) async {}
+
+  @override
+  Future<void> schedule(Meter meter) async {}
+}
 
 class MemoryMeterRepository implements MeterRepository {
   final Map<String, Meter> items = {};
