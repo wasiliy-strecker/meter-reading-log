@@ -92,6 +92,16 @@ void main() {
 
       expect(meters.items[meter.id]!.unit, 'kWh');
       expect(readings.items.values.single.meter.unit, 'kWh');
+      await tester.pumpAndSettle();
+      expect(
+        find.widgetWithText(OutlinedButton, 'Korrigieren'),
+        findsOneWidget,
+      );
+      expect(
+        find.widgetWithText(OutlinedButton, 'Ablesung löschen'),
+        findsOneWidget,
+      );
+      expect(find.byType(PopupMenuButton<String>), findsNothing);
     },
   );
 }

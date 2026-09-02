@@ -45,27 +45,7 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
   Widget _buildContent(MeterReading reading) {
     final revisions = ref.watch(revisionsForReadingProvider(reading.id));
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Ablesung'),
-        actions: [
-          PopupMenuButton<String>(
-            onSelected: (value) {
-              if (value == 'edit') {
-                context.pushNamed(
-                  'readingEdit',
-                  pathParameters: {'id': reading.id},
-                );
-              } else if (value == 'delete') {
-                _delete(reading);
-              }
-            },
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'edit', child: Text('Korrigieren')),
-              PopupMenuItem(value: 'delete', child: Text('Ablesung löschen')),
-            ],
-          ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('Ablesung')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
@@ -98,6 +78,14 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
                   'Beim Speichern lag der angegebene Ablesezeitpunkt in der Zukunft. Der tatsächliche Speicherzeitpunkt bleibt separat erhalten.',
             ),
           ],
+          const SizedBox(height: 16),
+          _ReadingActions(
+            onEdit: () => context.pushNamed(
+              'readingEdit',
+              pathParameters: {'id': reading.id},
+            ),
+            onDelete: () => _delete(reading),
+          ),
           const SizedBox(height: 18),
           _InfoCard(reading: reading),
           const SizedBox(height: 12),
@@ -164,6 +152,38 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
     if (mounted) {
       context.goNamed('meterDetail', pathParameters: {'id': reading.meterId});
     }
+  }
+}
+
+class _ReadingActions extends StatelessWidget {
+  const _ReadingActions({required this.onEdit, required this.onDelete});
+
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        OutlinedButton.icon(
+          onPressed: onEdit,
+          icon: const Icon(Icons.edit_outlined),
+          label: const Text('Korrigieren'),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: colors.error,
+            side: BorderSide(color: colors.error),
+          ),
+          onPressed: onDelete,
+          icon: const Icon(Icons.delete_outline),
+          label: const Text('Ablesung löschen'),
+        ),
+      ],
+    );
   }
 }
 

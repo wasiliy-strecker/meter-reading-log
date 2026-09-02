@@ -10,21 +10,28 @@ Future<bool> confirmDestructiveAction(
         context: context,
         builder: (context) => AlertDialog(
           title: Text(title),
-          content: Text(message),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Abbrechen'),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.error,
-                foregroundColor: Theme.of(context).colorScheme.onError,
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(message),
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.error,
+                  foregroundColor: Theme.of(context).colorScheme.onError,
+                ),
+                onPressed: () => Navigator.pop(context, true),
+                icon: const Icon(Icons.delete_outline),
+                label: Text(confirmLabel, textAlign: TextAlign.center),
               ),
-              onPressed: () => Navigator.pop(context, true),
-              child: Text(confirmLabel),
-            ),
-          ],
+              const SizedBox(height: 8),
+              OutlinedButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Abbrechen', textAlign: TextAlign.center),
+              ),
+            ],
+          ),
         ),
       ) ??
       false;
