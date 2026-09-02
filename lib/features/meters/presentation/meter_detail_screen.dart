@@ -193,7 +193,12 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
     );
     if (!confirmed) return;
     await ref.read(meterServiceProvider).delete(meter.id);
-    if (mounted) context.goNamed('home');
+    if (!mounted) return;
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.goNamed('home');
+    }
   }
 }
 

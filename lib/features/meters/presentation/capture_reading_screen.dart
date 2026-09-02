@@ -415,7 +415,10 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
       }
       _saved = true;
       if (!mounted) return;
-      context.goNamed('readingDetail', pathParameters: {'id': reading.id});
+      context.pushReplacementNamed(
+        'readingDetail',
+        pathParameters: {'id': reading.id},
+      );
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

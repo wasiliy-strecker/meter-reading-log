@@ -176,6 +176,34 @@ void main() {
     expect(meters.items.values.single.label, 'Strom Hauptzähler');
     expect(find.text(confirmation), findsWidgets);
     expect(find.text('Ablesen / Fotografieren'), findsOneWidget);
+
+    expect(await tester.binding.handlePopRoute(), isTrue);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Dashboard'), findsOneWidget);
+    expect(find.text('Ablesen / Fotografieren'), findsNothing);
+  });
+
+  testWidgets('system back traverses nested settings screens', (tester) async {
+    await tester.pumpWidget(_testApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Einstellungen'));
+    await tester.pumpAndSettle();
+    expect(find.text('Einstellungen'), findsOneWidget);
+
+    await tester.tap(find.text('PDF auf Änderungen prüfen'));
+    await tester.pumpAndSettle();
+    expect(find.text('PDF auswählen'), findsOneWidget);
+
+    expect(await tester.binding.handlePopRoute(), isTrue);
+    await tester.pumpAndSettle();
+    expect(find.text('Einstellungen'), findsOneWidget);
+    expect(find.text('PDF auswählen'), findsNothing);
+
+    expect(await tester.binding.handlePopRoute(), isTrue);
+    await tester.pumpAndSettle();
+    expect(find.text('Dashboard'), findsOneWidget);
   });
 
   testWidgets('dashboard searches, sorts and shows last edited dates', (
