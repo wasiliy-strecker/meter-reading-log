@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/app_providers.dart';
+import '../../../app/widgets/app_snack_bar.dart';
 import '../../../core/files/meter_photo_repository.dart';
 import '../../../core/ocr/meter_ocr_repository.dart';
 import '../domain/meter_reading.dart';
@@ -359,9 +360,7 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Foto konnte nicht verarbeitet werden: $error'),
-          ),
+          AppSnackBar(message: 'Foto konnte nicht verarbeitet werden: $error'),
         );
       }
     } finally {
@@ -466,7 +465,7 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Korrektur fehlgeschlagen: $error')),
+          AppSnackBar(message: 'Korrektur fehlgeschlagen: $error'),
         );
         setState(() => _saving = false);
       }

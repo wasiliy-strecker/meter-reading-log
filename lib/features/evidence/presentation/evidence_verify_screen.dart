@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/app_providers.dart';
+import '../../../app/widgets/app_snack_bar.dart';
 import '../../../core/integrity/integrity_copy.dart';
 import '../../../core/utils/formatters.dart';
 import '../../meters/application/meter_services.dart';
@@ -94,7 +95,7 @@ class _EvidenceVerifyScreenState extends ConsumerState<EvidenceVerifyScreen> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('PDF konnte nicht geprüft werden: $error')),
+          AppSnackBar(message: 'PDF konnte nicht geprüft werden: $error'),
         );
       }
     } finally {

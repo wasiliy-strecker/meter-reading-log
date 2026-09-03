@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/app_providers.dart';
+import '../../../app/widgets/app_snack_bar.dart';
 import '../../../app/widgets/confirm_dialog.dart';
 import '../../../core/integrity/integrity_copy.dart';
 import '../../../core/utils/formatters.dart';
@@ -141,7 +142,7 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('PDF konnte nicht erstellt werden: $error')),
+          AppSnackBar(message: 'PDF konnte nicht erstellt werden: $error'),
         );
       }
     } finally {
