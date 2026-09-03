@@ -23,6 +23,7 @@ class AppTheme {
   }
 
   static ThemeData _base(ColorScheme scheme) {
+    const buttonShape = StadiumBorder();
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
@@ -49,10 +50,17 @@ class AppTheme {
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           minimumSize: const Size(0, 50),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
+          shape: buttonShape,
         ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(shape: buttonShape),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(shape: buttonShape),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(shape: buttonShape),
       ),
     );
   }
