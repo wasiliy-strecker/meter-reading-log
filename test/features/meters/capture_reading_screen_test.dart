@@ -30,6 +30,7 @@ void main() {
       );
       final meters = MemoryMeterRepository()..items[meter.id] = meter;
       final readings = MemoryReadingRepository();
+      final photos = _FixedPhotoRepository();
 
       await tester.pumpWidget(
         ProviderScope(
@@ -39,9 +40,7 @@ void main() {
             evidenceExportRepositoryProvider.overrideWithValue(
               MemoryEvidenceExportRepository(),
             ),
-            meterPhotoCaptureRepositoryProvider.overrideWithValue(
-              _FixedPhotoRepository(),
-            ),
+            meterPhotoCaptureRepositoryProvider.overrideWithValue(photos),
             meterOcrRepositoryProvider.overrideWithValue(
               const _FixedOcrRepository(),
             ),
@@ -137,6 +136,35 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Erkannte Werte'), findsOneWidget);
+      final changePhotoButton = find.widgetWithText(
+        OutlinedButton,
+        'Korrekturfoto ändern',
+      );
+      expect(changePhotoButton, findsOneWidget);
+      expect(
+        tester.getTopLeft(changePhotoButton).dy,
+        lessThan(
+          tester
+              .getTopLeft(
+                find.textContaining(
+                  'Das bisherige Foto bleibt als frühere Version',
+                ),
+              )
+              .dy,
+        ),
+      );
+
+      final capturesBeforeChange = photos.captureCount;
+      await tester.tap(changePhotoButton);
+      await tester.pumpAndSettle();
+      expect(find.text('Neues Nachweisfoto'), findsOneWidget);
+      await tester.tap(find.text('Neu fotografieren'));
+      await tester.pumpAndSettle();
+      expect(photos.captureCount, capturesBeforeChange + 1);
+      expect(
+        find.widgetWithText(OutlinedButton, 'Korrekturfoto ändern'),
+        findsOneWidget,
+      );
 
       await tester.scrollUntilVisible(
         find.text('Grund der Korrektur *'),
@@ -252,6 +280,8 @@ class _PendingRevisionRepository extends MemoryReadingRepository {
 }
 
 class _FixedPhotoRepository implements MeterPhotoCaptureRepository {
+  int captureCount = 0;
+
   final photo = StoredMeterPhoto(
     path: '/synthetic/meter.jpg',
     sha256: 'a' * 64,
@@ -260,7 +290,10 @@ class _FixedPhotoRepository implements MeterPhotoCaptureRepository {
   );
 
   @override
-  Future<StoredMeterPhoto?> capture(ReadingSource source) async => photo;
+  Future<StoredMeterPhoto?> capture(ReadingSource source) async {
+    captureCount++;
+    return photo;
+  }
 
   @override
   Future<void> delete(String path) async {}
