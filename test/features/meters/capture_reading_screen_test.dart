@@ -87,6 +87,16 @@ void main() {
       await tester.ensureVisible(
         find.text('Ablesung bestätigen und speichern'),
       );
+      final confirmButton = find.widgetWithText(
+        FilledButton,
+        'Ablesung bestätigen und speichern',
+      );
+      expect(
+        Theme.of(
+          tester.element(confirmButton),
+        ).filledButtonTheme.style?.shape?.resolve(const <WidgetState>{}),
+        isA<StadiumBorder>(),
+      );
       await tester.tap(find.text('Ablesung bestätigen und speichern'));
       for (var attempt = 0; attempt < 30 && readings.items.isEmpty; attempt++) {
         await tester.pump(const Duration(milliseconds: 100));
