@@ -241,6 +241,8 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
                 '${_replacementPhoto!.source.label} · neues Foto',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
+              const SizedBox(height: 12),
+              _buildPhotoSelectionButton(hasReplacement: true),
               const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.all(12),
@@ -292,29 +294,43 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
                   'Kein sicherer Wert erkannt. Bitte den Zählerstand manuell prüfen und eintragen.',
                 ),
               ],
-            ],
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: _processingPhoto ? null : _chooseReplacementSource,
-              icon: _processingPhoto
-                  ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.add_a_photo_outlined),
-              label: Text(
-                _replacementPhoto == null
-                    ? 'Neues Foto für Korrektur'
-                    : 'Anderes neues Foto wählen',
-              ),
-            ),
-            if (_processingPhoto) ...[
-              const SizedBox(height: 8),
-              const Center(child: Text('Foto wird lokal ausgewertet …')),
+            ] else ...[
+              const SizedBox(height: 12),
+              _buildPhotoSelectionButton(hasReplacement: false),
             ],
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildPhotoSelectionButton({required bool hasReplacement}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        OutlinedButton.icon(
+          onPressed: _processingPhoto ? null : _chooseReplacementSource,
+          icon: _processingPhoto
+              ? const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Icon(
+                  hasReplacement
+                      ? Icons.change_circle_outlined
+                      : Icons.add_a_photo_outlined,
+                ),
+          label: Text(
+            hasReplacement
+                ? 'Korrekturfoto ändern'
+                : 'Neues Foto für Korrektur',
+          ),
+        ),
+        if (_processingPhoto) ...[
+          const SizedBox(height: 8),
+          const Center(child: Text('Foto wird lokal ausgewertet …')),
+        ],
+      ],
     );
   }
 
