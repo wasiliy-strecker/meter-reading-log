@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/app_providers.dart';
+import '../../../app/widgets/app_snack_bar.dart';
 import '../domain/meter.dart';
 import 'meter_unit_field.dart';
 
@@ -310,10 +311,9 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
           messenger
             ..hideCurrentSnackBar()
             ..showSnackBar(
-              const SnackBar(
-                content: Text(
-                  'Zähler gespeichert. Das Ablesen des Zählerstands folgt im nächsten Schritt.',
-                ),
+              AppSnackBar(
+                message:
+                    'Zähler gespeichert. Das Ablesen des Zählerstands folgt im nächsten Schritt.',
               ),
             );
         });
@@ -327,9 +327,9 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
       }
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Speichern fehlgeschlagen: $error')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(AppSnackBar(message: 'Speichern fehlgeschlagen: $error'));
       setState(() => _saving = false);
     }
   }

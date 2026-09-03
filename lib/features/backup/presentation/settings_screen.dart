@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../app/app_providers.dart';
+import '../../../app/widgets/app_snack_bar.dart';
 import '../../../core/integrity/integrity_copy.dart';
 import '../application/encrypted_backup_service.dart';
 
@@ -272,8 +273,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   void _showMessage(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context).showSnackBar(AppSnackBar(message: message));
   }
 }
