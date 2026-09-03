@@ -104,7 +104,7 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
           const SizedBox(height: 18),
           _InfoCard(reading: reading),
           const SizedBox(height: 12),
-          _IntegrityCard(reading: reading),
+          _CorrectionHistoryCard(reading: reading),
           const SizedBox(height: 12),
           revisions.when(
             loading: () => const Center(child: CircularProgressIndicator()),
@@ -283,8 +283,8 @@ class _InfoCard extends StatelessWidget {
   }
 }
 
-class _IntegrityCard extends StatelessWidget {
-  const _IntegrityCard({required this.reading});
+class _CorrectionHistoryCard extends StatelessWidget {
+  const _CorrectionHistoryCard({required this.reading});
 
   final MeterReading reading;
 
@@ -299,27 +299,20 @@ class _IntegrityCard extends StatelessWidget {
             Row(
               children: [
                 Icon(
-                  Icons.verified_outlined,
+                  Icons.history_outlined,
                   color: Theme.of(context).colorScheme.primary,
                 ),
                 const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
-                    integrityProtectionTitle,
+                    correctionHistoryTitle,
                     style: TextStyle(fontWeight: FontWeight.w800),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 10),
-            const Text(integrityBenefitText),
-            const SizedBox(height: 8),
-            Text(
-              integrityLimitationText,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
+            const Text(correctionHistoryText),
             const SizedBox(height: 4),
             Theme(
               data: Theme.of(

@@ -1,7 +1,9 @@
 const integrityProtectionTitle = 'Schutz vor nachträglichen Änderungen';
 
-const integrityBenefitText =
-    'Diese Prüfwerte helfen dir zu erkennen, ob das Foto oder die Ablesung später verändert wurde. Ändert sich der Inhalt, ändert sich auch der Prüfwert.';
+const correctionHistoryTitle = 'Korrekturen nachvollziehbar';
+
+const correctionHistoryText =
+    'Wenn du einen Zählerstand oder das Foto korrigierst, bleiben die frühere Version, der Zeitpunkt und der Grund der Änderung erhalten.';
 
 const integrityLimitationText =
     'Sie bestätigen jedoch nicht, wann oder von wem das Foto aufgenommen wurde.';

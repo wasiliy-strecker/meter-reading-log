@@ -11,7 +11,7 @@ import 'package:meter_reading_log/features/meters/presentation/reading_detail_sc
 import '../../support/fakes.dart';
 
 void main() {
-  testWidgets('hides OCR diagnostics and explains change protection', (
+  testWidgets('hides OCR diagnostics and explains correction history', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(430, 1200));
@@ -43,12 +43,12 @@ void main() {
     expect(find.text('Manuell abweichend'), findsNothing);
 
     await tester.scrollUntilVisible(
-      find.text(integrityProtectionTitle),
+      find.text(correctionHistoryTitle),
       250,
       scrollable: scrollable,
     );
-    expect(find.text(integrityBenefitText), findsOneWidget);
-    expect(find.text(integrityLimitationText), findsOneWidget);
+    expect(find.text(correctionHistoryText), findsOneWidget);
+    expect(find.text(integrityProtectionTitle), findsNothing);
     expect(find.text(technicalChecksTitle), findsOneWidget);
     expect(find.textContaining(reading.photoSha256), findsNothing);
 
