@@ -257,7 +257,7 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Das bisherige Foto bleibt als frühere Version erhalten. Der Ablesezeitpunkt wird durch das neue Foto nicht automatisch geändert.',
+                        'Das bisherige Foto bleibt als frühere Version erhalten.',
                       ),
                     ),
                   ],

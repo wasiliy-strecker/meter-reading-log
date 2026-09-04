@@ -135,6 +135,7 @@ void main() {
         find.textContaining('Das bisherige Foto bleibt als frühere Version'),
         findsOneWidget,
       );
+      expect(find.textContaining('Der Ablesezeitpunkt'), findsNothing);
       expect(find.text('Erkannte Werte'), findsOneWidget);
       final changePhotoButton = find.widgetWithText(
         OutlinedButton,
