@@ -120,8 +120,22 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.picture_as_pdf_outlined),
-            label: const Text('Einzelnachweis als PDF'),
+            label: Text(
+              _exporting ? 'PDF wird erstellt …' : 'Einzelnachweis als PDF',
+            ),
           ),
+          if (_exporting) ...[
+            const SizedBox(height: 10),
+            const LinearProgressIndicator(),
+            const SizedBox(height: 8),
+            Semantics(
+              liveRegion: true,
+              child: const Text(
+                'Foto und Nachweisdaten werden verarbeitet.',
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
           const SizedBox(height: 10),
           const _PdfPurposeCard(),
         ],
@@ -132,6 +146,8 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
   Future<void> _export(MeterReading reading) async {
     setState(() => _exporting = true);
     try {
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return;
       final revisions = await ref
           .read(meterReadingRepositoryProvider)
           .loadRevisions(reading.id);
