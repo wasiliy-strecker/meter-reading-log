@@ -11,6 +11,7 @@ import 'package:pdf/widgets.dart' as pw;
 import '../../../core/integrity/integrity_copy.dart';
 import '../../../core/integrity/integrity_service.dart';
 import '../../../core/utils/id_generator.dart';
+import '../../meters/application/reading_revision_photos.dart';
 import '../../meters/application/meter_services.dart';
 import '../../meters/domain/meter.dart';
 import '../../meters/domain/meter_reading.dart';
@@ -348,26 +349,6 @@ class EvidenceReportService {
         'Prüfwert der Ablesung (SHA-256): ${reading.manifestSha256}',
         style: _hashStyle,
       ),
-      for (final entry in reading.photoHistory.indexed) ...[
-        pw.SizedBox(height: 14),
-        pw.Text(
-          entry.$1 == 0
-              ? 'Ursprüngliches Foto'
-              : 'Frühere Foto-Version ${entry.$1 + 1}',
-          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-        ),
-        pw.SizedBox(height: 6),
-        _photo(entry.$2.path),
-        pw.SizedBox(height: 6),
-        pw.Text(
-          '${entry.$2.source.label} · hinzugefügt ${date.format(entry.$2.addedAt.toLocal())}',
-          style: const pw.TextStyle(fontSize: 9),
-        ),
-        pw.Text(
-          'Prüfwert des Fotos (SHA-256): ${entry.$2.sha256}',
-          style: _hashStyle,
-        ),
-      ],
       if (revisions.isNotEmpty) ...[
         pw.SizedBox(height: 10),
         pw.Text(
@@ -377,29 +358,23 @@ class EvidenceReportService {
         for (final revision in ([
           ...revisions,
         ]..sort((left, right) => right.changedAt.compareTo(left.changedAt))))
-          _revisionSection(
-            revision: revision,
-            unit: reading.meter.unit,
-            date: date,
-          ),
+          _revisionSection(revision: revision, reading: reading, date: date),
       ],
     ];
   }
 
   pw.Widget _revisionSection({
     required ReadingRevision revision,
-    required String unit,
+    required MeterReading reading,
     required DateFormat date,
   }) {
-    const photoChangeKeys = {
-      'Prüfwert des Fotos (SHA-256)',
-      'Fotoquelle',
-      'OCR-Kandidat',
-    };
-    final visibleChanges = revision.changes.entries
-        .where((entry) => !photoChangeKeys.contains(entry.key))
-        .toList(growable: false);
-    final photoChanged = revision.changes.keys.any(photoChangeKeys.contains);
+    final visibleChanges = visibleRevisionChanges(
+      revision,
+    ).toList(growable: false);
+    final revisionPhotos = photosForRevision(
+      reading: reading,
+      revision: revision,
+    );
     return pw.Container(
       margin: const pw.EdgeInsets.only(top: 6),
       padding: const pw.EdgeInsets.all(8),
@@ -425,23 +400,95 @@ class EvidenceReportService {
               style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
             ),
             pw.Text(
-              'Vorher: ${_revisionValue(change.key, change.value.before, unit, date)}',
+              'Vorher: ${_revisionValue(change.key, change.value.before, reading.meter.unit, date)}',
               style: const pw.TextStyle(fontSize: 9),
             ),
             pw.Text(
-              'Neu: ${_revisionValue(change.key, change.value.after, unit, date)}',
+              'Neu: ${_revisionValue(change.key, change.value.after, reading.meter.unit, date)}',
               style: const pw.TextStyle(fontSize: 9),
             ),
           ],
-          if (photoChanged) ...[
+          if (revisionPhotos != null) ...[
             pw.SizedBox(height: 4),
-            pw.Text(
-              'Nachweisfoto geändert',
-              style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
-            ),
+            _revisionPhotoComparison(photos: revisionPhotos, date: date),
           ],
         ],
       ),
+    );
+  }
+
+  pw.Widget _revisionPhotoComparison({
+    required ReadingRevisionPhotos photos,
+    required DateFormat date,
+  }) {
+    final before = photos.before;
+    final after = photos.after;
+    if (before == null && after == null) {
+      return pw.Text(
+        'Nachweisfoto geändert',
+        style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+      );
+    }
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            if (before != null)
+              pw.Expanded(
+                child: _revisionPhoto(
+                  label: 'Vorheriges Foto',
+                  photo: before,
+                  date: date,
+                ),
+              ),
+            if (before != null && after != null) pw.SizedBox(width: 8),
+            if (after != null)
+              pw.Expanded(
+                child: _revisionPhoto(
+                  label: 'Neues Foto',
+                  photo: after,
+                  date: date,
+                ),
+              ),
+          ],
+        ),
+        if (before != null)
+          pw.Text(
+            'Prüfwert vorheriges Foto (SHA-256): ${before.sha256}',
+            style: _hashStyle,
+          ),
+        if (after != null)
+          pw.Text(
+            'Prüfwert neues Foto (SHA-256): ${after.sha256}',
+            style: _hashStyle,
+          ),
+      ],
+    );
+  }
+
+  pw.Widget _revisionPhoto({
+    required String label,
+    required ReadingPhotoVersion photo,
+    required DateFormat date,
+  }) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text(
+          label,
+          style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+        ),
+        pw.SizedBox(height: 4),
+        _photo(photo.path, height: 120),
+        pw.SizedBox(height: 3),
+        pw.Text(
+          '${photo.source.label} · ${date.format(photo.addedAt.toLocal())}',
+          style: const pw.TextStyle(fontSize: 8),
+        ),
+      ],
     );
   }
 
@@ -460,7 +507,7 @@ class EvidenceReportService {
     return value;
   }
 
-  pw.Widget _photo(String path) {
+  pw.Widget _photo(String path, {double height = 280}) {
     try {
       final bytes = File(path).readAsBytesSync();
       final decoded = img.decodeImage(bytes);
@@ -469,7 +516,7 @@ class EvidenceReportService {
       }
       final normalized = img.encodeJpg(decoded, quality: 88);
       return pw.Container(
-        height: 280,
+        height: height,
         alignment: pw.Alignment.center,
         decoration: pw.BoxDecoration(
           border: pw.Border.all(color: PdfColors.grey400),
