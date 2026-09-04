@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:meter_reading_log/app/app_providers.dart';
 import 'package:meter_reading_log/core/integrity/integrity_copy.dart';
+import 'package:meter_reading_log/core/utils/formatters.dart';
 import 'package:meter_reading_log/features/evidence/application/evidence_report_service.dart';
 import 'package:meter_reading_log/features/meters/domain/meter.dart';
 import 'package:meter_reading_log/features/meters/domain/meter_reading.dart';
@@ -14,7 +15,7 @@ import 'package:meter_reading_log/features/meters/presentation/reading_detail_sc
 import '../../support/fakes.dart';
 
 void main() {
-  testWidgets('hides OCR diagnostics and explains correction history', (
+  testWidgets('hides OCR diagnostics and explains empty correction history', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(430, 1200));
@@ -51,6 +52,10 @@ void main() {
       scrollable: scrollable,
     );
     expect(find.text(correctionHistoryText), findsOneWidget);
+    expect(
+      find.text('Für diese Ablesung gibt es noch keine Korrekturen.'),
+      findsOneWidget,
+    );
     expect(find.text(integrityProtectionTitle), findsNothing);
     expect(find.text(technicalChecksTitle), findsOneWidget);
     expect(find.textContaining(reading.photoSha256), findsNothing);
@@ -70,6 +75,89 @@ void main() {
     expect(find.text(pdfPurposeText), findsOneWidget);
     expect(find.text(privateDocumentationText), findsOneWidget);
     expect(find.byIcon(Icons.fact_check_outlined), findsOneWidget);
+  });
+
+  testWidgets('shows correction reason and newest changes first', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(430, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final reading = _reading();
+    final olderChange = DateTime.utc(2026, 9, 3, 8);
+    final newerChange = DateTime.utc(2026, 9, 4, 9);
+    final readings = MemoryReadingRepository()
+      ..items[reading.id] = reading
+      ..revisions[reading.id] = [
+        ReadingRevision(
+          id: 'revision_older',
+          readingId: reading.id,
+          changedAt: olderChange,
+          reason: 'Zahlendreher berichtigt',
+          changes: const {
+            'Zählerstand': ReadingChange(before: '24,1', after: '42,1'),
+          },
+        ),
+        ReadingRevision(
+          id: 'revision_newer',
+          readingId: reading.id,
+          changedAt: newerChange,
+          reason: 'Unscharfes Foto ausgetauscht',
+          changes: {
+            'Prüfwert des Fotos (SHA-256)': ReadingChange(
+              before: 'c' * 64,
+              after: 'd' * 64,
+            ),
+            'OCR-Kandidat': const ReadingChange(before: '24,1', after: '42,1'),
+          },
+        ),
+      ];
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          meterReadingRepositoryProvider.overrideWithValue(readings),
+          evidenceExportRepositoryProvider.overrideWithValue(
+            MemoryEvidenceExportRepository(),
+          ),
+        ],
+        child: MaterialApp(home: ReadingDetailScreen(readingId: reading.id)),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final scrollable = find
+        .descendant(
+          of: find.byType(ListView),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.scrollUntilVisible(
+      find.text(correctionHistoryTitle),
+      250,
+      scrollable: scrollable,
+    );
+
+    final newerTitle = find.text(
+      'Korrektur vom ${formatDateTime(newerChange)}',
+    );
+    final olderTitle = find.text(
+      'Korrektur vom ${formatDateTime(olderChange)}',
+    );
+    expect(newerTitle, findsOneWidget);
+    expect(olderTitle, findsOneWidget);
+    expect(
+      tester.getTopLeft(newerTitle).dy,
+      lessThan(tester.getTopLeft(olderTitle).dy),
+    );
+    expect(find.text('Grund: Unscharfes Foto ausgetauscht'), findsOneWidget);
+    expect(find.text('Grund: Zahlendreher berichtigt'), findsOneWidget);
+    expect(find.text('Vorher:'), findsOneWidget);
+    expect(find.text('Neu:'), findsOneWidget);
+    expect(find.text('24,1 m³'), findsOneWidget);
+    expect(find.text('42,1 m³'), findsWidgets);
+    expect(find.text('Nachweisfoto geändert'), findsOneWidget);
+    expect(find.text('OCR-Kandidat'), findsNothing);
+    expect(find.textContaining('c' * 64), findsNothing);
+    expect(find.textContaining('d' * 64), findsNothing);
   });
 
   testWidgets('previous photos expand without an extra top and bottom frame', (

@@ -79,6 +79,47 @@ void main() {
     expect(report.bytes.take(4), [0x25, 0x50, 0x44, 0x46]);
     expect(futureReadingEvidenceNotice(reading), isNotNull);
   });
+
+  test('creates a PDF with a readable correction history', () async {
+    final temp = await Directory.systemTemp.createTemp('revision_pdf_test_');
+    addTearDown(() => temp.delete(recursive: true));
+    final photo = File('${temp.path}/photo.jpg');
+    await photo.writeAsBytes(img.encodeJpg(img.Image(width: 20, height: 20)));
+    final service = EvidenceReportService(
+      exports: MemoryEvidenceExportRepository(),
+      documentsDirectoryProvider: () async => temp,
+    );
+    final reading = _reading(photo.path);
+
+    final report = await service.createSingle(
+      reading: reading,
+      revisions: [
+        ReadingRevision(
+          id: 'revision_1',
+          readingId: reading.id,
+          changedAt: DateTime.utc(2026, 9, 2, 12),
+          reason: 'Zahlendreher berichtigt',
+          changes: {
+            'Zählerstand': const ReadingChange(
+              before: '00132,4',
+              after: '00123,4',
+            ),
+            'Prüfwert des Fotos (SHA-256)': ReadingChange(
+              before: 'c' * 64,
+              after: 'a' * 64,
+            ),
+            'OCR-Kandidat': const ReadingChange(
+              before: '00132,4',
+              after: '00123,4',
+            ),
+          },
+        ),
+      ],
+    );
+
+    expect(report.bytes.take(4), [0x25, 0x50, 0x44, 0x46]);
+    expect(await File(report.record.filePath).exists(), isTrue);
+  });
 }
 
 MeterReading _reading(

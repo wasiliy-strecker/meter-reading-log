@@ -40,7 +40,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   leading: const Icon(Icons.lock_outline),
                   title: const Text('Verschlüsseltes Backup erstellen'),
                   subtitle: const Text(
-                    'Zähler, Fotos, PDFs und Änderungsprotokolle',
+                    'Zähler, Fotos, PDFs und Korrekturverläufe',
                   ),
                   trailing: const Icon(Icons.chevron_right),
                   enabled: !_working,
