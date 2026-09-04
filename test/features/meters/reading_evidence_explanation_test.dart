@@ -160,10 +160,10 @@ void main() {
     expect(find.textContaining('d' * 64), findsNothing);
   });
 
-  testWidgets('previous photos expand without an extra top and bottom frame', (
+  testWidgets('shows correction photo and expands its previous photo', (
     tester,
   ) async {
-    await tester.binding.setSurfaceSize(const Size(430, 1200));
+    await tester.binding.setSurfaceSize(const Size(430, 1800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final reading = _reading(
       photoHistory: [
@@ -178,7 +178,22 @@ void main() {
         ),
       ],
     );
-    final readings = MemoryReadingRepository()..items[reading.id] = reading;
+    final readings = MemoryReadingRepository()
+      ..items[reading.id] = reading
+      ..revisions[reading.id] = [
+        ReadingRevision(
+          id: 'revision_photo',
+          readingId: reading.id,
+          changedAt: reading.effectivePhotoAddedAt,
+          reason: 'Foto war unscharf',
+          changes: {
+            'Prüfwert des Fotos (SHA-256)': ReadingChange(
+              before: 'c' * 64,
+              after: 'a' * 64,
+            ),
+          },
+        ),
+      ];
 
     await tester.pumpWidget(
       ProviderScope(
@@ -193,17 +208,50 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final historyTile = find.widgetWithText(ExpansionTile, 'Frühere Fotos (1)');
-    final tile = tester.widget<ExpansionTile>(historyTile);
+    final scrollable = find
+        .descendant(
+          of: find.byType(ListView),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.scrollUntilVisible(
+      find.text('Neues Foto'),
+      250,
+      scrollable: scrollable,
+    );
+
+    expect(find.textContaining('Frühere Fotos'), findsNothing);
+    expect(
+      find.bySemanticsLabel('Neues Foto der Korrektur revision_photo'),
+      findsOneWidget,
+    );
+    expect(
+      find.bySemanticsLabel('Vorheriges Foto der Korrektur revision_photo'),
+      findsNothing,
+    );
+
+    final previousPhotoTile = find.widgetWithText(
+      ExpansionTile,
+      'Vorheriges Foto anzeigen',
+    );
+    final tile = tester.widget<ExpansionTile>(previousPhotoTile);
     expect((tile.shape as RoundedRectangleBorder).side.style, BorderStyle.none);
     expect(
       (tile.collapsedShape as RoundedRectangleBorder).side.style,
       BorderStyle.none,
     );
 
-    await tester.tap(find.text('Frühere Fotos (1)'));
+    await tester.scrollUntilVisible(
+      find.text('Vorheriges Foto anzeigen'),
+      250,
+      scrollable: scrollable,
+    );
+    await tester.tap(find.text('Vorheriges Foto anzeigen'));
     await tester.pumpAndSettle();
-    expect(find.text('Ursprüngliches Foto'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel('Vorheriges Foto der Korrektur revision_photo'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('single PDF action immediately shows indeterminate progress', (

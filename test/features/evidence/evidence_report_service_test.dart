@@ -43,7 +43,20 @@ void main() {
 
     final report = await service.createSingle(
       reading: reading,
-      revisions: const [],
+      revisions: [
+        ReadingRevision(
+          id: 'revision_photo',
+          readingId: reading.id,
+          changedAt: reading.effectivePhotoAddedAt,
+          reason: 'Foto war unscharf',
+          changes: {
+            'Prüfwert des Fotos (SHA-256)': ReadingChange(
+              before: 'c' * 64,
+              after: 'a' * 64,
+            ),
+          },
+        ),
+      ],
     );
 
     expect(report.bytes.take(4), [0x25, 0x50, 0x44, 0x46]);
@@ -84,12 +97,44 @@ void main() {
     final temp = await Directory.systemTemp.createTemp('revision_pdf_test_');
     addTearDown(() => temp.delete(recursive: true));
     final photo = File('${temp.path}/photo.jpg');
+    final firstPhoto = File('${temp.path}/first-photo.jpg');
+    final originalPhoto = File('${temp.path}/original-photo.jpg');
     await photo.writeAsBytes(img.encodeJpg(img.Image(width: 20, height: 20)));
+    await firstPhoto.writeAsBytes(
+      img.encodeJpg(img.Image(width: 18, height: 18)),
+    );
+    await originalPhoto.writeAsBytes(
+      img.encodeJpg(img.Image(width: 16, height: 16)),
+    );
     final service = EvidenceReportService(
       exports: MemoryEvidenceExportRepository(),
       documentsDirectoryProvider: () async => temp,
     );
-    final reading = _reading(photo.path);
+    final firstChange = DateTime.utc(2026, 9, 2, 12);
+    final secondChange = DateTime.utc(2026, 9, 3, 12);
+    final reading = _reading(photo.path).copyWith(
+      photoAddedAt: secondChange,
+      photoHistory: [
+        ReadingPhotoVersion(
+          id: 'photo_original',
+          path: originalPhoto.path,
+          sha256: 'c' * 64,
+          source: ReadingSource.camera,
+          addedAt: DateTime.utc(2026, 9, 1, 12),
+          ocrRawText: '00132,4',
+          ocrCandidate: '00132,4',
+        ),
+        ReadingPhotoVersion(
+          id: 'photo_first_correction',
+          path: firstPhoto.path,
+          sha256: 'd' * 64,
+          source: ReadingSource.gallery,
+          addedAt: firstChange,
+          ocrRawText: '00123,4',
+          ocrCandidate: '00123,4',
+        ),
+      ],
+    );
 
     final report = await service.createSingle(
       reading: reading,
@@ -97,7 +142,7 @@ void main() {
         ReadingRevision(
           id: 'revision_1',
           readingId: reading.id,
-          changedAt: DateTime.utc(2026, 9, 2, 12),
+          changedAt: firstChange,
           reason: 'Zahlendreher berichtigt',
           changes: {
             'Zählerstand': const ReadingChange(
@@ -106,11 +151,23 @@ void main() {
             ),
             'Prüfwert des Fotos (SHA-256)': ReadingChange(
               before: 'c' * 64,
-              after: 'a' * 64,
+              after: 'd' * 64,
             ),
             'OCR-Kandidat': const ReadingChange(
               before: '00132,4',
               after: '00123,4',
+            ),
+          },
+        ),
+        ReadingRevision(
+          id: 'revision_2',
+          readingId: reading.id,
+          changedAt: secondChange,
+          reason: 'Schärferes Foto ergänzt',
+          changes: {
+            'Prüfwert des Fotos (SHA-256)': ReadingChange(
+              before: 'd' * 64,
+              after: 'a' * 64,
             ),
           },
         ),

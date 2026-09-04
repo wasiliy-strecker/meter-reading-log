@@ -9,6 +9,7 @@ import '../../../app/widgets/app_snack_bar.dart';
 import '../../../app/widgets/confirm_dialog.dart';
 import '../../../core/integrity/integrity_copy.dart';
 import '../../../core/utils/formatters.dart';
+import '../application/reading_revision_photos.dart';
 import '../domain/meter.dart';
 import '../domain/meter_reading.dart';
 import 'editable_reading_time_card.dart';
@@ -74,10 +75,6 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
               ),
             ),
           ),
-          if (reading.photoHistory.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            _PhotoHistoryCard(versions: reading.photoHistory),
-          ],
           const SizedBox(height: 16),
           Text(
             '${reading.value.displayText} ${reading.meter.unit}',
@@ -334,7 +331,7 @@ class _CorrectionHistoryCard extends StatelessWidget {
                 'Der Korrekturverlauf konnte nicht geladen werden.',
               ),
               data: (items) =>
-                  _RevisionList(revisions: items, unit: reading.meter.unit),
+                  _RevisionList(revisions: items, reading: reading),
             ),
             const SizedBox(height: 4),
             Theme(
@@ -371,10 +368,10 @@ class _CorrectionHistoryCard extends StatelessWidget {
 }
 
 class _RevisionList extends StatelessWidget {
-  const _RevisionList({required this.revisions, required this.unit});
+  const _RevisionList({required this.revisions, required this.reading});
 
   final List<ReadingRevision> revisions;
-  final String unit;
+  final MeterReading reading;
 
   @override
   Widget build(BuildContext context) {
@@ -388,7 +385,7 @@ class _RevisionList extends StatelessWidget {
       children: [
         for (final entry in newestFirst.indexed) ...[
           if (entry.$1 > 0) const Divider(height: 24),
-          _RevisionEntry(revision: entry.$2, unit: unit),
+          _RevisionEntry(revision: entry.$2, reading: reading),
         ],
       ],
     );
@@ -396,23 +393,20 @@ class _RevisionList extends StatelessWidget {
 }
 
 class _RevisionEntry extends StatelessWidget {
-  const _RevisionEntry({required this.revision, required this.unit});
-
-  static const _photoChangeKeys = {
-    'Prüfwert des Fotos (SHA-256)',
-    'Fotoquelle',
-    'OCR-Kandidat',
-  };
+  const _RevisionEntry({required this.revision, required this.reading});
 
   final ReadingRevision revision;
-  final String unit;
+  final MeterReading reading;
 
   @override
   Widget build(BuildContext context) {
-    final visibleChanges = revision.changes.entries
-        .where((entry) => !_photoChangeKeys.contains(entry.key))
-        .toList(growable: false);
-    final photoChanged = revision.changes.keys.any(_photoChangeKeys.contains);
+    final visibleChanges = visibleRevisionChanges(
+      revision,
+    ).toList(growable: false);
+    final revisionPhotos = photosForRevision(
+      reading: reading,
+      revision: revision,
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -432,7 +426,7 @@ class _RevisionEntry extends StatelessWidget {
             ],
           ),
         ),
-        if (visibleChanges.isNotEmpty || photoChanged)
+        if (visibleChanges.isNotEmpty || revisionPhotos != null)
           const SizedBox(height: 10),
         for (final change in visibleChanges) ...[
           Text(change.key, style: const TextStyle(fontWeight: FontWeight.w700)),
@@ -447,19 +441,8 @@ class _RevisionEntry extends StatelessWidget {
           ),
           const SizedBox(height: 8),
         ],
-        if (photoChanged)
-          const Row(
-            children: [
-              Icon(Icons.photo_camera_back_outlined, size: 20),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Nachweisfoto geändert',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ),
-            ],
-          ),
+        if (revisionPhotos != null)
+          _RevisionPhotos(photos: revisionPhotos, revisionId: revision.id),
       ],
     );
   }
@@ -470,7 +453,7 @@ class _RevisionEntry extends StatelessWidget {
       final parsed = DateTime.tryParse(value);
       if (parsed != null) return formatDateTime(parsed);
     }
-    if (key == 'Zählerstand') return '$value $unit';
+    if (key == 'Zählerstand') return '$value ${reading.meter.unit}';
     return value;
   }
 }
@@ -504,64 +487,105 @@ class _RevisionValue extends StatelessWidget {
   }
 }
 
-class _PhotoHistoryCard extends StatelessWidget {
-  const _PhotoHistoryCard({required this.versions});
+class _RevisionPhotos extends StatelessWidget {
+  const _RevisionPhotos({required this.photos, required this.revisionId});
 
-  final List<ReadingPhotoVersion> versions;
+  final ReadingRevisionPhotos photos;
+  final String revisionId;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: ExpansionTile(
-        shape: const RoundedRectangleBorder(),
-        collapsedShape: const RoundedRectangleBorder(),
-        leading: const Icon(Icons.photo_library_outlined),
-        title: Text('Frühere Fotos (${versions.length})'),
-        subtitle: const Text('Originale bleiben unverändert erhalten'),
-        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        children: [
-          for (final entry in versions.indexed) ...[
-            const Divider(),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                entry.$1 == 0
-                    ? 'Ursprüngliches Foto'
-                    : 'Frühere Foto-Version ${entry.$1 + 1}',
-                style: const TextStyle(fontWeight: FontWeight.w800),
-              ),
-            ),
-            const SizedBox(height: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: AspectRatio(
-                aspectRatio: 4 / 3,
-                child: Image.file(
-                  File(entry.$2.path),
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, _, _) => const ColoredBox(
-                    color: Colors.black12,
-                    child: Center(child: Icon(Icons.broken_image_outlined)),
-                  ),
+    final after = photos.after;
+    final before = photos.before;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (after != null) ...[
+          const Text(
+            'Neues Foto',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          _RevisionPhotoPreview(
+            photo: after,
+            semanticsLabel: 'Neues Foto der Korrektur $revisionId',
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${after.source.label} · hinzugefügt ${formatDateTime(after.addedAt)}',
+          ),
+        ] else
+          const Row(
+            children: [
+              Icon(Icons.photo_camera_back_outlined, size: 20),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Nachweisfoto geändert',
+                  style: TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),
+            ],
+          ),
+        if (before != null) ...[
+          const SizedBox(height: 4),
+          Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              childrenPadding: const EdgeInsets.only(bottom: 4),
+              shape: const RoundedRectangleBorder(),
+              collapsedShape: const RoundedRectangleBorder(),
+              leading: const Icon(Icons.compare_outlined),
+              title: const Text('Vorheriges Foto anzeigen'),
+              children: [
+                _RevisionPhotoPreview(
+                  photo: before,
+                  semanticsLabel: 'Vorheriges Foto der Korrektur $revisionId',
+                ),
+                const SizedBox(height: 6),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '${before.source.label} · hinzugefügt ${formatDateTime(before.addedAt)}',
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                '${entry.$2.source.label} · hinzugefügt ${formatDateTime(entry.$2.addedAt)}',
-              ),
-            ),
-            const SizedBox(height: 6),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: SelectableText(
-                'Prüfwert des Fotos (SHA-256)\n${entry.$2.sha256}',
-              ),
-            ),
-          ],
+          ),
         ],
+      ],
+    );
+  }
+}
+
+class _RevisionPhotoPreview extends StatelessWidget {
+  const _RevisionPhotoPreview({
+    required this.photo,
+    required this.semanticsLabel,
+  });
+
+  final ReadingPhotoVersion photo;
+  final String semanticsLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: semanticsLabel,
+      image: true,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: AspectRatio(
+          aspectRatio: 4 / 3,
+          child: Image.file(
+            File(photo.path),
+            fit: BoxFit.contain,
+            errorBuilder: (_, _, _) => const ColoredBox(
+              color: Colors.black12,
+              child: Center(child: Icon(Icons.broken_image_outlined)),
+            ),
+          ),
+        ),
       ),
     );
   }
