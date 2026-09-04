@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:meter_reading_log/app/app_providers.dart';
 import 'package:meter_reading_log/core/integrity/integrity_copy.dart';
+import 'package:meter_reading_log/features/evidence/application/evidence_report_service.dart';
 import 'package:meter_reading_log/features/meters/domain/meter.dart';
 import 'package:meter_reading_log/features/meters/domain/meter_reading.dart';
 import 'package:meter_reading_log/features/meters/domain/reading_value.dart';
@@ -114,6 +117,67 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Ursprüngliches Foto'), findsOneWidget);
   });
+
+  testWidgets('single PDF action immediately shows indeterminate progress', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(430, 1200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final reading = _reading();
+    final readings = MemoryReadingRepository()..items[reading.id] = reading;
+    final pendingReports = _PendingEvidenceReportService();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          meterReadingRepositoryProvider.overrideWithValue(readings),
+          evidenceExportRepositoryProvider.overrideWithValue(
+            MemoryEvidenceExportRepository(),
+          ),
+          evidenceReportServiceProvider.overrideWithValue(pendingReports),
+        ],
+        child: MaterialApp(home: ReadingDetailScreen(readingId: reading.id)),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final scrollable = find
+        .descendant(
+          of: find.byType(ListView),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.scrollUntilVisible(
+      find.text('Einzelnachweis als PDF'),
+      250,
+      scrollable: scrollable,
+    );
+
+    await tester.tap(find.text('Einzelnachweis als PDF'));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('PDF wird erstellt …'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    expect(
+      find.text('Foto und Nachweisdaten werden verarbeitet.'),
+      findsOneWidget,
+    );
+  });
+}
+
+class _PendingEvidenceReportService extends EvidenceReportService {
+  _PendingEvidenceReportService()
+    : super(exports: MemoryEvidenceExportRepository());
+
+  final pending = Completer<GeneratedEvidenceReport>();
+
+  @override
+  Future<GeneratedEvidenceReport> createSingle({
+    required MeterReading reading,
+    required List<ReadingRevision> revisions,
+  }) {
+    return pending.future;
+  }
 }
 
 MeterReading _reading({List<ReadingPhotoVersion> photoHistory = const []}) {
