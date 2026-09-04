@@ -406,6 +406,8 @@ class _PhotoHistoryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: ExpansionTile(
+        shape: const RoundedRectangleBorder(),
+        collapsedShape: const RoundedRectangleBorder(),
         leading: const Icon(Icons.photo_library_outlined),
         title: Text('Frühere Fotos (${versions.length})'),
         subtitle: const Text('Originale bleiben unverändert erhalten'),

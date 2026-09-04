@@ -54,6 +54,58 @@ void main() {
     expect(find.byType(TimePickerDialog), findsOneWidget);
   });
 
+  testWidgets('reminders support daily and weekly intervals', (tester) async {
+    final meters = MemoryMeterRepository();
+    await tester.pumpWidget(_testApp(meters: meters));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Zähler anlegen'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Bezeichnung *'),
+      'Wasser wöchentlich',
+    );
+
+    await tester.tap(find.text('Ableseerinnerung'));
+    await tester.pumpAndSettle();
+    final intervalField = find.byType(
+      DropdownButtonFormField<ReminderInterval>,
+    );
+    await tester.ensureVisible(intervalField);
+    await tester.tap(intervalField);
+    await tester.pumpAndSettle();
+    expect(find.text('Täglich'), findsOneWidget);
+    expect(find.text('Wöchentlich'), findsOneWidget);
+
+    await tester.tap(find.text('Täglich'));
+    await tester.pumpAndSettle();
+    expect(find.text('Wochentag'), findsNothing);
+    expect(find.text('Tag'), findsNothing);
+
+    await tester.tap(intervalField);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Wöchentlich').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Wochentag'), findsOneWidget);
+
+    final weekdayField = find.byType(DropdownButtonFormField<int>);
+    await tester.tap(weekdayField);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Montag').last);
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Zähler speichern'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Zähler speichern'));
+    for (var attempt = 0; attempt < 30 && meters.items.isEmpty; attempt++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    await tester.pump();
+
+    final reminder = meters.items.values.single.reminder!;
+    expect(reminder.interval, ReminderInterval.weekly);
+    expect(reminder.day, DateTime.monday);
+  });
+
   testWidgets('meter form offers expanded types and matching units', (
     tester,
   ) async {
@@ -182,6 +234,53 @@ void main() {
 
     expect(find.text('Dashboard'), findsOneWidget);
     expect(find.text('Ablesen / Fotografieren'), findsNothing);
+  });
+
+  testWidgets('meter edit and delete actions are visible below its summary', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(430, 1200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final meters = MemoryMeterRepository();
+    final meter =
+        _meter(
+          id: 'weekly_meter',
+          label: 'Wasser Garten',
+          type: MeterType.water,
+          location: 'Garten',
+          updatedAt: DateTime.utc(2026, 9, 4),
+        ).copyWith(
+          reminder: const ReadingReminderSchedule(
+            interval: ReminderInterval.weekly,
+            day: DateTime.friday,
+            hour: 9,
+            minute: 0,
+          ),
+        );
+    meters.items[meter.id] = meter;
+
+    await tester.pumpWidget(_testApp(meters: meters));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Wasser Garten'));
+    await tester.pumpAndSettle();
+
+    final edit = find.widgetWithText(OutlinedButton, 'Bearbeiten');
+    final delete = find.widgetWithText(OutlinedButton, 'Zähler löschen');
+    expect(edit, findsOneWidget);
+    expect(delete, findsOneWidget);
+    expect(find.byType(PopupMenuButton<String>), findsNothing);
+    expect(
+      find.text('Erinnerung: wöchentlich am Freitag um 09:00 Uhr'),
+      findsOneWidget,
+    );
+    expect(
+      tester.getBottomLeft(find.byType(Card).first).dy,
+      lessThan(tester.getTopLeft(edit).dy),
+    );
+    expect(
+      tester.getTopLeft(delete).dy,
+      lessThan(tester.getTopLeft(find.text('Verlauf')).dy),
+    );
   });
 
   testWidgets('system back traverses nested settings screens', (tester) async {

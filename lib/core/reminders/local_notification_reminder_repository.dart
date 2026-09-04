@@ -109,9 +109,7 @@ class LocalNotificationReminderRepository implements MeterReminderRepository {
     }
 
     final next = nextReminderDate(schedule, DateTime.now());
-    final components = schedule.interval == ReminderInterval.monthly
-        ? DateTimeComponents.dayOfMonthAndTime
-        : DateTimeComponents.dateAndTime;
+    final components = reminderDateTimeComponents(schedule.interval);
     try {
       await _plugin.zonedSchedule(
         id: stableNotificationId(meter.id),
@@ -162,6 +160,49 @@ class LocalNotificationReminderRepository implements MeterReminderRepository {
 }
 
 DateTime nextReminderDate(ReadingReminderSchedule schedule, DateTime now) {
+  if (schedule.interval == ReminderInterval.daily) {
+    var candidate = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      schedule.hour,
+      schedule.minute,
+    );
+    if (!candidate.isAfter(now)) {
+      candidate = DateTime(
+        now.year,
+        now.month,
+        now.day + 1,
+        schedule.hour,
+        schedule.minute,
+      );
+    }
+    return candidate;
+  }
+
+  if (schedule.interval == ReminderInterval.weekly) {
+    final weekday = schedule.day.clamp(DateTime.monday, DateTime.sunday);
+    var daysAhead = (weekday - now.weekday) % DateTime.daysPerWeek;
+    var candidate = DateTime(
+      now.year,
+      now.month,
+      now.day + daysAhead,
+      schedule.hour,
+      schedule.minute,
+    );
+    if (!candidate.isAfter(now)) {
+      daysAhead += DateTime.daysPerWeek;
+      candidate = DateTime(
+        now.year,
+        now.month,
+        now.day + daysAhead,
+        schedule.hour,
+        schedule.minute,
+      );
+    }
+    return candidate;
+  }
+
   if (schedule.interval == ReminderInterval.monthly) {
     var year = now.year;
     var month = now.month;
@@ -207,6 +248,15 @@ DateTime nextReminderDate(ReadingReminderSchedule schedule, DateTime now) {
     );
   }
   return candidate;
+}
+
+DateTimeComponents reminderDateTimeComponents(ReminderInterval interval) {
+  return switch (interval) {
+    ReminderInterval.daily => DateTimeComponents.time,
+    ReminderInterval.weekly => DateTimeComponents.dayOfWeekAndTime,
+    ReminderInterval.monthly => DateTimeComponents.dayOfMonthAndTime,
+    ReminderInterval.yearly => DateTimeComponents.dateAndTime,
+  };
 }
 
 DateTime _safeDate(int year, int month, int day, int hour, int minute) {

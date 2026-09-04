@@ -53,7 +53,8 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
   late String _unit;
   late bool _reminderEnabled;
   late ReminderInterval _interval;
-  late int _day;
+  late int _dayOfMonth;
+  late int _weekday;
   late int _month;
   late TimeOfDay _time;
   bool _saving = false;
@@ -71,10 +72,19 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
         ? _type.defaultUnit
         : savedUnit;
     final reminder = meter?.reminder;
+    final now = DateTime.now();
     _reminderEnabled = reminder != null;
     _interval = reminder?.interval ?? ReminderInterval.monthly;
-    _day = reminder?.day ?? DateTime.now().day;
-    _month = reminder?.month ?? DateTime.now().month;
+    _dayOfMonth =
+        reminder != null &&
+            (reminder.interval == ReminderInterval.monthly ||
+                reminder.interval == ReminderInterval.yearly)
+        ? reminder.day.clamp(1, 28)
+        : now.day.clamp(1, 28);
+    _weekday = reminder?.interval == ReminderInterval.weekly
+        ? reminder!.day.clamp(DateTime.monday, DateTime.sunday)
+        : now.weekday;
+    _month = reminder?.month ?? now.month;
     _time = TimeOfDay(hour: reminder?.hour ?? 9, minute: reminder?.minute ?? 0);
   }
 
@@ -172,15 +182,12 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
                         decoration: const InputDecoration(
                           labelText: 'Intervall',
                         ),
-                        items: const [
-                          DropdownMenuItem(
-                            value: ReminderInterval.monthly,
-                            child: Text('Monatlich'),
-                          ),
-                          DropdownMenuItem(
-                            value: ReminderInterval.yearly,
-                            child: Text('Jährlich'),
-                          ),
+                        items: [
+                          for (final interval in ReminderInterval.values)
+                            DropdownMenuItem(
+                              value: interval,
+                              child: Text(interval.label),
+                            ),
                         ],
                         onChanged: (value) =>
                             setState(() => _interval = value ?? _interval),
@@ -202,17 +209,46 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
                         ),
                       if (_interval == ReminderInterval.yearly)
                         const SizedBox(height: 12),
-                      DropdownButtonFormField<int>(
-                        initialValue: _day,
-                        decoration: const InputDecoration(labelText: 'Tag'),
-                        items: [
-                          for (var day = 1; day <= 28; day++)
-                            DropdownMenuItem(value: day, child: Text('$day.')),
-                        ],
-                        onChanged: (value) =>
-                            setState(() => _day = value ?? _day),
-                      ),
-                      const SizedBox(height: 12),
+                      if (_interval == ReminderInterval.weekly) ...[
+                        DropdownButtonFormField<int>(
+                          initialValue: _weekday,
+                          decoration: const InputDecoration(
+                            labelText: 'Wochentag',
+                          ),
+                          items: [
+                            for (
+                              var weekday = DateTime.monday;
+                              weekday <= DateTime.sunday;
+                              weekday++
+                            )
+                              DropdownMenuItem(
+                                value: weekday,
+                                child: Text(reminderWeekdayLabel(weekday)),
+                              ),
+                          ],
+                          onChanged: (value) =>
+                              setState(() => _weekday = value ?? _weekday),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      if (_interval == ReminderInterval.monthly ||
+                          _interval == ReminderInterval.yearly) ...[
+                        DropdownButtonFormField<int>(
+                          initialValue: _dayOfMonth,
+                          decoration: const InputDecoration(labelText: 'Tag'),
+                          items: [
+                            for (var day = 1; day <= 28; day++)
+                              DropdownMenuItem(
+                                value: day,
+                                child: Text('$day.'),
+                              ),
+                          ],
+                          onChanged: (value) => setState(
+                            () => _dayOfMonth = value ?? _dayOfMonth,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
                       Align(
                         alignment: Alignment.centerLeft,
                         child: Column(
@@ -269,7 +305,12 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
     final reminder = _reminderEnabled
         ? ReadingReminderSchedule(
             interval: _interval,
-            day: _day,
+            day: switch (_interval) {
+              ReminderInterval.weekly => _weekday,
+              ReminderInterval.monthly ||
+              ReminderInterval.yearly => _dayOfMonth,
+              ReminderInterval.daily => 1,
+            },
             month: _interval == ReminderInterval.yearly ? _month : null,
             hour: _time.hour,
             minute: _time.minute,
