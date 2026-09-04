@@ -47,27 +47,7 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
     final exports =
         ref.watch(evidenceForMeterProvider(meter.id)).value ?? const [];
     return Scaffold(
-      appBar: AppBar(
-        title: Text(meter.label),
-        actions: [
-          PopupMenuButton<String>(
-            onSelected: (value) {
-              if (value == 'edit') {
-                context.pushNamed(
-                  'meterEdit',
-                  pathParameters: {'id': meter.id},
-                );
-              } else if (value == 'delete') {
-                _deleteMeter(meter);
-              }
-            },
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'edit', child: Text('Bearbeiten')),
-              PopupMenuItem(value: 'delete', child: Text('Zähler löschen')),
-            ],
-          ),
-        ],
-      ),
+      appBar: AppBar(title: Text(meter.label)),
       body: readingsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, _) => const Center(
@@ -77,6 +57,14 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 112),
           children: [
             _MeterHeader(meter: meter, readings: readings),
+            const SizedBox(height: 12),
+            _MeterActions(
+              onEdit: () => context.pushNamed(
+                'meterEdit',
+                pathParameters: {'id': meter.id},
+              ),
+              onDelete: () => _deleteMeter(meter),
+            ),
             const SizedBox(height: 18),
             Row(
               children: [
@@ -203,6 +191,38 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
   }
 }
 
+class _MeterActions extends StatelessWidget {
+  const _MeterActions({required this.onEdit, required this.onDelete});
+
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        OutlinedButton.icon(
+          onPressed: onEdit,
+          icon: const Icon(Icons.edit_outlined),
+          label: const Text('Bearbeiten'),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: colors.error,
+            side: BorderSide(color: colors.error),
+          ),
+          onPressed: onDelete,
+          icon: const Icon(Icons.delete_outline),
+          label: const Text('Zähler löschen'),
+        ),
+      ],
+    );
+  }
+}
+
 class _HistoryPdfAction extends StatelessWidget {
   const _HistoryPdfAction({required this.exporting, required this.onPressed});
 
@@ -314,14 +334,25 @@ class _MeterHeader extends StatelessWidget {
               Text('Zählernummer: ${meter.meterNumber}'),
             if (meter.location.isNotEmpty) Text('Standort: ${meter.location}'),
             if (meter.reminder != null)
-              Text(
-                'Erinnerung: ${meter.reminder!.interval == ReminderInterval.monthly ? 'monatlich' : 'jährlich'} am ${meter.reminder!.day}. um ${meter.reminder!.hour.toString().padLeft(2, '0')}:${meter.reminder!.minute.toString().padLeft(2, '0')} Uhr',
-              ),
+              Text('Erinnerung: ${_reminderSummary(meter.reminder!)}'),
           ],
         ),
       ),
     );
   }
+}
+
+String _reminderSummary(ReadingReminderSchedule reminder) {
+  final time =
+      '${reminder.hour.toString().padLeft(2, '0')}:${reminder.minute.toString().padLeft(2, '0')} Uhr';
+  return switch (reminder.interval) {
+    ReminderInterval.daily => 'täglich um $time',
+    ReminderInterval.weekly =>
+      'wöchentlich am ${reminderWeekdayLabel(reminder.day)} um $time',
+    ReminderInterval.monthly => 'monatlich am ${reminder.day}. um $time',
+    ReminderInterval.yearly =>
+      'jährlich am ${reminder.day}.${(reminder.month ?? 1).toString().padLeft(2, '0')}. um $time',
+  };
 }
 
 class _ReadingTile extends StatelessWidget {

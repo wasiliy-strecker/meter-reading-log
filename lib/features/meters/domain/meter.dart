@@ -216,7 +216,27 @@ MeterUnitOption? meterUnitOption(String unit) {
 String meterUnitDescription(String unit) =>
     meterUnitOption(unit)?.description ?? 'Eigene Einheit dieses Zählers';
 
-enum ReminderInterval { monthly, yearly }
+enum ReminderInterval { daily, weekly, monthly, yearly }
+
+extension ReminderIntervalLabel on ReminderInterval {
+  String get label => switch (this) {
+    ReminderInterval.daily => 'Täglich',
+    ReminderInterval.weekly => 'Wöchentlich',
+    ReminderInterval.monthly => 'Monatlich',
+    ReminderInterval.yearly => 'Jährlich',
+  };
+}
+
+String reminderWeekdayLabel(int weekday) => switch (weekday) {
+  DateTime.monday => 'Montag',
+  DateTime.tuesday => 'Dienstag',
+  DateTime.wednesday => 'Mittwoch',
+  DateTime.thursday => 'Donnerstag',
+  DateTime.friday => 'Freitag',
+  DateTime.saturday => 'Samstag',
+  DateTime.sunday => 'Sonntag',
+  _ => 'Montag',
+};
 
 class ReadingReminderSchedule {
   const ReadingReminderSchedule({

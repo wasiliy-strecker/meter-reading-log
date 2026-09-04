@@ -68,9 +68,55 @@ void main() {
     expect(find.text(privateDocumentationText), findsOneWidget);
     expect(find.byIcon(Icons.fact_check_outlined), findsOneWidget);
   });
+
+  testWidgets('previous photos expand without an extra top and bottom frame', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(430, 1200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final reading = _reading(
+      photoHistory: [
+        ReadingPhotoVersion(
+          id: 'original_photo',
+          path: '/tmp/original.jpg',
+          sha256: 'c' * 64,
+          source: ReadingSource.gallery,
+          addedAt: DateTime.utc(2026, 9, 1, 10),
+          ocrRawText: '41,9',
+          ocrCandidate: '41,9',
+        ),
+      ],
+    );
+    final readings = MemoryReadingRepository()..items[reading.id] = reading;
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          meterReadingRepositoryProvider.overrideWithValue(readings),
+          evidenceExportRepositoryProvider.overrideWithValue(
+            MemoryEvidenceExportRepository(),
+          ),
+        ],
+        child: MaterialApp(home: ReadingDetailScreen(readingId: reading.id)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final historyTile = find.widgetWithText(ExpansionTile, 'Frühere Fotos (1)');
+    final tile = tester.widget<ExpansionTile>(historyTile);
+    expect((tile.shape as RoundedRectangleBorder).side.style, BorderStyle.none);
+    expect(
+      (tile.collapsedShape as RoundedRectangleBorder).side.style,
+      BorderStyle.none,
+    );
+
+    await tester.tap(find.text('Frühere Fotos (1)'));
+    await tester.pumpAndSettle();
+    expect(find.text('Ursprüngliches Foto'), findsOneWidget);
+  });
 }
 
-MeterReading _reading() {
+MeterReading _reading({List<ReadingPhotoVersion> photoHistory = const []}) {
   final meter = Meter(
     id: 'meter_1',
     label: 'Wasser Bad',
@@ -93,6 +139,7 @@ MeterReading _reading() {
     photoSha256: 'a' * 64,
     ocrRawText: '42,1',
     ocrCandidate: '42,1',
+    photoHistory: photoHistory,
     manifestSha256: 'b' * 64,
   );
 }
