@@ -371,20 +371,93 @@ class EvidenceReportService {
       if (revisions.isNotEmpty) ...[
         pw.SizedBox(height: 10),
         pw.Text(
-          'Änderungsprotokoll',
+          'Korrekturverlauf',
           style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
         ),
-        for (final revision in revisions)
-          pw.Padding(
-            padding: const pw.EdgeInsets.only(top: 4),
-            child: pw.Text(
-              '${date.format(revision.changedAt.toLocal())}: ${revision.reason} · '
-              '${revision.changes.entries.map((entry) => '${entry.key}: „${entry.value.before}“ → „${entry.value.after}“').join('; ')}',
-              style: const pw.TextStyle(fontSize: 9),
-            ),
+        for (final revision in ([
+          ...revisions,
+        ]..sort((left, right) => right.changedAt.compareTo(left.changedAt))))
+          _revisionSection(
+            revision: revision,
+            unit: reading.meter.unit,
+            date: date,
           ),
       ],
     ];
+  }
+
+  pw.Widget _revisionSection({
+    required ReadingRevision revision,
+    required String unit,
+    required DateFormat date,
+  }) {
+    const photoChangeKeys = {
+      'Prüfwert des Fotos (SHA-256)',
+      'Fotoquelle',
+      'OCR-Kandidat',
+    };
+    final visibleChanges = revision.changes.entries
+        .where((entry) => !photoChangeKeys.contains(entry.key))
+        .toList(growable: false);
+    final photoChanged = revision.changes.keys.any(photoChangeKeys.contains);
+    return pw.Container(
+      margin: const pw.EdgeInsets.only(top: 6),
+      padding: const pw.EdgeInsets.all(8),
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(color: PdfColors.grey400),
+        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            'Korrektur vom ${date.format(revision.changedAt.toLocal())}',
+            style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.Text(
+            'Grund: ${revision.reason}',
+            style: const pw.TextStyle(fontSize: 9),
+          ),
+          for (final change in visibleChanges) ...[
+            pw.SizedBox(height: 4),
+            pw.Text(
+              change.key,
+              style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+            ),
+            pw.Text(
+              'Vorher: ${_revisionValue(change.key, change.value.before, unit, date)}',
+              style: const pw.TextStyle(fontSize: 9),
+            ),
+            pw.Text(
+              'Neu: ${_revisionValue(change.key, change.value.after, unit, date)}',
+              style: const pw.TextStyle(fontSize: 9),
+            ),
+          ],
+          if (photoChanged) ...[
+            pw.SizedBox(height: 4),
+            pw.Text(
+              'Nachweisfoto geändert',
+              style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _revisionValue(
+    String key,
+    String value,
+    String unit,
+    DateFormat date,
+  ) {
+    if (value.trim().isEmpty) return 'Keine Angabe';
+    if (key == 'Zeitpunkt der Ablesung') {
+      final parsed = DateTime.tryParse(value);
+      if (parsed != null) return date.format(parsed.toLocal());
+    }
+    if (key == 'Zählerstand') return '$value $unit';
+    return value;
   }
 
   pw.Widget _photo(String path) {

@@ -122,7 +122,7 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
               child: Padding(
                 padding: const EdgeInsets.all(14),
                 child: Text(
-                  'Korrekturen überschreiben den ursprünglichen Eintrag nicht. Alter und neuer Inhalt sowie der Grund bleiben im Änderungsprotokoll erhalten.',
+                  'Nach dem Speichern findest du diese Änderung unter „Korrekturverlauf“. Dort stehen der Grund und die geänderten Angaben mit „Vorher“ und „Neu“.',
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),

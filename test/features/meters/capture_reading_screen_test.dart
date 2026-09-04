@@ -14,187 +14,181 @@ import 'package:meter_reading_log/features/meters/domain/reading_value.dart';
 import '../../support/fakes.dart';
 
 void main() {
-  testWidgets(
-    'capture flow clearly exposes photo, unit, time and keyboard UX',
-    (tester) async {
-      await tester.binding.setSurfaceSize(const Size(430, 1200));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
+  testWidgets('capture flow clearly exposes photo, unit, time and keyboard UX', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(430, 1200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
 
-      final meter = Meter(
-        id: 'meter_heat',
-        label: 'Wärme Keller',
-        type: MeterType.heat,
-        unit: 'GJ',
-        createdAt: DateTime.utc(2026, 9, 2),
-        updatedAt: DateTime.utc(2026, 9, 2),
-      );
-      final meters = MemoryMeterRepository()..items[meter.id] = meter;
-      final readings = MemoryReadingRepository();
-      final photos = _FixedPhotoRepository();
+    final meter = Meter(
+      id: 'meter_heat',
+      label: 'Wärme Keller',
+      type: MeterType.heat,
+      unit: 'GJ',
+      createdAt: DateTime.utc(2026, 9, 2),
+      updatedAt: DateTime.utc(2026, 9, 2),
+    );
+    final meters = MemoryMeterRepository()..items[meter.id] = meter;
+    final readings = MemoryReadingRepository();
+    final photos = _FixedPhotoRepository();
 
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            meterRepositoryProvider.overrideWithValue(meters),
-            meterReadingRepositoryProvider.overrideWithValue(readings),
-            evidenceExportRepositoryProvider.overrideWithValue(
-              MemoryEvidenceExportRepository(),
-            ),
-            meterPhotoCaptureRepositoryProvider.overrideWithValue(photos),
-            meterOcrRepositoryProvider.overrideWithValue(
-              const _FixedOcrRepository(),
-            ),
-            meterReminderRepositoryProvider.overrideWithValue(
-              NoopMeterReminderRepository(),
-            ),
-          ],
-          child: const MeterReadingLogApp(),
-        ),
-      );
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          meterRepositoryProvider.overrideWithValue(meters),
+          meterReadingRepositoryProvider.overrideWithValue(readings),
+          evidenceExportRepositoryProvider.overrideWithValue(
+            MemoryEvidenceExportRepository(),
+          ),
+          meterPhotoCaptureRepositoryProvider.overrideWithValue(photos),
+          meterOcrRepositoryProvider.overrideWithValue(
+            const _FixedOcrRepository(),
+          ),
+          meterReminderRepositoryProvider.overrideWithValue(
+            NoopMeterReminderRepository(),
+          ),
+        ],
+        child: const MeterReadingLogApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Wärme Keller'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Ablesen / Fotografieren'));
-      await tester.pumpAndSettle();
-      expect(find.text('Ablesen / Fotografieren'), findsWidgets);
+    await tester.tap(find.text('Wärme Keller'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ablesen / Fotografieren'));
+    await tester.pumpAndSettle();
+    expect(find.text('Ablesen / Fotografieren'), findsWidgets);
 
-      await tester.tap(find.text('Zähler fotografieren'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.text('Zähler fotografieren'));
+    await tester.pumpAndSettle();
 
-      expect(find.text('Ersetzen'), findsNothing);
-      expect(find.text('Neues Foto aufnehmen oder auswählen'), findsOneWidget);
-      expect(find.text('Einheit des Zählerstands'), findsOneWidget);
-      expect(find.text('GJ'), findsWidgets);
-      expect(find.text('Gigajoule – Einheit für Wärmeenergie'), findsOneWidget);
-      expect(find.text('Datum & Uhrzeit ändern'), findsOneWidget);
-      expect(
-        tester.widget<ListView>(find.byType(ListView)).keyboardDismissBehavior,
-        ScrollViewKeyboardDismissBehavior.onDrag,
-      );
+    expect(find.text('Ersetzen'), findsNothing);
+    expect(find.text('Neues Foto aufnehmen oder auswählen'), findsOneWidget);
+    expect(find.text('Einheit des Zählerstands'), findsOneWidget);
+    expect(find.text('GJ'), findsWidgets);
+    expect(find.text('Gigajoule – Einheit für Wärmeenergie'), findsOneWidget);
+    expect(find.text('Datum & Uhrzeit ändern'), findsOneWidget);
+    expect(
+      tester.widget<ListView>(find.byType(ListView)).keyboardDismissBehavior,
+      ScrollViewKeyboardDismissBehavior.onDrag,
+    );
 
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
-      await tester.pumpAndSettle();
-      expect(find.text('Weitere Einheit …'), findsOneWidget);
-      await tester.tap(find.text('kWh').last);
-      await tester.pumpAndSettle();
-      expect(
-        find.text('Kilowattstunde – Energieverbrauch oder Erzeugung'),
-        findsOneWidget,
-      );
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    expect(find.text('Weitere Einheit …'), findsOneWidget);
+    await tester.tap(find.text('kWh').last);
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Kilowattstunde – Energieverbrauch oder Erzeugung'),
+      findsOneWidget,
+    );
 
-      await tester.ensureVisible(
-        find.text('Ablesung bestätigen und speichern'),
-      );
-      final confirmButton = find.widgetWithText(
-        FilledButton,
-        'Ablesung bestätigen und speichern',
-      );
-      expect(
-        Theme.of(
-          tester.element(confirmButton),
-        ).filledButtonTheme.style?.shape?.resolve(const <WidgetState>{}),
-        isA<StadiumBorder>(),
-      );
-      await tester.tap(find.text('Ablesung bestätigen und speichern'));
-      for (var attempt = 0; attempt < 30 && readings.items.isEmpty; attempt++) {
-        await tester.pump(const Duration(milliseconds: 100));
-      }
+    await tester.ensureVisible(find.text('Ablesung bestätigen und speichern'));
+    final confirmButton = find.widgetWithText(
+      FilledButton,
+      'Ablesung bestätigen und speichern',
+    );
+    expect(
+      Theme.of(
+        tester.element(confirmButton),
+      ).filledButtonTheme.style?.shape?.resolve(const <WidgetState>{}),
+      isA<StadiumBorder>(),
+    );
+    await tester.tap(find.text('Ablesung bestätigen und speichern'));
+    for (var attempt = 0; attempt < 30 && readings.items.isEmpty; attempt++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
 
-      expect(meters.items[meter.id]!.unit, 'kWh');
-      expect(readings.items.values.single.meter.unit, 'kWh');
-      await tester.pumpAndSettle();
-      expect(
-        find.widgetWithText(OutlinedButton, 'Korrigieren'),
-        findsOneWidget,
-      );
-      expect(
-        find.widgetWithText(OutlinedButton, 'Ablesung löschen'),
-        findsOneWidget,
-      );
-      expect(find.byType(PopupMenuButton<String>), findsNothing);
+    expect(meters.items[meter.id]!.unit, 'kWh');
+    expect(readings.items.values.single.meter.unit, 'kWh');
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(OutlinedButton, 'Korrigieren'), findsOneWidget);
+    expect(
+      find.widgetWithText(OutlinedButton, 'Ablesung löschen'),
+      findsOneWidget,
+    );
+    expect(find.byType(PopupMenuButton<String>), findsNothing);
 
-      await tester.tap(find.text('Korrigieren'));
-      await tester.pumpAndSettle();
-      expect(find.text('Aktuelles Nachweisfoto'), findsOneWidget);
-      expect(find.text('Neues Foto für Korrektur'), findsOneWidget);
-      expect(
-        find.textContaining(
-          'Korrekturen überschreiben den ursprünglichen Eintrag nicht',
-        ),
-        findsOneWidget,
-      );
+    await tester.tap(find.text('Korrigieren'));
+    await tester.pumpAndSettle();
+    expect(find.text('Aktuelles Nachweisfoto'), findsOneWidget);
+    expect(find.text('Neues Foto für Korrektur'), findsOneWidget);
+    expect(
+      find.textContaining(
+        'Nach dem Speichern findest du diese Änderung unter „Korrekturverlauf“',
+      ),
+      findsOneWidget,
+    );
 
-      await tester.ensureVisible(find.text('Neues Foto für Korrektur'));
-      await tester.tap(find.text('Neues Foto für Korrektur'));
-      await tester.pumpAndSettle();
-      expect(find.text('Neues Nachweisfoto'), findsOneWidget);
-      await tester.tap(find.text('Aus Galerie wählen'));
-      await tester.pumpAndSettle();
-      expect(
-        find.textContaining('Das bisherige Foto bleibt als frühere Version'),
-        findsOneWidget,
-      );
-      expect(find.textContaining('Der Ablesezeitpunkt'), findsNothing);
-      expect(find.text('Erkannte Werte'), findsOneWidget);
-      final changePhotoButton = find.widgetWithText(
-        OutlinedButton,
-        'Korrekturfoto ändern',
-      );
-      expect(changePhotoButton, findsOneWidget);
-      expect(
-        tester.getTopLeft(changePhotoButton).dy,
-        lessThan(
-          tester
-              .getTopLeft(
-                find.textContaining(
-                  'Das bisherige Foto bleibt als frühere Version',
-                ),
-              )
-              .dy,
-        ),
-      );
+    await tester.ensureVisible(find.text('Neues Foto für Korrektur'));
+    await tester.tap(find.text('Neues Foto für Korrektur'));
+    await tester.pumpAndSettle();
+    expect(find.text('Neues Nachweisfoto'), findsOneWidget);
+    await tester.tap(find.text('Aus Galerie wählen'));
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('Das bisherige Foto bleibt als frühere Version'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Der Ablesezeitpunkt'), findsNothing);
+    expect(find.text('Erkannte Werte'), findsOneWidget);
+    final changePhotoButton = find.widgetWithText(
+      OutlinedButton,
+      'Korrekturfoto ändern',
+    );
+    expect(changePhotoButton, findsOneWidget);
+    expect(
+      tester.getTopLeft(changePhotoButton).dy,
+      lessThan(
+        tester
+            .getTopLeft(
+              find.textContaining(
+                'Das bisherige Foto bleibt als frühere Version',
+              ),
+            )
+            .dy,
+      ),
+    );
 
-      final capturesBeforeChange = photos.captureCount;
-      await tester.tap(changePhotoButton);
-      await tester.pumpAndSettle();
-      expect(find.text('Neues Nachweisfoto'), findsOneWidget);
-      await tester.tap(find.text('Neu fotografieren'));
-      await tester.pumpAndSettle();
-      expect(photos.captureCount, capturesBeforeChange + 1);
-      expect(
-        find.widgetWithText(OutlinedButton, 'Korrekturfoto ändern'),
-        findsOneWidget,
-      );
+    final capturesBeforeChange = photos.captureCount;
+    await tester.tap(changePhotoButton);
+    await tester.pumpAndSettle();
+    expect(find.text('Neues Nachweisfoto'), findsOneWidget);
+    await tester.tap(find.text('Neu fotografieren'));
+    await tester.pumpAndSettle();
+    expect(photos.captureCount, capturesBeforeChange + 1);
+    expect(
+      find.widgetWithText(OutlinedButton, 'Korrekturfoto ändern'),
+      findsOneWidget,
+    );
 
-      await tester.scrollUntilVisible(
-        find.text('Grund der Korrektur *'),
-        300,
-        scrollable: find.byType(Scrollable).last,
-      );
-      final reasonField = find.widgetWithText(
-        TextFormField,
-        'Grund der Korrektur *',
-      );
-      await tester.enterText(reasonField, 'Neues Nachweisfoto');
-      final saveCorrection = find.text('Korrektur protokollieren');
-      await tester.ensureVisible(saveCorrection);
-      await tester.tap(saveCorrection);
-      await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Grund der Korrektur *'),
+      300,
+      scrollable: find.byType(Scrollable).last,
+    );
+    final reasonField = find.widgetWithText(
+      TextFormField,
+      'Grund der Korrektur *',
+    );
+    await tester.enterText(reasonField, 'Neues Nachweisfoto');
+    final saveCorrection = find.text('Korrektur protokollieren');
+    await tester.ensureVisible(saveCorrection);
+    await tester.tap(saveCorrection);
+    await tester.pumpAndSettle();
 
-      expect(find.text('Ablesung'), findsOneWidget);
-      expect(readings.revisions.values.single, hasLength(1));
+    expect(find.text('Ablesung'), findsOneWidget);
+    expect(readings.revisions.values.single, hasLength(1));
 
-      expect(await tester.binding.handlePopRoute(), isTrue);
-      await tester.pumpAndSettle();
-      expect(find.text('Verlauf'), findsOneWidget);
-      expect(find.text('Ablesen / Fotografieren'), findsOneWidget);
+    expect(await tester.binding.handlePopRoute(), isTrue);
+    await tester.pumpAndSettle();
+    expect(find.text('Verlauf'), findsOneWidget);
+    expect(find.text('Ablesen / Fotografieren'), findsOneWidget);
 
-      expect(await tester.binding.handlePopRoute(), isTrue);
-      await tester.pumpAndSettle();
-      expect(find.text('Dashboard'), findsOneWidget);
-    },
-  );
+    expect(await tester.binding.handlePopRoute(), isTrue);
+    await tester.pumpAndSettle();
+    expect(find.text('Dashboard'), findsOneWidget);
+  });
 
   testWidgets('history PDF action shows immediate progress feedback', (
     tester,

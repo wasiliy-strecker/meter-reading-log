@@ -104,13 +104,7 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
           const SizedBox(height: 18),
           _InfoCard(reading: reading),
           const SizedBox(height: 12),
-          _CorrectionHistoryCard(reading: reading),
-          const SizedBox(height: 12),
-          revisions.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, _) => const Text('Änderungsprotokoll nicht verfügbar.'),
-            data: (items) => _RevisionCard(revisions: items),
-          ),
+          _CorrectionHistoryCard(reading: reading, revisions: revisions),
           const SizedBox(height: 20),
           FilledButton.icon(
             onPressed: _exporting ? null : () => _export(reading),
@@ -171,7 +165,7 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
       context,
       title: 'Ablesung löschen?',
       message:
-          'Ablesung, alle Foto-Versionen und das Änderungsprotokoll werden dauerhaft gelöscht. Bereits erzeugte PDF-Nachweise bleiben als eigenständige Dateien erhalten.',
+          'Ablesung, alle Foto-Versionen und der Korrekturverlauf werden dauerhaft gelöscht. Bereits erzeugte PDF-Nachweise bleiben als eigenständige Dateien erhalten.',
     );
     if (!confirmed) return;
     await ref.read(meterReadingServiceProvider).delete(reading);
@@ -300,9 +294,13 @@ class _InfoCard extends StatelessWidget {
 }
 
 class _CorrectionHistoryCard extends StatelessWidget {
-  const _CorrectionHistoryCard({required this.reading});
+  const _CorrectionHistoryCard({
+    required this.reading,
+    required this.revisions,
+  });
 
   final MeterReading reading;
+  final AsyncValue<List<ReadingRevision>> revisions;
 
   @override
   Widget build(BuildContext context) {
@@ -329,6 +327,15 @@ class _CorrectionHistoryCard extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             const Text(correctionHistoryText),
+            const SizedBox(height: 12),
+            revisions.when(
+              loading: () => const LinearProgressIndicator(),
+              error: (_, _) => const Text(
+                'Der Korrekturverlauf konnte nicht geladen werden.',
+              ),
+              data: (items) =>
+                  _RevisionList(revisions: items, unit: reading.meter.unit),
+            ),
             const SizedBox(height: 4),
             Theme(
               data: Theme.of(
@@ -363,53 +370,137 @@ class _CorrectionHistoryCard extends StatelessWidget {
   }
 }
 
-class _RevisionCard extends StatelessWidget {
-  const _RevisionCard({required this.revisions});
+class _RevisionList extends StatelessWidget {
+  const _RevisionList({required this.revisions, required this.unit});
 
   final List<ReadingRevision> revisions;
+  final String unit;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Änderungsprotokoll',
-              style: TextStyle(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 8),
-            if (revisions.isEmpty)
-              const Text('Keine nachträglichen Änderungen.')
-            else
-              for (final revision in revisions)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${formatDateTime(revision.changedAt)} · ${revision.reason}',
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      for (final change in revision.changes.entries)
-                        Text(
-                          '${change.key}: „${_displayValue(change.key, change.value.before)}“ → „${_displayValue(change.key, change.value.after)}“',
-                        ),
-                    ],
-                  ),
-                ),
-          ],
+    if (revisions.isEmpty) {
+      return const Text('Für diese Ablesung gibt es noch keine Korrekturen.');
+    }
+
+    final newestFirst = [...revisions]
+      ..sort((left, right) => right.changedAt.compareTo(left.changedAt));
+    return Column(
+      children: [
+        for (final entry in newestFirst.indexed) ...[
+          if (entry.$1 > 0) const Divider(height: 24),
+          _RevisionEntry(revision: entry.$2, unit: unit),
+        ],
+      ],
+    );
+  }
+}
+
+class _RevisionEntry extends StatelessWidget {
+  const _RevisionEntry({required this.revision, required this.unit});
+
+  static const _photoChangeKeys = {
+    'Prüfwert des Fotos (SHA-256)',
+    'Fotoquelle',
+    'OCR-Kandidat',
+  };
+
+  final ReadingRevision revision;
+  final String unit;
+
+  @override
+  Widget build(BuildContext context) {
+    final visibleChanges = revision.changes.entries
+        .where((entry) => !_photoChangeKeys.contains(entry.key))
+        .toList(growable: false);
+    final photoChanged = revision.changes.keys.any(_photoChangeKeys.contains);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Korrektur vom ${formatDateTime(revision.changedAt)}',
+          style: const TextStyle(fontWeight: FontWeight.w800),
         ),
-      ),
+        const SizedBox(height: 6),
+        Text.rich(
+          TextSpan(
+            children: [
+              const TextSpan(
+                text: 'Grund: ',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              TextSpan(text: revision.reason),
+            ],
+          ),
+        ),
+        if (visibleChanges.isNotEmpty || photoChanged)
+          const SizedBox(height: 10),
+        for (final change in visibleChanges) ...[
+          Text(change.key, style: const TextStyle(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 3),
+          _RevisionValue(
+            label: 'Vorher',
+            value: _displayValue(change.key, change.value.before),
+          ),
+          _RevisionValue(
+            label: 'Neu',
+            value: _displayValue(change.key, change.value.after),
+          ),
+          const SizedBox(height: 8),
+        ],
+        if (photoChanged)
+          const Row(
+            children: [
+              Icon(Icons.photo_camera_back_outlined, size: 20),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Nachweisfoto geändert',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+      ],
     );
   }
 
   String _displayValue(String key, String value) {
-    if (key.contains('SHA-256') && value.length > 12) return shortHash(value);
+    if (value.trim().isEmpty) return 'Keine Angabe';
+    if (key == 'Zeitpunkt der Ablesung') {
+      final parsed = DateTime.tryParse(value);
+      if (parsed != null) return formatDateTime(parsed);
+    }
+    if (key == 'Zählerstand') return '$value $unit';
     return value;
+  }
+}
+
+class _RevisionValue extends StatelessWidget {
+  const _RevisionValue({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 1),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 62,
+            child: Text(
+              '$label:',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          Expanded(child: Text(value)),
+        ],
+      ),
+    );
   }
 }
 

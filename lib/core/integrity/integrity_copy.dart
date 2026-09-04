@@ -1,9 +1,9 @@
 const integrityProtectionTitle = 'Schutz vor nachträglichen Änderungen';
 
-const correctionHistoryTitle = 'Korrekturen nachvollziehbar';
+const correctionHistoryTitle = 'Korrekturverlauf';
 
 const correctionHistoryText =
-    'Wenn du einen Zählerstand oder das Foto korrigierst, bleiben die frühere Version, der Zeitpunkt und der Grund der Änderung erhalten.';
+    'Hier findest du jede gespeicherte Korrektur mit Zeitpunkt, Grund und den geänderten Angaben.';
 
 const integrityLimitationText =
     'Sie bestätigen jedoch nicht, wann oder von wem das Foto aufgenommen wurde.';
