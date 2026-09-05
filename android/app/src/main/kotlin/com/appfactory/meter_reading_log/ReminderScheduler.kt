@@ -246,13 +246,6 @@ internal object ReminderNotifier {
     private fun openMeterIntent(context: Context, meterId: String): PendingIntent {
         val intent = Intent(context, MainActivity::class.java)
             .setAction("com.appfactory.meter_reading_log.OPEN_METER")
-            .setData(
-                Uri.Builder()
-                    .scheme("meter-reading-log")
-                    .authority("meter")
-                    .appendPath(meterId)
-                    .build(),
-            )
             .putExtra("meter_id", meterId)
             .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         return PendingIntent.getActivity(
