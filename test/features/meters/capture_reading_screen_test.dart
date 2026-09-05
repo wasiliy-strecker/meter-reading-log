@@ -281,12 +281,37 @@ void main() {
       find.textContaining('alle Ablesungen, Fotos und Korrekturen'),
       findsOneWidget,
     );
+    final readingCard = find.byKey(const ValueKey('reading-card-reading_pdf'));
+    expect(readingCard, findsOneWidget);
+    expect(
+      find.descendant(of: readingCard, matching: find.text('Zählerstand')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: readingCard, matching: find.text('42,1 m³')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: readingCard, matching: find.text('Abgelesen am')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('reading-thumbnail-reading_pdf')),
+      findsOneWidget,
+    );
     await tester.tap(find.text('Verlauf als PDF erstellen'));
     await tester.pump();
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('PDF wird erstellt …'), findsOneWidget);
-    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    expect(find.text('PDF-Nachweis wird erstellt'), findsOneWidget);
+    expect(
+      find.text(
+        'Ablesungen, Fotos und Korrekturen werden für die PDF zusammengestellt.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('history-pdf-progress')), findsOneWidget);
+    expect(find.text('Verlauf als PDF erstellen'), findsOneWidget);
   });
 }
 
