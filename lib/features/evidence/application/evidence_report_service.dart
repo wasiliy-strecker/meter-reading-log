@@ -442,10 +442,11 @@ class EvidenceReportService {
             'Korrektur vom ${date.format(revision.changedAt.toLocal())}',
             style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
           ),
-          pw.Text(
-            'Grund: ${revision.reason}',
-            style: const pw.TextStyle(fontSize: 9),
-          ),
+          if (revision.reason.trim().isNotEmpty)
+            pw.Text(
+              'Grund: ${revision.reason.trim()}',
+              style: const pw.TextStyle(fontSize: 9),
+            ),
           for (final change in visibleChanges) ...[
             pw.SizedBox(height: 4),
             pw.Text(

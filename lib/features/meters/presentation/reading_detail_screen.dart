@@ -481,18 +481,20 @@ class _RevisionEntry extends StatelessWidget {
           'Korrektur vom ${formatDateTime(revision.changedAt)}',
           style: const TextStyle(fontWeight: FontWeight.w800),
         ),
-        const SizedBox(height: 6),
-        Text.rich(
-          TextSpan(
-            children: [
-              const TextSpan(
-                text: 'Grund: ',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
-              TextSpan(text: revision.reason),
-            ],
+        if (revision.reason.trim().isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text.rich(
+            TextSpan(
+              children: [
+                const TextSpan(
+                  text: 'Grund: ',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                TextSpan(text: revision.reason.trim()),
+              ],
+            ),
           ),
-        ),
+        ],
         if (visibleChanges.isNotEmpty || revisionPhotos != null)
           const SizedBox(height: 10),
         for (final change in visibleChanges) ...[
