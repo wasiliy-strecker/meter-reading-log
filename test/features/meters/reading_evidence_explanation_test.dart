@@ -290,14 +290,15 @@ void main() {
 
     await tester.tap(find.text('Einzelnachweis als PDF'));
     await tester.pump();
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('PDF wird erstellt …'), findsOneWidget);
-    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    expect(find.text('PDF-Nachweis wird erstellt'), findsOneWidget);
+    expect(find.byKey(const ValueKey('pdf-export-progress')), findsOneWidget);
     expect(
-      find.text('Foto und Nachweisdaten werden verarbeitet.'),
+      find.text('Foto und Nachweisdaten werden für die PDF zusammengestellt.'),
       findsOneWidget,
     );
+    expect(find.text('Einzelnachweis als PDF'), findsOneWidget);
   });
 }
 

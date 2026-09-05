@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../app/app_providers.dart';
 import '../../../app/widgets/app_snack_bar.dart';
 import '../../../app/widgets/confirm_dialog.dart';
+import '../../../app/widgets/pdf_export_progress_dialog.dart';
 import '../../../core/integrity/integrity_copy.dart';
 import '../../../core/utils/formatters.dart';
 import '../../evidence/application/evidence_report_service.dart';
@@ -109,14 +110,9 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
               ),
               const SizedBox(height: 8),
               for (final export in exports)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.verified_outlined),
-                  title: Text(export.fileName),
-                  subtitle: Text(
-                    '${formatDateTime(export.createdAt)} · ${shortHash(export.pdfSha256)}',
-                  ),
-                  trailing: const Icon(Icons.chevron_right),
+                _EvidenceExportCard(
+                  export: export,
+                  readings: readings,
                   onTap: () => _openExport(export),
                 ),
             ],
@@ -137,40 +133,34 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
   Future<void> _exportHistory(List<MeterReading> readings) async {
     if (_exporting) return;
     setState(() => _exporting = true);
-    final progressDialog = showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const _PdfExportProgressDialog(),
-    );
-    GeneratedEvidenceReport? report;
-    Object? failure;
     try {
-      await WidgetsBinding.instance.endOfFrame;
-      final repository = ref.read(meterReadingRepositoryProvider);
-      final revisions = <String, List<ReadingRevision>>{};
-      for (final reading in readings) {
-        revisions[reading.id] = await repository.loadRevisions(reading.id);
-      }
-      report = await ref
-          .read(evidenceReportServiceProvider)
-          .createHistory(readings: readings, revisions: revisions);
-    } catch (error) {
-      failure = error;
-    }
-    if (!mounted) return;
-
-    Navigator.of(context, rootNavigator: true).pop();
-    await progressDialog;
-    if (!mounted) return;
-    setState(() => _exporting = false);
-
-    if (failure != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        AppSnackBar(message: 'PDF konnte nicht erstellt werden: $failure'),
+      final report = await runWithPdfExportProgress(
+        context,
+        description:
+            'Ablesungen, Fotos und Korrekturen werden für die PDF zusammengestellt.',
+        operation: () async {
+          final repository = ref.read(meterReadingRepositoryProvider);
+          final revisions = <String, List<ReadingRevision>>{};
+          for (final reading in readings) {
+            revisions[reading.id] = await repository.loadRevisions(reading.id);
+          }
+          return ref
+              .read(evidenceReportServiceProvider)
+              .createHistory(readings: readings, revisions: revisions);
+        },
       );
-      return;
+      if (!mounted) return;
+      setState(() => _exporting = false);
+      await context.pushNamed('evidencePreview', extra: report);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          AppSnackBar(message: 'PDF konnte nicht erstellt werden: $error'),
+        );
+      }
+    } finally {
+      if (mounted && _exporting) setState(() => _exporting = false);
     }
-    await context.pushNamed('evidencePreview', extra: report!);
   }
 
   Future<void> _openExport(EvidenceExportRecord record) async {
@@ -292,48 +282,117 @@ class _HistoryPdfAction extends StatelessWidget {
   }
 }
 
-class _PdfExportProgressDialog extends StatelessWidget {
-  const _PdfExportProgressDialog();
+class _EvidenceExportCard extends StatelessWidget {
+  const _EvidenceExportCard({
+    required this.export,
+    required this.readings,
+    required this.onTap,
+  });
+
+  final EvidenceExportRecord export;
+  final List<MeterReading> readings;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    return PopScope<void>(
-      canPop: false,
-      child: AlertDialog(
-        icon: Icon(
-          Icons.picture_as_pdf_outlined,
-          size: 36,
-          color: colors.primary,
-        ),
-        title: const Text(
-          'PDF-Nachweis wird erstellt',
-          textAlign: TextAlign.center,
-        ),
-        content: Semantics(
-          liveRegion: true,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+    final title = switch (export.kind) {
+      EvidenceExportKind.meterHistory => 'Verlaufsnachweis',
+      EvidenceExportKind.singleReading => 'Einzelnachweis',
+    };
+    final detail = switch (export.kind) {
+      EvidenceExportKind.meterHistory => _readingCountLabel(
+        export.readingIds.length,
+      ),
+      EvidenceExportKind.singleReading => _singleReadingLabel(),
+    };
+
+    return Card(
+      key: ValueKey('evidence-export-${export.id}'),
+      margin: const EdgeInsets.only(bottom: 10),
+      color: colors.secondaryContainer.withValues(alpha: 0.38),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Ablesungen, Fotos und Korrekturen werden für die PDF zusammengestellt.',
-                textAlign: TextAlign.center,
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: colors.primaryContainer,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(
+                  Icons.picture_as_pdf_outlined,
+                  color: colors.onPrimaryContainer,
+                ),
               ),
-              const SizedBox(height: 20),
-              LinearProgressIndicator(
-                key: const ValueKey('history-pdf-progress'),
-                minHeight: 8,
-                borderRadius: BorderRadius.circular(999),
-                backgroundColor: colors.primary.withValues(alpha: 0.18),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Erstellt am ${formatDateTime(export.createdAt)} Uhr',
+                      style: TextStyle(color: colors.onSurfaceVariant),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      detail,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 10),
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: colors.primary.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.verified_outlined,
+                              size: 17,
+                              color: colors.primary,
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              'Lokal gespeichert',
+                              style: Theme.of(context).textTheme.labelMedium
+                                  ?.copyWith(
+                                    color: colors.primary,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 10),
-              Text(
-                'Bitte kurz warten …',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              const SizedBox(width: 8),
+              Padding(
+                padding: const EdgeInsets.only(top: 14),
+                child: Icon(
+                  Icons.chevron_right,
                   color: colors.onSurfaceVariant,
-                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
@@ -342,6 +401,20 @@ class _PdfExportProgressDialog extends StatelessWidget {
       ),
     );
   }
+
+  String _singleReadingLabel() {
+    for (final reading in readings) {
+      if (export.readingIds.contains(reading.id)) {
+        return 'Zählerstand: ${reading.value.displayText} ${reading.meter.unit}';
+      }
+    }
+    return '1 Ablesung dokumentiert';
+  }
+
+  String _readingCountLabel(int count) => switch (count) {
+    1 => '1 Ablesung enthalten',
+    _ => '$count Ablesungen enthalten',
+  };
 }
 
 class _MeterHeader extends StatelessWidget {

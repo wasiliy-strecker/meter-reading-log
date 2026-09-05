@@ -7,6 +7,7 @@ import 'package:meter_reading_log/app/app.dart';
 import 'package:meter_reading_log/app/app_providers.dart';
 import 'package:meter_reading_log/core/files/meter_photo_repository.dart';
 import 'package:meter_reading_log/core/ocr/meter_ocr_repository.dart';
+import 'package:meter_reading_log/features/evidence/domain/evidence_export.dart';
 import 'package:meter_reading_log/features/meters/domain/meter.dart';
 import 'package:meter_reading_log/features/meters/domain/meter_reading.dart';
 import 'package:meter_reading_log/features/meters/domain/reading_value.dart';
@@ -230,6 +231,7 @@ void main() {
     );
     final meters = MemoryMeterRepository()..items[meter.id] = meter;
     final readings = _PendingRevisionRepository();
+    final exports = MemoryEvidenceExportRepository();
     readings.items['reading_pdf'] = MeterReading(
       id: 'reading_pdf',
       meterId: meter.id,
@@ -246,15 +248,35 @@ void main() {
       ocrCandidate: '42,1',
       manifestSha256: 'b' * 64,
     );
+    exports.items['history_export'] = EvidenceExportRecord(
+      id: 'history_export',
+      meterId: meter.id,
+      kind: EvidenceExportKind.meterHistory,
+      readingIds: const ['reading_pdf'],
+      createdAt: DateTime.utc(2026, 9, 5, 8, 30),
+      fileName: 'zaehlerverlauf_wasser_bad_20260905_083000.pdf',
+      filePath: '/tmp/history.pdf',
+      pdfSha256: 'c' * 64,
+      manifestSha256: 'd' * 64,
+    );
+    exports.items['single_export'] = EvidenceExportRecord(
+      id: 'single_export',
+      meterId: meter.id,
+      kind: EvidenceExportKind.singleReading,
+      readingIds: const ['reading_pdf'],
+      createdAt: DateTime.utc(2026, 9, 5, 8),
+      fileName: 'zaehlerstand_wasser_bad_20260905_080000.pdf',
+      filePath: '/tmp/single.pdf',
+      pdfSha256: 'e' * 64,
+      manifestSha256: 'f' * 64,
+    );
 
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           meterRepositoryProvider.overrideWithValue(meters),
           meterReadingRepositoryProvider.overrideWithValue(readings),
-          evidenceExportRepositoryProvider.overrideWithValue(
-            MemoryEvidenceExportRepository(),
-          ),
+          evidenceExportRepositoryProvider.overrideWithValue(exports),
           meterPhotoCaptureRepositoryProvider.overrideWithValue(
             _FixedPhotoRepository(),
           ),
@@ -299,6 +321,30 @@ void main() {
       find.byKey(const ValueKey('reading-thumbnail-reading_pdf')),
       findsOneWidget,
     );
+    await tester.scrollUntilVisible(
+      find.text('Gespeicherte PDF-Nachweise'),
+      250,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(
+      find.byKey(const ValueKey('evidence-export-history_export')),
+      findsOneWidget,
+    );
+    expect(find.text('Verlaufsnachweis'), findsOneWidget);
+    expect(find.text('Einzelnachweis'), findsOneWidget);
+    expect(find.text('1 Ablesung enthalten'), findsOneWidget);
+    expect(find.text('Zählerstand: 42,1 m³'), findsOneWidget);
+    expect(find.text('Lokal gespeichert'), findsNWidgets(2));
+    expect(
+      find.text('zaehlerverlauf_wasser_bad_20260905_083000.pdf'),
+      findsNothing,
+    );
+    expect(find.textContaining('cccccccc'), findsNothing);
+    await tester.scrollUntilVisible(
+      find.text('Verlauf als PDF erstellen'),
+      -250,
+      scrollable: find.byType(Scrollable).last,
+    );
     await tester.tap(find.text('Verlauf als PDF erstellen'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
@@ -310,7 +356,7 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.byKey(const ValueKey('history-pdf-progress')), findsOneWidget);
+    expect(find.byKey(const ValueKey('pdf-export-progress')), findsOneWidget);
     expect(find.text('Verlauf als PDF erstellen'), findsOneWidget);
   });
 }
