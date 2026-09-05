@@ -219,6 +219,14 @@ void main() {
       await tester.tap(find.text('Pünktlich mit Ton'));
       await tester.pumpAndSettle();
 
+      final alarmSettings = find.widgetWithText(
+        OutlinedButton,
+        '„Alarme & Erinnerungen“ öffnen',
+      );
+      expect(alarmSettings, findsOneWidget);
+      await tester.tap(alarmSettings);
+      await tester.pump();
+      expect(reminders.exactAlarmSettingsOpenCount, 1);
       expect(find.text('Ton jetzt testen'), findsNothing);
       expect(find.text('Erinnerung jetzt testen'), findsOneWidget);
       await tester.tap(find.text('Erinnerung jetzt testen'));
@@ -548,6 +556,36 @@ void main() {
     expect(find.text('Nachweise'), findsNothing);
 
     expect(await tester.binding.handlePopRoute(), isTrue);
+    await tester.pumpAndSettle();
+    expect(find.text('Dashboard'), findsOneWidget);
+  });
+
+  testWidgets('notification meter has back button and edge back to dashboard', (
+    tester,
+  ) async {
+    final meter = _meter(
+      id: 'notification_meter',
+      label: 'Strom aus Erinnerung',
+      type: MeterType.electricity,
+      location: 'Keller',
+      updatedAt: DateTime.utc(2026, 9, 5),
+    );
+    final meters = MemoryMeterRepository()..items[meter.id] = meter;
+    final reminders = NoopMeterReminderRepository(initialMeterId: meter.id);
+
+    await tester.pumpWidget(_testApp(meters: meters, reminders: reminders));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Strom aus Erinnerung'), findsWidgets);
+    expect(find.byType(BackButton), findsOneWidget);
+    expect(await tester.binding.handlePopRoute(), isTrue);
+    await tester.pumpAndSettle();
+    expect(find.text('Dashboard'), findsOneWidget);
+
+    await tester.tap(find.text('Strom aus Erinnerung'));
+    await tester.pumpAndSettle();
+    expect(find.byType(BackButton), findsOneWidget);
+    await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
     expect(find.text('Dashboard'), findsOneWidget);
   });
