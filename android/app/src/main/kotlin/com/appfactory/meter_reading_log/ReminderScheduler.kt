@@ -8,11 +8,17 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
 import android.media.AudioAttributes
 import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
+import kotlin.math.roundToInt
 
 internal object ReminderScheduler {
     private const val fireAction =
@@ -137,6 +143,8 @@ internal object ReminderNotifier {
         val summary = "${reminder.meterTypeLabel} · $latestReading"
         val notification = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(notificationIcon(reminder.meterType))
+            .setLargeIcon(notificationLargeIcon(context, reminder.meterType))
+            .setColor(notificationColor(reminder.meterType))
             .setContentTitle("${reminder.meterTypeLabel} · ${reminder.label}")
             .setContentText(summary)
             .setStyle(
@@ -170,6 +178,44 @@ internal object ReminderNotifier {
         "heatingCostAllocator" -> R.drawable.ic_stat_home
         "oil" -> R.drawable.ic_stat_oil
         else -> R.drawable.ic_stat_other
+    }
+
+    private fun notificationColor(meterType: String): Int = when (meterType) {
+        "electricity" -> Color.rgb(198, 124, 0)
+        "electricityFeedIn" -> Color.rgb(84, 132, 0)
+        "gas" -> Color.rgb(198, 75, 54)
+        "water" -> Color.rgb(25, 118, 163)
+        "coldWater" -> Color.rgb(20, 121, 201)
+        "hotWater" -> Color.rgb(196, 75, 62)
+        "heat" -> Color.rgb(184, 95, 0)
+        "heatingCostAllocator" -> Color.rgb(135, 84, 161)
+        "oil" -> Color.rgb(95, 102, 94)
+        else -> Color.rgb(83, 104, 120)
+    }
+
+    private fun notificationLargeIcon(
+        context: Context,
+        meterType: String,
+    ): Bitmap {
+        val size = (48 * context.resources.displayMetrics.density)
+            .roundToInt()
+            .coerceAtLeast(48)
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = notificationColor(meterType)
+        }
+        canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
+
+        val inset = (size * 0.24f).roundToInt()
+        ContextCompat.getDrawable(context, notificationIcon(meterType))
+            ?.mutate()
+            ?.apply {
+                setTint(Color.WHITE)
+                setBounds(inset, inset, size - inset, size - inset)
+                draw(canvas)
+            }
+        return bitmap
     }
 
     fun migrateLegacyNotification(context: Context, reminder: StoredReminder) {
