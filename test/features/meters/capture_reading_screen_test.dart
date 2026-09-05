@@ -216,10 +216,8 @@ void main() {
     expect(find.text('Dashboard'), findsOneWidget);
   });
 
-  testWidgets('history PDF action shows immediate progress feedback', (
-    tester,
-  ) async {
-    await tester.binding.setSurfaceSize(const Size(430, 1200));
+  testWidgets('history PDFs follow readings and show progress', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(430, 3000));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final meter = Meter(
       id: 'meter_pdf',
@@ -330,16 +328,37 @@ void main() {
       find.byKey(const ValueKey('evidence-export-history_export')),
       findsOneWidget,
     );
+    expect(
+      find.byKey(const ValueKey('evidence-export-single_export')),
+      findsNothing,
+    );
     expect(find.text('Verlaufsnachweis'), findsOneWidget);
-    expect(find.text('Einzelnachweis'), findsOneWidget);
     expect(find.text('1 Ablesung enthalten'), findsOneWidget);
-    expect(find.text('Zählerstand: 42,1 m³'), findsOneWidget);
-    expect(find.text('Lokal gespeichert'), findsNWidgets(2));
+    expect(find.text('Einzelnachweis'), findsNothing);
+    expect(find.text('Zählerstand: 42,1 m³'), findsNothing);
+    expect(find.text('Lokal gespeichert'), findsOneWidget);
     expect(
       find.text('zaehlerverlauf_wasser_bad_20260905_083000.pdf'),
       findsNothing,
     );
     expect(find.textContaining('cccccccc'), findsNothing);
+    final savedEvidenceTitle = find.text('Gespeicherte PDF-Nachweise');
+    final historyActionTitle = find.text('PDF-Nachweis des Verlaufs');
+    final historyExportCard = find.byKey(
+      const ValueKey('evidence-export-history_export'),
+    );
+    expect(
+      tester.getTopLeft(readingCard).dy,
+      lessThan(tester.getTopLeft(savedEvidenceTitle).dy),
+    );
+    expect(
+      tester.getTopLeft(savedEvidenceTitle).dy,
+      lessThan(tester.getTopLeft(historyActionTitle).dy),
+    );
+    expect(
+      tester.getTopLeft(historyActionTitle).dy,
+      lessThan(tester.getTopLeft(historyExportCard).dy),
+    );
     await tester.scrollUntilVisible(
       find.text('Verlauf als PDF erstellen'),
       -250,

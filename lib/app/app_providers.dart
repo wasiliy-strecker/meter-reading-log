@@ -130,6 +130,22 @@ final revisionsForReadingProvider =
       (ref, id) => ref.watch(meterReadingRepositoryProvider).loadRevisions(id),
     );
 
+final singleReadingEvidenceManifestProvider = FutureProvider.autoDispose
+    .family<String?, String>((ref, readingId) async {
+      final readingFuture = ref.watch(readingByIdProvider(readingId).future);
+      final revisionsFuture = ref.watch(
+        revisionsForReadingProvider(readingId).future,
+      );
+      final service = ref.watch(evidenceReportServiceProvider);
+      final reading = await readingFuture;
+      if (reading == null) return null;
+      final revisions = await revisionsFuture;
+      return service.singleReadingManifestSha256(
+        reading: reading,
+        revisions: revisions,
+      );
+    });
+
 final evidenceForMeterProvider =
     StreamProvider.family<List<EvidenceExportRecord>, String>(
       (ref, id) =>

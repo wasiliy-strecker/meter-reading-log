@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +8,7 @@ import 'package:meter_reading_log/app/app_providers.dart';
 import 'package:meter_reading_log/core/integrity/integrity_copy.dart';
 import 'package:meter_reading_log/core/utils/formatters.dart';
 import 'package:meter_reading_log/features/evidence/application/evidence_report_service.dart';
+import 'package:meter_reading_log/features/evidence/domain/evidence_export.dart';
 import 'package:meter_reading_log/features/meters/domain/meter.dart';
 import 'package:meter_reading_log/features/meters/domain/meter_reading.dart';
 import 'package:meter_reading_log/features/meters/domain/reading_value.dart';
@@ -15,6 +17,14 @@ import 'package:meter_reading_log/features/meters/presentation/reading_detail_sc
 import '../../support/fakes.dart';
 
 void main() {
+  late String unchangedReadingManifest;
+
+  setUpAll(() async {
+    unchangedReadingManifest = await EvidenceReportService(
+      exports: MemoryEvidenceExportRepository(),
+    ).singleReadingManifestSha256(reading: _reading(), revisions: const []);
+  });
+
   testWidgets('hides OCR diagnostics and explains empty correction history', (
     tester,
   ) async {
@@ -283,12 +293,12 @@ void main() {
         )
         .first;
     await tester.scrollUntilVisible(
-      find.text('Einzelnachweis als PDF'),
+      find.text('Einzelnachweis als PDF erstellen'),
       250,
       scrollable: scrollable,
     );
 
-    await tester.tap(find.text('Einzelnachweis als PDF'));
+    await tester.tap(find.text('Einzelnachweis als PDF erstellen'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
@@ -298,7 +308,230 @@ void main() {
       find.text('Foto und Nachweisdaten werden für die PDF zusammengestellt.'),
       findsOneWidget,
     );
-    expect(find.text('Einzelnachweis als PDF'), findsOneWidget);
+    expect(find.text('Einzelnachweis als PDF erstellen'), findsOneWidget);
+  });
+
+  testWidgets('shows saved single evidence and blocks an unchanged duplicate', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(430, 1800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final temp = (await tester.runAsync(
+      () => Directory.systemTemp.createTemp('saved_single_evidence_'),
+    ))!;
+    addTearDown(() => temp.delete(recursive: true));
+    final pdf = File('${temp.path}/single.pdf');
+    await tester.runAsync(
+      () => pdf.writeAsBytes(const [0x25, 0x50, 0x44, 0x46]),
+    );
+    final reading = _reading();
+    final readings = MemoryReadingRepository()..items[reading.id] = reading;
+    final exports = MemoryEvidenceExportRepository();
+    exports.items['single_current'] = EvidenceExportRecord(
+      id: 'single_current',
+      meterId: reading.meterId,
+      kind: EvidenceExportKind.singleReading,
+      readingIds: [reading.id],
+      createdAt: DateTime.utc(2026, 9, 5, 10),
+      fileName: 'single.pdf',
+      filePath: pdf.path,
+      pdfSha256: 'c' * 64,
+      manifestSha256: unchangedReadingManifest,
+    );
+    exports.items['history'] = EvidenceExportRecord(
+      id: 'history',
+      meterId: reading.meterId,
+      kind: EvidenceExportKind.meterHistory,
+      readingIds: [reading.id],
+      createdAt: DateTime.utc(2026, 9, 5, 9),
+      fileName: 'history.pdf',
+      filePath: '${temp.path}/history.pdf',
+      pdfSha256: 'd' * 64,
+      manifestSha256: 'e' * 64,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          meterReadingRepositoryProvider.overrideWithValue(readings),
+          evidenceExportRepositoryProvider.overrideWithValue(exports),
+          singleReadingEvidenceManifestProvider(
+            reading.id,
+          ).overrideWith((ref) => unchangedReadingManifest),
+        ],
+        child: MaterialApp(home: ReadingDetailScreen(readingId: reading.id)),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final scrollable = find
+        .descendant(
+          of: find.byType(ListView),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.scrollUntilVisible(
+      find.text('Gespeicherte Einzelnachweise'),
+      250,
+      scrollable: scrollable,
+    );
+
+    expect(
+      find.byKey(const ValueKey('evidence-export-single_current')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('evidence-export-history')), findsNothing);
+    final blockedButton = tester.widget<FilledButton>(
+      find.widgetWithText(
+        FilledButton,
+        'Aktueller Einzelnachweis bereits erstellt',
+      ),
+    );
+    expect(blockedButton.onPressed, isNull);
+    expect(
+      tester
+          .getTopLeft(
+            find.byKey(const ValueKey('evidence-export-single_current')),
+          )
+          .dy,
+      lessThan(
+        tester
+            .getTopLeft(
+              find.widgetWithText(
+                FilledButton,
+                'Aktueller Einzelnachweis bereits erstellt',
+              ),
+            )
+            .dy,
+      ),
+    );
+    expect(
+      find.textContaining('Nach einer Korrektur kannst du einen neuen'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('missing single evidence file does not block recreation', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(430, 1800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final reading = _reading();
+    final readings = MemoryReadingRepository()..items[reading.id] = reading;
+    final exports = MemoryEvidenceExportRepository();
+    exports.items['single_missing'] = EvidenceExportRecord(
+      id: 'single_missing',
+      meterId: reading.meterId,
+      kind: EvidenceExportKind.singleReading,
+      readingIds: [reading.id],
+      createdAt: DateTime.utc(2026, 9, 5, 10),
+      fileName: 'missing.pdf',
+      filePath: '/tmp/definitely-missing-meter-reading-log.pdf',
+      pdfSha256: 'c' * 64,
+      manifestSha256: unchangedReadingManifest,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          meterReadingRepositoryProvider.overrideWithValue(readings),
+          evidenceExportRepositoryProvider.overrideWithValue(exports),
+          singleReadingEvidenceManifestProvider(
+            reading.id,
+          ).overrideWith((ref) => unchangedReadingManifest),
+        ],
+        child: MaterialApp(home: ReadingDetailScreen(readingId: reading.id)),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final scrollable = find
+        .descendant(
+          of: find.byType(ListView),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.scrollUntilVisible(
+      find.text('Einzelnachweis als PDF erstellen'),
+      250,
+      scrollable: scrollable,
+    );
+
+    final createButton = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, 'Einzelnachweis als PDF erstellen'),
+    );
+    expect(createButton.onPressed, isNotNull);
+    expect(find.text('Datei fehlt'), findsOneWidget);
+  });
+
+  testWidgets('a correction enables a new single evidence PDF', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(430, 1800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final temp = (await tester.runAsync(
+      () => Directory.systemTemp.createTemp('corrected_single_evidence_'),
+    ))!;
+    addTearDown(() => temp.delete(recursive: true));
+    final pdf = File('${temp.path}/old-single.pdf');
+    await tester.runAsync(
+      () => pdf.writeAsBytes(const [0x25, 0x50, 0x44, 0x46]),
+    );
+    final reading = _reading();
+    final readings = MemoryReadingRepository()..items[reading.id] = reading;
+    final exports = MemoryEvidenceExportRepository();
+    readings.revisions[reading.id] = [
+      ReadingRevision(
+        id: 'revision_after_export',
+        readingId: reading.id,
+        changedAt: DateTime.utc(2026, 9, 5, 11),
+        reason: 'Zählerstand korrigiert',
+        changes: const {
+          'Zählerstand': ReadingChange(before: '41,2', after: '42,1'),
+        },
+      ),
+    ];
+    exports.items['single_before_correction'] = EvidenceExportRecord(
+      id: 'single_before_correction',
+      meterId: reading.meterId,
+      kind: EvidenceExportKind.singleReading,
+      readingIds: [reading.id],
+      createdAt: DateTime.utc(2026, 9, 5, 10),
+      fileName: 'old-single.pdf',
+      filePath: pdf.path,
+      pdfSha256: 'c' * 64,
+      manifestSha256: unchangedReadingManifest,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          meterReadingRepositoryProvider.overrideWithValue(readings),
+          evidenceExportRepositoryProvider.overrideWithValue(exports),
+          singleReadingEvidenceManifestProvider(
+            reading.id,
+          ).overrideWith((ref) => 'current-after-correction'),
+        ],
+        child: MaterialApp(home: ReadingDetailScreen(readingId: reading.id)),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final scrollable = find
+        .descendant(
+          of: find.byType(ListView),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.scrollUntilVisible(
+      find.text('Einzelnachweis als PDF erstellen'),
+      250,
+      scrollable: scrollable,
+    );
+
+    final createButton = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, 'Einzelnachweis als PDF erstellen'),
+    );
+    expect(createButton.onPressed, isNotNull);
+    expect(
+      find.byKey(const ValueKey('evidence-export-single_before_correction')),
+      findsOneWidget,
+    );
   });
 }
 

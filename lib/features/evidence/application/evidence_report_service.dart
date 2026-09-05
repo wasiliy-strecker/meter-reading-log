@@ -49,11 +49,36 @@ class EvidenceReportService {
     required MeterReading reading,
     required List<ReadingRevision> revisions,
   }) async {
+    final manifestSha = await singleReadingManifestSha256(
+      reading: reading,
+      revisions: revisions,
+    );
+    final existingExports = await exports.loadForMeter(reading.meterId);
+    for (final export in existingExports) {
+      final matchesCurrentReading =
+          export.kind == EvidenceExportKind.singleReading &&
+          export.readingIds.length == 1 &&
+          export.readingIds.single == reading.id &&
+          export.manifestSha256 == manifestSha;
+      if (matchesCurrentReading && await File(export.filePath).exists()) {
+        throw StateError(
+          'Für den aktuellen Stand dieser Ablesung wurde bereits ein Einzelnachweis erstellt.',
+        );
+      }
+    }
     return _create(
       readings: [reading],
       revisions: {reading.id: revisions},
       kind: EvidenceExportKind.singleReading,
+      manifestSha256: manifestSha,
     );
+  }
+
+  Future<String> singleReadingManifestSha256({
+    required MeterReading reading,
+    required List<ReadingRevision> revisions,
+  }) {
+    return _reportManifestHash([reading], {reading.id: revisions});
   }
 
   Future<GeneratedEvidenceReport> createHistory({
@@ -75,6 +100,7 @@ class EvidenceReportService {
     required List<MeterReading> readings,
     required Map<String, List<ReadingRevision>> revisions,
     required EvidenceExportKind kind,
+    String? manifestSha256,
   }) async {
     final createdAt = DateTime.now();
     final fonts = await _loadFontBytes();
@@ -86,6 +112,7 @@ class EvidenceReportService {
       },
       'kind': kind.name,
       'createdAtMicroseconds': createdAt.microsecondsSinceEpoch,
+      'manifestSha256': manifestSha256,
       'regularFontBytes': fonts.regular,
       'boldFontBytes': fonts.bold,
     }, debugLabel: 'evidence-pdf-builder');
@@ -170,7 +197,9 @@ class EvidenceReportService {
       regular: pw.Font.ttf(ByteData.sublistView(regularFontBytes)),
       bold: pw.Font.ttf(ByteData.sublistView(boldFontBytes)),
     );
-    final manifestSha = await _reportManifestHash(readings, revisions);
+    final manifestSha =
+        message['manifestSha256'] as String? ??
+        await _reportManifestHash(readings, revisions);
     final document = pw.Document(
       title: kind == EvidenceExportKind.singleReading
           ? 'Zählerstand-Nachweis'

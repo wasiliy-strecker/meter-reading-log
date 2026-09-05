@@ -12,6 +12,7 @@ import '../../../core/integrity/integrity_copy.dart';
 import '../../../core/utils/formatters.dart';
 import '../../evidence/application/evidence_report_service.dart';
 import '../../evidence/domain/evidence_export.dart';
+import '../../evidence/presentation/evidence_export_card.dart';
 import '../domain/meter.dart';
 import '../domain/meter_reading.dart';
 import 'meter_visuals.dart';
@@ -47,6 +48,9 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
     final readingsAsync = ref.watch(readingsForMeterProvider(meter.id));
     final exports =
         ref.watch(evidenceForMeterProvider(meter.id)).value ?? const [];
+    final historyExports = exports
+        .where((export) => export.kind == EvidenceExportKind.meterHistory)
+        .toList(growable: false);
     void openMeterEditor() =>
         context.pushNamed('meterEdit', pathParameters: {'id': meter.id});
     return Scaffold(
@@ -83,13 +87,6 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
               ],
             ),
             const SizedBox(height: 8),
-            if (readings.isNotEmpty) ...[
-              _HistoryPdfAction(
-                exporting: _exporting,
-                onPressed: () => _exportHistory(readings),
-              ),
-              const SizedBox(height: 12),
-            ],
             if (readings.isEmpty)
               const _EmptyReadings()
             else
@@ -100,7 +97,7 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
                       ? readings[index + 1]
                       : null,
                 ),
-            if (exports.isNotEmpty) ...[
+            if (readings.isNotEmpty || historyExports.isNotEmpty) ...[
               const SizedBox(height: 22),
               Text(
                 'Gespeicherte PDF-Nachweise',
@@ -109,10 +106,18 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
                 ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 8),
-              for (final export in exports)
-                _EvidenceExportCard(
+              if (readings.isNotEmpty) ...[
+                _HistoryPdfAction(
+                  exporting: _exporting,
+                  onPressed: () => _exportHistory(readings),
+                ),
+                if (historyExports.isNotEmpty) const SizedBox(height: 12),
+              ],
+              for (final export in historyExports)
+                EvidenceExportCard(
                   export: export,
-                  readings: readings,
+                  title: 'Verlaufsnachweis',
+                  detail: _readingCountLabel(export.readingIds.length),
                   onTap: () => _openExport(export),
                 ),
             ],
@@ -282,140 +287,10 @@ class _HistoryPdfAction extends StatelessWidget {
   }
 }
 
-class _EvidenceExportCard extends StatelessWidget {
-  const _EvidenceExportCard({
-    required this.export,
-    required this.readings,
-    required this.onTap,
-  });
-
-  final EvidenceExportRecord export;
-  final List<MeterReading> readings;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final title = switch (export.kind) {
-      EvidenceExportKind.meterHistory => 'Verlaufsnachweis',
-      EvidenceExportKind.singleReading => 'Einzelnachweis',
-    };
-    final detail = switch (export.kind) {
-      EvidenceExportKind.meterHistory => _readingCountLabel(
-        export.readingIds.length,
-      ),
-      EvidenceExportKind.singleReading => _singleReadingLabel(),
-    };
-
-    return Card(
-      key: ValueKey('evidence-export-${export.id}'),
-      margin: const EdgeInsets.only(bottom: 10),
-      color: colors.secondaryContainer.withValues(alpha: 0.38),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: colors.primaryContainer,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Icon(
-                  Icons.picture_as_pdf_outlined,
-                  color: colors.onPrimaryContainer,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      'Erstellt am ${formatDateTime(export.createdAt)} Uhr',
-                      style: TextStyle(color: colors.onSurfaceVariant),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      detail,
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 10),
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: colors.primary.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.verified_outlined,
-                              size: 17,
-                              color: colors.primary,
-                            ),
-                            const SizedBox(width: 5),
-                            Text(
-                              'Lokal gespeichert',
-                              style: Theme.of(context).textTheme.labelMedium
-                                  ?.copyWith(
-                                    color: colors.primary,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Padding(
-                padding: const EdgeInsets.only(top: 14),
-                child: Icon(
-                  Icons.chevron_right,
-                  color: colors.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  String _singleReadingLabel() {
-    for (final reading in readings) {
-      if (export.readingIds.contains(reading.id)) {
-        return 'Zählerstand: ${reading.value.displayText} ${reading.meter.unit}';
-      }
-    }
-    return '1 Ablesung dokumentiert';
-  }
-
-  String _readingCountLabel(int count) => switch (count) {
-    1 => '1 Ablesung enthalten',
-    _ => '$count Ablesungen enthalten',
-  };
-}
+String _readingCountLabel(int count) => switch (count) {
+  1 => '1 Ablesung enthalten',
+  _ => '$count Ablesungen enthalten',
+};
 
 class _MeterHeader extends StatelessWidget {
   const _MeterHeader({
