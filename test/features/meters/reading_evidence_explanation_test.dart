@@ -25,67 +25,63 @@ void main() {
     ).singleReadingManifestSha256(reading: _reading(), revisions: const []);
   });
 
-  testWidgets('hides OCR diagnostics and explains empty correction history', (
-    tester,
-  ) async {
-    await tester.binding.setSurfaceSize(const Size(430, 1200));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    final reading = _reading();
-    final readings = MemoryReadingRepository()..items[reading.id] = reading;
+  testWidgets(
+    'hides OCR and hash diagnostics and explains empty correction history',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(430, 1200));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final reading = _reading();
+      final readings = MemoryReadingRepository()..items[reading.id] = reading;
 
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          meterReadingRepositoryProvider.overrideWithValue(readings),
-          evidenceExportRepositoryProvider.overrideWithValue(
-            MemoryEvidenceExportRepository(),
-          ),
-        ],
-        child: MaterialApp(home: ReadingDetailScreen(readingId: reading.id)),
-      ),
-    );
-    await tester.pumpAndSettle();
-    final scrollable = find
-        .descendant(
-          of: find.byType(ListView),
-          matching: find.byType(Scrollable),
-        )
-        .first;
-    expect(scrollable, findsOneWidget);
-    expect(find.text('OCR-Kandidat'), findsNothing);
-    expect(find.text('OCR-Konfidenz'), findsNothing);
-    expect(find.text('Manuell abweichend'), findsNothing);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            meterReadingRepositoryProvider.overrideWithValue(readings),
+            evidenceExportRepositoryProvider.overrideWithValue(
+              MemoryEvidenceExportRepository(),
+            ),
+          ],
+          child: MaterialApp(home: ReadingDetailScreen(readingId: reading.id)),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final scrollable = find
+          .descendant(
+            of: find.byType(ListView),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      expect(scrollable, findsOneWidget);
+      expect(find.text('OCR-Kandidat'), findsNothing);
+      expect(find.text('OCR-Konfidenz'), findsNothing);
+      expect(find.text('Manuell abweichend'), findsNothing);
 
-    await tester.scrollUntilVisible(
-      find.text(correctionHistoryTitle),
-      250,
-      scrollable: scrollable,
-    );
-    expect(find.text(correctionHistoryText), findsOneWidget);
-    expect(
-      find.text('Für diese Ablesung gibt es noch keine Korrekturen.'),
-      findsOneWidget,
-    );
-    expect(find.text(integrityProtectionTitle), findsNothing);
-    expect(find.text(technicalChecksTitle), findsOneWidget);
-    expect(find.textContaining(reading.photoSha256), findsNothing);
+      await tester.scrollUntilVisible(
+        find.text(correctionHistoryTitle),
+        250,
+        scrollable: scrollable,
+      );
+      expect(find.text(correctionHistoryText), findsOneWidget);
+      expect(
+        find.text('Für diese Ablesung gibt es noch keine Korrekturen.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Schutz vor nachträglichen'), findsNothing);
+      expect(find.text('Technische Prüfwerte anzeigen'), findsNothing);
+      expect(find.textContaining('SHA-256'), findsNothing);
+      expect(find.textContaining(reading.photoSha256), findsNothing);
+      expect(find.textContaining(reading.manifestSha256), findsNothing);
 
-    await tester.ensureVisible(find.text(technicalChecksTitle));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text(technicalChecksTitle));
-    await tester.pumpAndSettle();
-    expect(find.textContaining(reading.photoSha256), findsOneWidget);
-    expect(find.textContaining(reading.manifestSha256), findsOneWidget);
-
-    await tester.scrollUntilVisible(
-      find.text(pdfPurposeTitle),
-      250,
-      scrollable: scrollable,
-    );
-    expect(find.text(pdfPurposeText), findsOneWidget);
-    expect(find.text(privateDocumentationText), findsOneWidget);
-    expect(find.byIcon(Icons.fact_check_outlined), findsOneWidget);
-  });
+      await tester.scrollUntilVisible(
+        find.text(pdfPurposeTitle),
+        250,
+        scrollable: scrollable,
+      );
+      expect(find.text(pdfPurposeText), findsOneWidget);
+      expect(find.text(privateDocumentationText), findsOneWidget);
+      expect(find.byIcon(Icons.description_outlined), findsOneWidget);
+    },
+  );
 
   testWidgets('shows correction reason and newest changes first', (
     tester,

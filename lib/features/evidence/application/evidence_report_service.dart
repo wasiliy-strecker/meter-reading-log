@@ -13,7 +13,6 @@ import '../../../core/integrity/integrity_copy.dart';
 import '../../../core/integrity/integrity_service.dart';
 import '../../../core/utils/id_generator.dart';
 import '../../meters/application/reading_revision_photos.dart';
-import '../../meters/application/meter_services.dart';
 import '../../meters/domain/meter.dart';
 import '../../meters/domain/meter_reading.dart';
 import '../../meters/domain/meter_repositories.dart';
@@ -147,24 +146,6 @@ class EvidenceReportService {
     return GeneratedEvidenceReport(record: record, bytes: bytes);
   }
 
-  Future<EvidenceVerificationResult> verify(String path) async {
-    final bytes = await File(path).readAsBytes();
-    final hash = await integrity.sha256Bytes(bytes);
-    final record = await exports.findByPdfHash(hash);
-    final sameName = record == null
-        ? await exports.findByFileName(p.basename(path))
-        : null;
-    return EvidenceVerificationResult(
-      sha256: hash,
-      status: record != null
-          ? EvidenceVerificationStatus.unchanged
-          : sameName != null
-          ? EvidenceVerificationStatus.changed
-          : EvidenceVerificationStatus.unknown,
-      record: record ?? sameName,
-    );
-  }
-
   static Future<Map<String, Object?>> _buildPdfInBackground(
     Map<String, Object?> message,
   ) async {
@@ -267,7 +248,7 @@ class EvidenceReportService {
           if (kind == EvidenceExportKind.meterHistory) ...[
             pw.NewPage(),
             pw.Text(
-              'Fotoanhang und Prüfdaten',
+              'Fotoanhang und Details',
               style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
             ),
             pw.SizedBox(height: 12),
@@ -282,11 +263,7 @@ class EvidenceReportService {
             ],
           ],
           pw.SizedBox(height: 18),
-          _integrityBox(
-            manifestSha: manifestSha,
-            generatedAt: createdAt,
-            date: date,
-          ),
+          _documentInfoBox(generatedAt: createdAt, date: date),
         ],
       ),
     );
@@ -425,15 +402,6 @@ class EvidenceReportService {
           if (reading.note.isNotEmpty) ['Notiz', reading.note],
         ],
       ),
-      pw.SizedBox(height: 8),
-      pw.Text(
-        'Prüfwert des Fotos (SHA-256): ${reading.photoSha256}',
-        style: _hashStyle,
-      ),
-      pw.Text(
-        'Prüfwert der Ablesung (SHA-256): ${reading.manifestSha256}',
-        style: _hashStyle,
-      ),
       if (revisions.isNotEmpty) ...[
         pw.SizedBox(height: 10),
         pw.Text(
@@ -540,16 +508,6 @@ class EvidenceReportService {
               ),
           ],
         ),
-        if (before != null)
-          pw.Text(
-            'Prüfwert vorheriges Foto (SHA-256): ${before.sha256}',
-            style: _hashStyle,
-          ),
-        if (after != null)
-          pw.Text(
-            'Prüfwert neues Foto (SHA-256): ${after.sha256}',
-            style: _hashStyle,
-          ),
       ],
     );
   }
@@ -618,8 +576,7 @@ class EvidenceReportService {
     }
   }
 
-  static pw.Widget _integrityBox({
-    required String manifestSha,
+  static pw.Widget _documentInfoBox({
     required DateTime generatedAt,
     required DateFormat date,
   }) {
@@ -633,27 +590,20 @@ class EvidenceReportService {
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
           pw.Text(
-            integrityProtectionTitle,
+            'Dokumentinformationen',
             style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
           ),
           pw.SizedBox(height: 4),
-          pw.Text('Bericht erzeugt: ${date.format(generatedAt)}'),
-          pw.Text(
-            'Prüfwert der enthaltenen Daten (SHA-256): $manifestSha',
-            style: _hashStyle,
-          ),
+          pw.Text('PDF erstellt am ${date.format(generatedAt)}'),
           pw.SizedBox(height: 6),
           pw.Text(
-            '$pdfIntegrityExplanation $integrityLimitationText',
+            privateDocumentationText,
             style: const pw.TextStyle(fontSize: 9),
           ),
         ],
       ),
     );
   }
-
-  static pw.TextStyle get _hashStyle =>
-      const pw.TextStyle(fontSize: 8, color: PdfColors.grey800);
 
   Future<_ReportFontBytes> _loadFontBytes() async {
     final regular = await rootBundle.load('assets/fonts/Roboto-Regular.ttf');

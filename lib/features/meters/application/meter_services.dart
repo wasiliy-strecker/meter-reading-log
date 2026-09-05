@@ -5,7 +5,6 @@ import '../../../core/integrity/integrity_service.dart';
 import '../../../core/ocr/meter_ocr_repository.dart';
 import '../../../core/reminders/local_notification_reminder_repository.dart';
 import '../../../core/utils/id_generator.dart';
-import '../../evidence/domain/evidence_export.dart';
 import '../domain/meter.dart';
 import '../domain/meter_reading.dart';
 import '../domain/meter_repositories.dart';
@@ -287,17 +286,3 @@ MeterReading? _latestReading(List<MeterReading> readings) {
     (left, right) => left.capturedAt.isAfter(right.capturedAt) ? left : right,
   );
 }
-
-class EvidenceVerificationResult {
-  const EvidenceVerificationResult({
-    required this.sha256,
-    required this.status,
-    this.record,
-  });
-
-  final String sha256;
-  final EvidenceVerificationStatus status;
-  final EvidenceExportRecord? record;
-}
-
-enum EvidenceVerificationStatus { unchanged, changed, unknown }

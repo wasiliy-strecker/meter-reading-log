@@ -335,24 +335,6 @@ class DriftEvidenceExportRepository implements EvidenceExportRepository {
   }
 
   @override
-  Future<EvidenceExportRecord?> findByPdfHash(String sha256) async {
-    final row = await (database.select(
-      database.evidenceExportRecords,
-    )..where((item) => item.pdfSha256.equals(sha256))).getSingleOrNull();
-    return row == null ? null : _fromRow(row);
-  }
-
-  @override
-  Future<EvidenceExportRecord?> findByFileName(String fileName) async {
-    final row =
-        await (database.select(database.evidenceExportRecords)
-              ..where((item) => item.fileName.equals(fileName))
-              ..orderBy([(item) => OrderingTerm.desc(item.createdAtMillis)]))
-            .getSingleOrNull();
-    return row == null ? null : _fromRow(row);
-  }
-
-  @override
   Future<void> save(EvidenceExportRecord record) async {
     await database
         .into(database.evidenceExportRecords)

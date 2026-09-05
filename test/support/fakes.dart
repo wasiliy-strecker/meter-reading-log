@@ -149,14 +149,6 @@ class MemoryEvidenceExportRepository implements EvidenceExportRepository {
   Future<void> delete(String id) async => items.remove(id);
 
   @override
-  Future<EvidenceExportRecord?> findByFileName(String fileName) async =>
-      items.values.where((item) => item.fileName == fileName).firstOrNull;
-
-  @override
-  Future<EvidenceExportRecord?> findByPdfHash(String sha256) async =>
-      items.values.where((item) => item.pdfSha256 == sha256).firstOrNull;
-
-  @override
   Future<List<EvidenceExportRecord>> loadAll() async => items.values.toList();
 
   @override

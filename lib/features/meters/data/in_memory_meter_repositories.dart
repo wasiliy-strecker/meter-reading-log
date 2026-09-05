@@ -127,14 +127,6 @@ class InMemoryEvidenceExportRepository implements EvidenceExportRepository {
   }
 
   @override
-  Future<EvidenceExportRecord?> findByFileName(String fileName) async =>
-      _items.values.where((item) => item.fileName == fileName).firstOrNull;
-
-  @override
-  Future<EvidenceExportRecord?> findByPdfHash(String sha256) async =>
-      _items.values.where((item) => item.pdfSha256 == sha256).firstOrNull;
-
-  @override
   Future<List<EvidenceExportRecord>> loadAll() async => _items.values.toList();
 
   @override

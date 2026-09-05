@@ -29,8 +29,6 @@ abstract interface class EvidenceExportRepository {
   Stream<List<EvidenceExportRecord>> watchForMeter(String meterId);
   Future<List<EvidenceExportRecord>> loadAll();
   Future<List<EvidenceExportRecord>> loadForMeter(String meterId);
-  Future<EvidenceExportRecord?> findByPdfHash(String sha256);
-  Future<EvidenceExportRecord?> findByFileName(String fileName);
   Future<void> save(EvidenceExportRecord record);
   Future<void> delete(String id);
 }

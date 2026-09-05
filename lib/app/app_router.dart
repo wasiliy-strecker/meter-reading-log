@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import '../features/backup/presentation/settings_screen.dart';
 import '../features/evidence/application/evidence_report_service.dart';
 import '../features/evidence/presentation/evidence_preview_screen.dart';
-import '../features/evidence/presentation/evidence_verify_screen.dart';
 import '../features/meters/presentation/capture_reading_screen.dart';
 import '../features/meters/presentation/edit_reading_screen.dart';
 import '../features/meters/presentation/home_screen.dart';
@@ -55,11 +54,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/settings',
         name: 'settings',
         builder: (_, _) => const SettingsScreen(),
-      ),
-      GoRoute(
-        path: '/verify',
-        name: 'verify',
-        builder: (_, _) => const EvidenceVerifyScreen(),
       ),
       GoRoute(
         path: '/evidence-preview',

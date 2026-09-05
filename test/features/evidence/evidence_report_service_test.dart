@@ -13,62 +13,61 @@ import '../../support/fakes.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('creates and verifies a persistent single-reading PDF', () async {
-    final temp = await Directory.systemTemp.createTemp('evidence_test_');
-    addTearDown(() => temp.delete(recursive: true));
-    final photo = File('${temp.path}/photo.jpg');
-    final olderPhoto = File('${temp.path}/older-photo.jpg');
-    await photo.writeAsBytes(img.encodeJpg(img.Image(width: 20, height: 20)));
-    await olderPhoto.writeAsBytes(
-      img.encodeJpg(img.Image(width: 18, height: 18)),
-    );
-    final repository = MemoryEvidenceExportRepository();
-    final service = EvidenceReportService(
-      exports: repository,
-      documentsDirectoryProvider: () async => temp,
-    );
-    final reading = _reading(photo.path).copyWith(
-      photoHistory: [
-        ReadingPhotoVersion(
-          id: 'photo_version_1',
-          path: olderPhoto.path,
-          sha256: 'c' * 64,
-          source: ReadingSource.gallery,
-          addedAt: DateTime.utc(2026, 8, 30, 10),
-          ocrRawText: '00122,9',
-          ocrCandidate: '00122,9',
-          ocrConfidence: 0.8,
-        ),
-      ],
-    );
+  test(
+    'creates a persistent single-reading PDF with internal hashes',
+    () async {
+      final temp = await Directory.systemTemp.createTemp('evidence_test_');
+      addTearDown(() => temp.delete(recursive: true));
+      final photo = File('${temp.path}/photo.jpg');
+      final olderPhoto = File('${temp.path}/older-photo.jpg');
+      await photo.writeAsBytes(img.encodeJpg(img.Image(width: 20, height: 20)));
+      await olderPhoto.writeAsBytes(
+        img.encodeJpg(img.Image(width: 18, height: 18)),
+      );
+      final repository = MemoryEvidenceExportRepository();
+      final service = EvidenceReportService(
+        exports: repository,
+        documentsDirectoryProvider: () async => temp,
+      );
+      final reading = _reading(photo.path).copyWith(
+        photoHistory: [
+          ReadingPhotoVersion(
+            id: 'photo_version_1',
+            path: olderPhoto.path,
+            sha256: 'c' * 64,
+            source: ReadingSource.gallery,
+            addedAt: DateTime.utc(2026, 8, 30, 10),
+            ocrRawText: '00122,9',
+            ocrCandidate: '00122,9',
+            ocrConfidence: 0.8,
+          ),
+        ],
+      );
 
-    final report = await service.createSingle(
-      reading: reading,
-      revisions: [
-        ReadingRevision(
-          id: 'revision_photo',
-          readingId: reading.id,
-          changedAt: reading.effectivePhotoAddedAt,
-          reason: 'Foto war unscharf',
-          changes: {
-            'Prüfwert des Fotos (SHA-256)': ReadingChange(
-              before: 'c' * 64,
-              after: 'a' * 64,
-            ),
-          },
-        ),
-      ],
-    );
+      final report = await service.createSingle(
+        reading: reading,
+        revisions: [
+          ReadingRevision(
+            id: 'revision_photo',
+            readingId: reading.id,
+            changedAt: reading.effectivePhotoAddedAt,
+            reason: 'Foto war unscharf',
+            changes: {
+              'Prüfwert des Fotos (SHA-256)': ReadingChange(
+                before: 'c' * 64,
+                after: 'a' * 64,
+              ),
+            },
+          ),
+        ],
+      );
 
-    expect(report.bytes.take(4), [0x25, 0x50, 0x44, 0x46]);
-    expect(await File(report.record.filePath).exists(), isTrue);
-    final verified = await service.verify(report.record.filePath);
-    expect(verified.status.name, 'unchanged');
-
-    await File(report.record.filePath).writeAsString('changed');
-    final changed = await service.verify(report.record.filePath);
-    expect(changed.status.name, 'changed');
-  });
+      expect(report.bytes.take(4), [0x25, 0x50, 0x44, 0x46]);
+      expect(await File(report.record.filePath).exists(), isTrue);
+      expect(report.record.pdfSha256, hasLength(64));
+      expect(report.record.manifestSha256, hasLength(64));
+    },
+  );
 
   test(
     'rejects a duplicate single-reading PDF for unchanged evidence',

@@ -1,12 +1,10 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../app/app_providers.dart';
 import '../../../app/widgets/app_snack_bar.dart';
-import '../../../core/integrity/integrity_copy.dart';
 import '../application/encrypted_backup_service.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -58,25 +56,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   onTap: _restoreBackup,
                 ),
               ],
-            ),
-          ),
-          const SizedBox(height: 18),
-          Text(
-            'Nachweise',
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 8),
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.fact_check_outlined),
-              title: const Text(pdfVerificationTitle),
-              subtitle: const Text(
-                'Erkennen, ob eine von dieser App erstellte PDF verändert wurde',
-              ),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => context.pushNamed('verify'),
             ),
           ),
           const SizedBox(height: 18),
@@ -262,7 +241,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       BackupFailure.missingFile =>
         'Eine zu sichernde Datei fehlt: ${error.detail}',
       BackupFailure.integrityMismatch =>
-        'Eine Datei im Backup hat eine ungültige Prüfsumme.',
+        'Eine Datei im Backup ist beschädigt oder unvollständig.',
       BackupFailure.unsupportedVersion =>
         'Diese Backup-Version wird nicht unterstützt.',
       BackupFailure.invalidFormat =>

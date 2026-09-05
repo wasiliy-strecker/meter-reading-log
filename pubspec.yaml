@@ -1,5 +1,5 @@
 name: meter_reading_log
-description: "Android-first meter reading log with on-device OCR and tamper-evident PDF reports."
+description: "Android-first meter reading log with on-device OCR and PDF reports."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
