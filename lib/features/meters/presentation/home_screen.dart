@@ -3,17 +3,48 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/app_providers.dart';
+import '../../../core/reminders/local_notification_reminder_repository.dart';
 import '../../../core/utils/formatters.dart';
 import '../domain/meter.dart';
 import '../domain/meter_reading.dart';
 import 'meter_visuals.dart';
 
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(meterReminderRepositoryProvider).refreshStatuses();
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.read(meterReminderRepositoryProvider).refreshStatuses();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final meters = ref.watch(metersProvider);
+    final reminderStatuses =
+        ref.watch(reminderStatusesProvider).value ?? const {};
     return Scaffold(
       appBar: AppBar(
         title: const Text('Dashboard'),
@@ -29,8 +60,9 @@ class HomeScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) =>
             _ErrorState(onRetry: () => ref.invalidate(metersProvider)),
-        data: (items) =>
-            items.isEmpty ? const _EmptyState() : _MeterList(meters: items),
+        data: (items) => items.isEmpty
+            ? const _EmptyState()
+            : _MeterList(meters: items, reminderStatuses: reminderStatuses),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.pushNamed('meterNew'),
@@ -52,9 +84,10 @@ extension on _MeterSort {
 }
 
 class _MeterList extends ConsumerStatefulWidget {
-  const _MeterList({required this.meters});
+  const _MeterList({required this.meters, required this.reminderStatuses});
 
   final List<Meter> meters;
+  final Map<String, ReminderStatus> reminderStatuses;
 
   @override
   ConsumerState<_MeterList> createState() => _MeterListState();
@@ -170,7 +203,11 @@ class _MeterListState extends ConsumerState<_MeterList> {
           const _NoSearchResults()
         else
           for (final entry in entries)
-            _MeterCard(meter: entry.meter, readings: entry.readings),
+            _MeterCard(
+              meter: entry.meter,
+              readings: entry.readings,
+              reminderStatus: widget.reminderStatuses[entry.meter.id],
+            ),
       ],
     );
   }
@@ -210,10 +247,15 @@ class _MeterListEntry {
 }
 
 class _MeterCard extends StatelessWidget {
-  const _MeterCard({required this.meter, required this.readings});
+  const _MeterCard({
+    required this.meter,
+    required this.readings,
+    this.reminderStatus,
+  });
 
   final Meter meter;
   final List<MeterReading> readings;
+  final ReminderStatus? reminderStatus;
 
   @override
   Widget build(BuildContext context) {
@@ -230,10 +272,14 @@ class _MeterCard extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              CircleAvatar(
-                backgroundColor: color.withValues(alpha: 0.12),
-                foregroundColor: color,
-                child: Icon(meterIcon(meter.type)),
+              Badge(
+                isLabelVisible: reminderStatus?.isNotificationActive ?? false,
+                label: const Text('1'),
+                child: CircleAvatar(
+                  backgroundColor: color.withValues(alpha: 0.12),
+                  foregroundColor: color,
+                  child: Icon(meterIcon(meter.type)),
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -272,6 +318,53 @@ class _MeterCard extends StatelessWidget {
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
+                    if (meter.reminder != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        'Erinnern: ${_reminderSummary(meter.reminder!)}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.notifications_active_outlined,
+                              size: 19,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onPrimaryContainer,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                reminderStatus?.lastTriggeredAt == null
+                                    ? 'Letzte Erinnerung: noch keine'
+                                    : 'Letzte Erinnerung: ${formatDateTime(reminderStatus!.lastTriggeredAt!)} Uhr',
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onPrimaryContainer,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -282,6 +375,22 @@ class _MeterCard extends StatelessWidget {
       ),
     );
   }
+}
+
+String _reminderSummary(ReadingReminderSchedule reminder) {
+  final time =
+      '${reminder.hour.toString().padLeft(2, '0')}:${reminder.minute.toString().padLeft(2, '0')} Uhr';
+  final schedule = switch (reminder.interval) {
+    ReminderInterval.daily => 'täglich um $time',
+    ReminderInterval.weekly =>
+      'wöchentlich am ${reminderWeekdayLabel(reminder.day)} um $time',
+    ReminderInterval.monthly => 'monatlich am ${reminder.day}. um $time',
+    ReminderInterval.yearly =>
+      'jährlich am ${reminder.day}.${(reminder.month ?? 1).toString().padLeft(2, '0')}. um $time',
+  };
+  return reminder.deliveryMode == ReminderDeliveryMode.punctualWithSound
+      ? '$schedule · pünktlich mit Ton'
+      : schedule;
 }
 
 class _NoSearchResults extends StatelessWidget {

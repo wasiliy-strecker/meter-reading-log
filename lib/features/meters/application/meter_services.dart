@@ -82,11 +82,13 @@ class MeterReadingService {
   const MeterReadingService({
     required this.readings,
     required this.photos,
+    required this.reminders,
     this.integrity = const IntegrityService(),
   });
 
   final MeterReadingRepository readings;
   final MeterPhotoCaptureRepository photos;
+  final MeterReminderRepository reminders;
   final IntegrityService integrity;
 
   Future<MeterReading> create({
@@ -124,6 +126,7 @@ class MeterReadingService {
       manifestSha256: await integrity.readingManifestHash(reading),
     );
     await readings.save(reading);
+    await reminders.acknowledge(meter.id);
     return reading;
   }
 

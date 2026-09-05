@@ -14,7 +14,11 @@ void main() {
     () async {
       final repository = MemoryReadingRepository();
       final photos = _TrackingPhotoRepository();
-      final service = MeterReadingService(readings: repository, photos: photos);
+      final service = MeterReadingService(
+        readings: repository,
+        photos: photos,
+        reminders: NoopMeterReminderRepository(),
+      );
       final existing = _reading();
       await repository.save(existing);
       final capturedAt = existing.capturedAt.toLocal();
