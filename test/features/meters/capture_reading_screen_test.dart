@@ -208,7 +208,7 @@ void main() {
 
     expect(await tester.binding.handlePopRoute(), isTrue);
     await tester.pumpAndSettle();
-    expect(find.text('Verlauf'), findsOneWidget);
+    expect(find.text('Zählerverlauf'), findsOneWidget);
     expect(find.text('Ablesen / Fotografieren'), findsOneWidget);
 
     expect(await tester.binding.handlePopRoute(), isTrue);
@@ -292,11 +292,11 @@ void main() {
     await tester.tap(find.text('Wasser Bad'));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
-      find.text('Verlauf als PDF erstellen'),
+      find.text('Zählerverlauf als PDF erstellen'),
       250,
       scrollable: find.byType(Scrollable).last,
     );
-    expect(find.text('PDF-Nachweis des Verlaufs'), findsOneWidget);
+    expect(find.text('PDF-Nachweis des Zählerverlaufs'), findsOneWidget);
     expect(
       find.textContaining('alle Ablesungen, Fotos und Korrekturen'),
       findsOneWidget,
@@ -311,9 +311,40 @@ void main() {
       find.descendant(of: readingCard, matching: find.text('42,1 m³')),
       findsOneWidget,
     );
+    final dateBadge = find.byKey(
+      const ValueKey('reading-date-badge-reading_pdf'),
+    );
+    expect(dateBadge, findsOneWidget);
+    expect(
+      find.descendant(
+        of: dateBadge,
+        matching: find.byIcon(Icons.calendar_month_outlined),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: dateBadge,
+        matching: find.textContaining('Abgelesen ·'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      tester.getTopLeft(dateBadge).dy,
+      lessThan(
+        tester
+            .getTopLeft(
+              find.descendant(
+                of: readingCard,
+                matching: find.text('Zählerstand'),
+              ),
+            )
+            .dy,
+      ),
+    );
     expect(
       find.descendant(of: readingCard, matching: find.text('Abgelesen am')),
-      findsOneWidget,
+      findsNothing,
     );
     expect(
       find.byKey(const ValueKey('reading-thumbnail-reading_pdf')),
@@ -332,7 +363,7 @@ void main() {
       find.byKey(const ValueKey('evidence-export-single_export')),
       findsNothing,
     );
-    expect(find.text('Verlaufsnachweis'), findsOneWidget);
+    expect(find.text('Zählerverlaufsnachweis'), findsOneWidget);
     expect(find.text('1 Ablesung enthalten'), findsOneWidget);
     expect(find.text('Einzelnachweis'), findsNothing);
     expect(find.text('Zählerstand: 42,1 m³'), findsNothing);
@@ -343,7 +374,7 @@ void main() {
     );
     expect(find.textContaining('cccccccc'), findsNothing);
     final savedEvidenceTitle = find.text('Gespeicherte PDF-Nachweise');
-    final historyActionTitle = find.text('PDF-Nachweis des Verlaufs');
+    final historyActionTitle = find.text('PDF-Nachweis des Zählerverlaufs');
     final historyExportCard = find.byKey(
       const ValueKey('evidence-export-history_export'),
     );
@@ -360,11 +391,11 @@ void main() {
       lessThan(tester.getTopLeft(historyExportCard).dy),
     );
     await tester.scrollUntilVisible(
-      find.text('Verlauf als PDF erstellen'),
+      find.text('Zählerverlauf als PDF erstellen'),
       -250,
       scrollable: find.byType(Scrollable).last,
     );
-    await tester.tap(find.text('Verlauf als PDF erstellen'));
+    await tester.tap(find.text('Zählerverlauf als PDF erstellen'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
@@ -376,7 +407,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.byKey(const ValueKey('pdf-export-progress')), findsOneWidget);
-    expect(find.text('Verlauf als PDF erstellen'), findsOneWidget);
+    expect(find.text('Zählerverlauf als PDF erstellen'), findsOneWidget);
   });
 }
 

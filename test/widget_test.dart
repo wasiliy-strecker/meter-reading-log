@@ -323,7 +323,7 @@ void main() {
     );
     expect(
       tester.getTopLeft(delete).dy,
-      lessThan(tester.getTopLeft(find.text('Verlauf')).dy),
+      lessThan(tester.getTopLeft(find.text('Zählerverlauf')).dy),
     );
 
     await tester.tap(find.byKey(const ValueKey('meter-summary-weekly_meter')));

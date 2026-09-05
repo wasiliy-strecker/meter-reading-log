@@ -78,7 +78,7 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
               children: [
                 Expanded(
                   child: Text(
-                    'Verlauf',
+                    'Zählerverlauf',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
@@ -116,7 +116,7 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
               for (final export in historyExports)
                 EvidenceExportCard(
                   export: export,
-                  title: 'Verlaufsnachweis',
+                  title: 'Zählerverlaufsnachweis',
                   detail: _readingCountLabel(export.readingIds.length),
                   onTap: () => _openExport(export),
                 ),
@@ -261,7 +261,7 @@ class _HistoryPdfAction extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'PDF-Nachweis des Verlaufs',
+                        'PDF-Nachweis des Zählerverlaufs',
                         style: TextStyle(fontWeight: FontWeight.w800),
                       ),
                       SizedBox(height: 4),
@@ -277,7 +277,7 @@ class _HistoryPdfAction extends StatelessWidget {
               child: FilledButton.icon(
                 onPressed: onPressed,
                 icon: const Icon(Icons.picture_as_pdf_outlined),
-                label: const Text('Verlauf als PDF erstellen'),
+                label: const Text('Zählerverlauf als PDF erstellen'),
               ),
             ),
           ],
@@ -391,6 +391,7 @@ class _ReadingTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final meterAccent = meterColor(reading.meter.type);
     final sameUnit =
         previous == null || previous!.meter.unit == reading.meter.unit;
     final delta = previous == null || !sameUnit
@@ -407,50 +408,93 @@ class _ReadingTile extends StatelessWidget {
         ),
         child: Padding(
           padding: const EdgeInsets.all(14),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _ReadingPhotoThumbnail(reading: reading),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Zählerstand',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w700,
+              Semantics(
+                label: 'Abgelesen am ${formatDateTime(reading.capturedAt)} Uhr',
+                child: SizedBox(
+                  width: double.infinity,
+                  child: DecoratedBox(
+                    key: ValueKey('reading-date-badge-${reading.id}'),
+                    decoration: BoxDecoration(
+                      color: meterAccent.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.calendar_month_outlined,
+                            size: 17,
+                            color: meterAccent,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'Abgelesen · ${formatDateTime(reading.capturedAt)} Uhr',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.labelLarge
+                                  ?.copyWith(
+                                    color: meterAccent,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${reading.value.displayText} ${reading.meter.unit}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Abgelesen am',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    Text(formatDateTime(reading.capturedAt)),
-                    if (previous != null && !sameUnit)
-                      const Text('Einheit seit dieser Ablesung gewechselt')
-                    else if (delta != null)
-                      Text('Δ $delta ${reading.meter.unit}'),
-                  ],
+                  ),
                 ),
               ),
-              const SizedBox(width: 8),
-              Icon(
-                Icons.chevron_right,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  _ReadingPhotoThumbnail(reading: reading),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Zählerstand',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${reading.value.displayText} ${reading.meter.unit}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.w900),
+                        ),
+                        if (previous != null && !sameUnit) ...[
+                          const SizedBox(height: 8),
+                          const Text('Einheit seit dieser Ablesung gewechselt'),
+                        ] else if (delta != null) ...[
+                          const SizedBox(height: 8),
+                          Text('Δ $delta ${reading.meter.unit}'),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    Icons.chevron_right,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ],
               ),
             ],
           ),
