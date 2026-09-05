@@ -1,5 +1,6 @@
 import 'package:universal_io/io.dart';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
 import 'package:intl/intl.dart';
@@ -76,8 +77,100 @@ class EvidenceReportService {
     required EvidenceExportKind kind,
   }) async {
     final createdAt = DateTime.now();
+    final fonts = await _loadFontBytes();
+    final buildResult = await compute(_buildPdfInBackground, <String, Object?>{
+      'readings': readings.map((reading) => reading.toJson()).toList(),
+      'revisions': <String, Object?>{
+        for (final entry in revisions.entries)
+          entry.key: entry.value.map((revision) => revision.toJson()).toList(),
+      },
+      'kind': kind.name,
+      'createdAtMicroseconds': createdAt.microsecondsSinceEpoch,
+      'regularFontBytes': fonts.regular,
+      'boldFontBytes': fonts.bold,
+    }, debugLabel: 'evidence-pdf-builder');
+    final bytes = buildResult['bytes']! as Uint8List;
+    final manifestSha = buildResult['manifestSha256']! as String;
+    final pdfSha = buildResult['pdfSha256']! as String;
+    final meter = readings.first.meter;
+    final id = newLocalId('evidence');
+    final safeLabel = _safeFilePart(meter.label);
+    final stamp = DateFormat('yyyyMMdd_HHmmss').format(createdAt);
+    final fileName = kind == EvidenceExportKind.singleReading
+        ? 'zaehlerstand_${safeLabel}_$stamp.pdf'
+        : 'zaehlerverlauf_${safeLabel}_$stamp.pdf';
+    final directory = Directory(
+      p.join((await _documentsDirectoryProvider()).path, 'evidence_reports'),
+    );
+    await directory.create(recursive: true);
+    final file = File(p.join(directory.path, fileName));
+    await file.writeAsBytes(bytes, flush: true);
+    final record = EvidenceExportRecord(
+      id: id,
+      meterId: readings.first.meterId,
+      kind: kind,
+      readingIds: readings.map((reading) => reading.id).toList(),
+      createdAt: createdAt.toUtc(),
+      fileName: fileName,
+      filePath: file.path,
+      pdfSha256: pdfSha,
+      manifestSha256: manifestSha,
+    );
+    await exports.save(record);
+    return GeneratedEvidenceReport(record: record, bytes: bytes);
+  }
+
+  Future<EvidenceVerificationResult> verify(String path) async {
+    final bytes = await File(path).readAsBytes();
+    final hash = await integrity.sha256Bytes(bytes);
+    final record = await exports.findByPdfHash(hash);
+    final sameName = record == null
+        ? await exports.findByFileName(p.basename(path))
+        : null;
+    return EvidenceVerificationResult(
+      sha256: hash,
+      status: record != null
+          ? EvidenceVerificationStatus.unchanged
+          : sameName != null
+          ? EvidenceVerificationStatus.changed
+          : EvidenceVerificationStatus.unknown,
+      record: record ?? sameName,
+    );
+  }
+
+  static Future<Map<String, Object?>> _buildPdfInBackground(
+    Map<String, Object?> message,
+  ) async {
+    final readings = (message['readings']! as List)
+        .map(
+          (json) =>
+              MeterReading.fromJson(Map<String, dynamic>.from(json as Map)),
+        )
+        .toList(growable: false);
+    final revisionData = Map<String, Object?>.from(
+      message['revisions']! as Map,
+    );
+    final revisions = <String, List<ReadingRevision>>{
+      for (final entry in revisionData.entries)
+        entry.key: (entry.value! as List)
+            .map(
+              (json) => ReadingRevision.fromJson(
+                Map<String, dynamic>.from(json as Map),
+              ),
+            )
+            .toList(growable: false),
+    };
+    final kind = EvidenceExportKind.values.byName(message['kind']! as String);
+    final createdAt = DateTime.fromMicrosecondsSinceEpoch(
+      message['createdAtMicroseconds']! as int,
+    );
+    final regularFontBytes = message['regularFontBytes']! as Uint8List;
+    final boldFontBytes = message['boldFontBytes']! as Uint8List;
+    final fonts = _ReportFonts(
+      regular: pw.Font.ttf(ByteData.sublistView(regularFontBytes)),
+      bold: pw.Font.ttf(ByteData.sublistView(boldFontBytes)),
+    );
     final manifestSha = await _reportManifestHash(readings, revisions);
-    final fonts = await _loadFonts();
     final document = pw.Document(
       title: kind == EvidenceExportKind.singleReading
           ? 'Zählerstand-Nachweis'
@@ -170,56 +263,19 @@ class EvidenceReportService {
     );
 
     final bytes = await document.save();
-    final pdfSha = await integrity.sha256Bytes(bytes);
-    final id = newLocalId('evidence');
-    final safeLabel = _safeFilePart(meter.label);
-    final stamp = DateFormat('yyyyMMdd_HHmmss').format(createdAt);
-    final fileName = kind == EvidenceExportKind.singleReading
-        ? 'zaehlerstand_${safeLabel}_$stamp.pdf'
-        : 'zaehlerverlauf_${safeLabel}_$stamp.pdf';
-    final directory = Directory(
-      p.join((await _documentsDirectoryProvider()).path, 'evidence_reports'),
-    );
-    await directory.create(recursive: true);
-    final file = File(p.join(directory.path, fileName));
-    await file.writeAsBytes(bytes, flush: true);
-    final record = EvidenceExportRecord(
-      id: id,
-      meterId: readings.first.meterId,
-      kind: kind,
-      readingIds: readings.map((reading) => reading.id).toList(),
-      createdAt: createdAt.toUtc(),
-      fileName: fileName,
-      filePath: file.path,
-      pdfSha256: pdfSha,
-      manifestSha256: manifestSha,
-    );
-    await exports.save(record);
-    return GeneratedEvidenceReport(record: record, bytes: bytes);
+    final pdfSha = await const IntegrityService().sha256Bytes(bytes);
+    return <String, Object?>{
+      'bytes': bytes,
+      'manifestSha256': manifestSha,
+      'pdfSha256': pdfSha,
+    };
   }
 
-  Future<EvidenceVerificationResult> verify(String path) async {
-    final bytes = await File(path).readAsBytes();
-    final hash = await integrity.sha256Bytes(bytes);
-    final record = await exports.findByPdfHash(hash);
-    final sameName = record == null
-        ? await exports.findByFileName(p.basename(path))
-        : null;
-    return EvidenceVerificationResult(
-      sha256: hash,
-      status: record != null
-          ? EvidenceVerificationStatus.unchanged
-          : sameName != null
-          ? EvidenceVerificationStatus.changed
-          : EvidenceVerificationStatus.unknown,
-      record: record ?? sameName,
-    );
-  }
-
-  Future<String> _reportManifestHash(
+  static Future<String> _reportManifestHash(
     List<MeterReading> readings,
     Map<String, List<ReadingRevision>> revisions,
   ) async {
+    const integrity = IntegrityService();
     final normalizedReadings = readings.map((reading) {
       return integrity.normalizedReadingData(reading);
     }).toList();
@@ -238,7 +294,7 @@ class EvidenceReportService {
     );
   }
 
-  pw.Widget _meterTable(MeterReading reading) {
+  static pw.Widget _meterTable(MeterReading reading) {
     final meter = reading.meter;
     return pw.TableHelper.fromTextArray(
       headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
@@ -260,7 +316,7 @@ class EvidenceReportService {
     );
   }
 
-  pw.Widget _historyTable(List<MeterReading> readings, DateFormat date) {
+  static pw.Widget _historyTable(List<MeterReading> readings, DateFormat date) {
     return pw.TableHelper.fromTextArray(
       headers: const ['Ablesezeitpunkt', 'Zählerstand', 'Differenz', 'Quelle'],
       headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
@@ -283,7 +339,7 @@ class EvidenceReportService {
     );
   }
 
-  List<pw.Widget> _readingSection({
+  static List<pw.Widget> _readingSection({
     required MeterReading reading,
     required List<ReadingRevision> revisions,
     required DateFormat date,
@@ -363,7 +419,7 @@ class EvidenceReportService {
     ];
   }
 
-  pw.Widget _revisionSection({
+  static pw.Widget _revisionSection({
     required ReadingRevision revision,
     required MeterReading reading,
     required DateFormat date,
@@ -417,7 +473,7 @@ class EvidenceReportService {
     );
   }
 
-  pw.Widget _revisionPhotoComparison({
+  static pw.Widget _revisionPhotoComparison({
     required ReadingRevisionPhotos photos,
     required DateFormat date,
   }) {
@@ -469,7 +525,7 @@ class EvidenceReportService {
     );
   }
 
-  pw.Widget _revisionPhoto({
+  static pw.Widget _revisionPhoto({
     required String label,
     required ReadingPhotoVersion photo,
     required DateFormat date,
@@ -492,7 +548,7 @@ class EvidenceReportService {
     );
   }
 
-  String _revisionValue(
+  static String _revisionValue(
     String key,
     String value,
     String unit,
@@ -507,7 +563,7 @@ class EvidenceReportService {
     return value;
   }
 
-  pw.Widget _photo(String path, {double height = 280}) {
+  static pw.Widget _photo(String path, {double height = 280}) {
     try {
       final bytes = File(path).readAsBytesSync();
       final decoded = img.decodeImage(bytes);
@@ -533,7 +589,7 @@ class EvidenceReportService {
     }
   }
 
-  pw.Widget _integrityBox({
+  static pw.Widget _integrityBox({
     required String manifestSha,
     required DateTime generatedAt,
     required DateFormat date,
@@ -567,13 +623,19 @@ class EvidenceReportService {
     );
   }
 
-  pw.TextStyle get _hashStyle =>
+  static pw.TextStyle get _hashStyle =>
       const pw.TextStyle(fontSize: 8, color: PdfColors.grey800);
 
-  Future<_ReportFonts> _loadFonts() async {
+  Future<_ReportFontBytes> _loadFontBytes() async {
     final regular = await rootBundle.load('assets/fonts/Roboto-Regular.ttf');
     final bold = await rootBundle.load('assets/fonts/Roboto-Bold.ttf');
-    return _ReportFonts(regular: pw.Font.ttf(regular), bold: pw.Font.ttf(bold));
+    return _ReportFontBytes(
+      regular: regular.buffer.asUint8List(
+        regular.offsetInBytes,
+        regular.lengthInBytes,
+      ),
+      bold: bold.buffer.asUint8List(bold.offsetInBytes, bold.lengthInBytes),
+    );
   }
 
   String _safeFilePart(String value) {
@@ -588,7 +650,7 @@ class EvidenceReportService {
     return normalized.isEmpty ? 'zaehler' : normalized;
   }
 
-  String _offset(int minutes) {
+  static String _offset(int minutes) {
     final sign = minutes < 0 ? '-' : '+';
     final absolute = minutes.abs();
     return 'UTC$sign${(absolute ~/ 60).toString().padLeft(2, '0')}:'
@@ -601,4 +663,11 @@ class _ReportFonts {
 
   final pw.Font regular;
   final pw.Font bold;
+}
+
+class _ReportFontBytes {
+  const _ReportFontBytes({required this.regular, required this.bold});
+
+  final Uint8List regular;
+  final Uint8List bold;
 }

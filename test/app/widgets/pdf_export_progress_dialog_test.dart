@@ -10,6 +10,7 @@ void main() {
   ) async {
     final operation = Completer<String>();
     String? result;
+    var operationStarted = false;
 
     await tester.pumpWidget(
       MaterialApp(
@@ -20,7 +21,10 @@ void main() {
                 result = await runWithPdfExportProgress(
                   context,
                   description: 'Nachweisdaten werden zusammengestellt.',
-                  operation: () => operation.future,
+                  operation: () {
+                    operationStarted = true;
+                    return operation.future;
+                  },
                 );
               },
               child: const Text('PDF erstellen'),
@@ -31,7 +35,10 @@ void main() {
     );
 
     await tester.tap(find.text('PDF erstellen'));
+    expect(operationStarted, isFalse);
     await tester.pump();
+    expect(find.text('PDF-Nachweis wird erstellt'), findsOneWidget);
+    expect(operationStarted, isTrue);
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('PDF-Nachweis wird erstellt'), findsOneWidget);
@@ -45,5 +52,43 @@ void main() {
 
     expect(find.text('PDF-Nachweis wird erstellt'), findsNothing);
     expect(result, 'fertig');
+  });
+
+  testWidgets('PDF progress dialog closes when creation fails', (tester) async {
+    Object? caughtError;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => FilledButton(
+              onPressed: () async {
+                try {
+                  await runWithPdfExportProgress<void>(
+                    context,
+                    description: 'Nachweisdaten werden zusammengestellt.',
+                    operation: () => Future<void>.error(
+                      StateError('PDF-Erstellung fehlgeschlagen'),
+                    ),
+                  );
+                } on Object catch (error) {
+                  caughtError = error;
+                }
+              },
+              child: const Text('PDF erstellen'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('PDF erstellen'));
+    await tester.pump();
+    expect(find.text('PDF-Nachweis wird erstellt'), findsOneWidget);
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('PDF-Nachweis wird erstellt'), findsNothing);
+    expect(caughtError, isA<StateError>());
   });
 }
