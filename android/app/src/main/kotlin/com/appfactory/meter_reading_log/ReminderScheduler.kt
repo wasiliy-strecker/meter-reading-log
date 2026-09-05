@@ -136,7 +136,7 @@ internal object ReminderNotifier {
         }
         val summary = "${reminder.meterTypeLabel} · $latestReading"
         val notification = NotificationCompat.Builder(context, channelId)
-            .setSmallIcon(R.drawable.ic_stat_meter)
+            .setSmallIcon(notificationIcon(reminder.meterType))
             .setContentTitle("${reminder.meterTypeLabel} · ${reminder.label}")
             .setContentText(summary)
             .setStyle(
@@ -157,6 +157,19 @@ internal object ReminderNotifier {
             notification,
         )
         return postedAt
+    }
+
+    private fun notificationIcon(meterType: String): Int = when (meterType) {
+        "electricity" -> R.drawable.ic_stat_meter
+        "electricityFeedIn" -> R.drawable.ic_stat_solar
+        "gas" -> R.drawable.ic_stat_gas
+        "water" -> R.drawable.ic_stat_water
+        "coldWater" -> R.drawable.ic_stat_cold_water
+        "hotWater" -> R.drawable.ic_stat_hot_water
+        "heat" -> R.drawable.ic_stat_heat
+        "heatingCostAllocator" -> R.drawable.ic_stat_home
+        "oil" -> R.drawable.ic_stat_oil
+        else -> R.drawable.ic_stat_other
     }
 
     fun migrateLegacyNotification(context: Context, reminder: StoredReminder) {
