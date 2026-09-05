@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -63,7 +65,8 @@ class _MeterForm extends ConsumerStatefulWidget {
   ConsumerState<_MeterForm> createState() => _MeterFormState();
 }
 
-class _MeterFormState extends ConsumerState<_MeterForm> {
+class _MeterFormState extends ConsumerState<_MeterForm>
+    with WidgetsBindingObserver {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _label;
   late final TextEditingController _number;
@@ -80,12 +83,15 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
   late final _MeterFormSnapshot _initialSnapshot;
   bool _saving = false;
   bool _testingReminder = false;
+  bool _awaitingExactAlarmSettings = false;
+  bool? _exactAlarmAvailable;
   bool _discardDialogOpen = false;
   bool _allowPop = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     final meter = widget.meter;
     _type = meter?.type ?? MeterType.electricity;
     _label = TextEditingController(text: meter?.label ?? '');
@@ -118,10 +124,14 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
     _label.addListener(_handleTextChanged);
     _number.addListener(_handleTextChanged);
     _location.addListener(_handleTextChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_refreshExactAlarmAvailability());
+    });
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _label.removeListener(_handleTextChanged);
     _number.removeListener(_handleTextChanged);
     _location.removeListener(_handleTextChanged);
@@ -129,6 +139,13 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
     _number.dispose();
     _location.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_refreshExactAlarmAvailability());
+    }
   }
 
   @override
@@ -384,6 +401,20 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
                                   ReminderDeliveryMode.punctualWithSound,
                                 ),
                         ),
+                        if (!kIsWeb &&
+                            defaultTargetPlatform == TargetPlatform.android &&
+                            _deliveryMode ==
+                                ReminderDeliveryMode.punctualWithSound &&
+                            !_awaitingExactAlarmSettings &&
+                            _exactAlarmAvailable == false) ...[
+                          const SizedBox(height: 10),
+                          _ExactAlarmWarning(
+                            busy: _saving,
+                            onPressed: () => _selectDeliveryMode(
+                              ReminderDeliveryMode.punctualWithSound,
+                            ),
+                          ),
+                        ],
                         if (kDebugMode &&
                             !kIsWeb &&
                             defaultTargetPlatform ==
@@ -536,6 +567,10 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
             .read(meterReminderRepositoryProvider)
             .canScheduleExactAlarms()) {
       if (!mounted) return;
+      setState(() {
+        _exactAlarmAvailable = false;
+        _awaitingExactAlarmSettings = false;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         AppSnackBar(
           message:
@@ -624,14 +659,31 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
 
   Future<void> _selectDeliveryMode(ReminderDeliveryMode mode) async {
     if (mode == ReminderDeliveryMode.normal) {
-      setState(() => _deliveryMode = mode);
+      setState(() {
+        _deliveryMode = mode;
+        _awaitingExactAlarmSettings = false;
+      });
       return;
     }
-    setState(() => _deliveryMode = mode);
+    setState(() {
+      _deliveryMode = mode;
+      _awaitingExactAlarmSettings = true;
+    });
     final reminders = ref.read(meterReminderRepositoryProvider);
-    if (await reminders.canScheduleExactAlarms()) return;
+    if (await reminders.canScheduleExactAlarms()) {
+      if (!mounted) return;
+      setState(() {
+        _awaitingExactAlarmSettings = false;
+        _exactAlarmAvailable = true;
+      });
+      return;
+    }
     final opened = await reminders.requestExactAlarmPermission();
     if (!mounted || opened) return;
+    setState(() {
+      _awaitingExactAlarmSettings = false;
+      _exactAlarmAvailable = false;
+    });
     ScaffoldMessenger.of(context).showSnackBar(
       AppSnackBar(
         message:
@@ -641,16 +693,29 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
   }
 
   Future<void> _openExactAlarmSettings() async {
+    setState(() => _awaitingExactAlarmSettings = true);
     final opened = await ref
         .read(meterReminderRepositoryProvider)
         .openExactAlarmSettings();
     if (!mounted || opened) return;
+    setState(() => _awaitingExactAlarmSettings = false);
     ScaffoldMessenger.of(context).showSnackBar(
       AppSnackBar(
         message:
             'Die Android-Einstellung „Alarme & Erinnerungen“ ist auf diesem Gerät nicht verfügbar.',
       ),
     );
+  }
+
+  Future<void> _refreshExactAlarmAvailability() async {
+    final available = await ref
+        .read(meterReminderRepositoryProvider)
+        .canScheduleExactAlarms();
+    if (!mounted) return;
+    setState(() {
+      _exactAlarmAvailable = available;
+      _awaitingExactAlarmSettings = false;
+    });
   }
 
   Future<void> _testReminderNow() async {
@@ -772,6 +837,38 @@ class _ReminderModeCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _ExactAlarmWarning extends StatelessWidget {
+  const _ExactAlarmWarning({required this.busy, required this.onPressed});
+
+  final bool busy;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.errorContainer,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Für pünktliche Erinnerungen muss Android „Alarme & Erinnerungen“ erlauben. Aktiviere die Freigabe, damit die Erinnerung zuverlässig zur gewählten Zeit mit Ton erscheint.',
+          ),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: busy ? null : onPressed,
+            icon: const Icon(Icons.settings_outlined),
+            label: const Text('Alarme & Erinnerungen erlauben'),
+          ),
+        ],
       ),
     );
   }

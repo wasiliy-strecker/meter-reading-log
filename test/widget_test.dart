@@ -205,7 +205,7 @@ void main() {
   testWidgets(
     'punctual reminder uses the same test button and reports denial',
     (tester) async {
-      await tester.binding.setSurfaceSize(const Size(430, 1400));
+      await tester.binding.setSurfaceSize(const Size(430, 1800));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       final reminders = NoopMeterReminderRepository(
         reminderTestResult: false,
@@ -236,6 +236,35 @@ void main() {
         findsOneWidget,
       );
       expect(reminders.exactAlarmPermissionRequestCount, 1);
+      expect(find.text('Alarme & Erinnerungen erlauben'), findsNothing);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('Für pünktliche Erinnerungen muss Android'),
+        findsOneWidget,
+      );
+      final allowExactAlarms = find.widgetWithText(
+        TextButton,
+        'Alarme & Erinnerungen erlauben',
+      );
+      expect(allowExactAlarms, findsOneWidget);
+      await tester.ensureVisible(allowExactAlarms);
+      await tester.tap(allowExactAlarms);
+      await tester.pumpAndSettle();
+      expect(reminders.exactAlarmPermissionRequestCount, 2);
+      expect(find.text('Alarme & Erinnerungen erlauben'), findsNothing);
+
+      reminders.exactAlarmPermissionGranted = true;
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('Für pünktliche Erinnerungen muss Android'),
+        findsNothing,
+      );
       final alarmSettings = find.widgetWithText(
         OutlinedButton,
         '„Alarme & Erinnerungen“ öffnen',
