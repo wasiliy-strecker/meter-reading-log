@@ -227,6 +227,15 @@ extension ReminderIntervalLabel on ReminderInterval {
   };
 }
 
+enum ReminderDeliveryMode { normal, punctualWithSound }
+
+extension ReminderDeliveryModeLabel on ReminderDeliveryMode {
+  String get label => switch (this) {
+    ReminderDeliveryMode.normal => 'Normale Erinnerung',
+    ReminderDeliveryMode.punctualWithSound => 'Pünktlich mit Ton',
+  };
+}
+
 String reminderWeekdayLabel(int weekday) => switch (weekday) {
   DateTime.monday => 'Montag',
   DateTime.tuesday => 'Dienstag',
@@ -245,6 +254,7 @@ class ReadingReminderSchedule {
     required this.hour,
     required this.minute,
     this.month,
+    this.deliveryMode = ReminderDeliveryMode.normal,
   });
 
   final ReminderInterval interval;
@@ -252,6 +262,7 @@ class ReadingReminderSchedule {
   final int hour;
   final int minute;
   final int? month;
+  final ReminderDeliveryMode deliveryMode;
 
   Map<String, dynamic> toJson() => {
     'interval': interval.name,
@@ -259,6 +270,7 @@ class ReadingReminderSchedule {
     'hour': hour,
     'minute': minute,
     'month': month,
+    'deliveryMode': deliveryMode.name,
   };
 
   factory ReadingReminderSchedule.fromJson(Map<String, dynamic> json) {
@@ -268,6 +280,10 @@ class ReadingReminderSchedule {
       hour: (json['hour'] as num).toInt(),
       minute: (json['minute'] as num).toInt(),
       month: (json['month'] as num?)?.toInt(),
+      deliveryMode: ReminderDeliveryMode.values.firstWhere(
+        (mode) => mode.name == json['deliveryMode'],
+        orElse: () => ReminderDeliveryMode.normal,
+      ),
     );
   }
 }

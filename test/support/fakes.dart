@@ -7,11 +7,68 @@ import 'package:meter_reading_log/features/meters/domain/meter_repositories.dart
 import 'package:meter_reading_log/core/reminders/local_notification_reminder_repository.dart';
 
 class NoopMeterReminderRepository implements MeterReminderRepository {
+  NoopMeterReminderRepository({this.statuses = const {}});
+
+  final Map<String, ReminderStatus> statuses;
+  final List<String> acknowledgedMeterIds = [];
+  int alarmTestCount = 0;
+
+  @override
+  Stream<String> get notificationOpened => const Stream.empty();
+
+  @override
+  Stream<int> get statusChanges => const Stream.empty();
+
+  @override
+  Future<void> acknowledge(String meterId) async {
+    acknowledgedMeterIds.add(meterId);
+  }
+
+  @override
+  Future<bool> canScheduleExactAlarms() async => true;
+
   @override
   Future<void> cancel(String meterId) async {}
 
   @override
+  Future<String?> consumeInitialMeterId() async => null;
+
+  @override
+  Future<void> initialize() async {}
+
+  @override
+  Future<Map<String, ReminderStatus>> loadStatuses(
+    Iterable<String> meterIds,
+  ) async {
+    final result = <String, ReminderStatus>{};
+    for (final meterId in meterIds) {
+      final status = statuses[meterId];
+      if (status != null) result[meterId] = status;
+    }
+    return result;
+  }
+
+  @override
+  Future<ReminderPermissionStatus> permissionStatus() async =>
+      ReminderPermissionStatus.granted;
+
+  @override
+  void refreshStatuses() {}
+
+  @override
+  Future<bool> requestExactAlarmPermission() async => true;
+
+  @override
+  Future<ReminderPermissionStatus> requestPermission() async =>
+      ReminderPermissionStatus.granted;
+
+  @override
   Future<void> schedule(Meter meter) async {}
+
+  @override
+  Future<void> showAlarmTest() async {
+    alarmTestCount += 1;
+  }
 }
 
 class MemoryMeterRepository implements MeterRepository {

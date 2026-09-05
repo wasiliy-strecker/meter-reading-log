@@ -71,6 +71,7 @@ final meterReadingServiceProvider = Provider<MeterReadingService>(
     readings: ref.watch(meterReadingRepositoryProvider),
     photos: ref.watch(meterPhotoCaptureRepositoryProvider),
     integrity: ref.watch(integrityServiceProvider),
+    reminders: ref.watch(meterReminderRepositoryProvider),
   ),
 );
 
@@ -94,6 +95,20 @@ final encryptedBackupServiceProvider = Provider<EncryptedBackupService>(
 final metersProvider = StreamProvider<List<Meter>>(
   (ref) => ref.watch(meterRepositoryProvider).watchAll(),
 );
+
+final reminderStatusChangesProvider = StreamProvider<int>(
+  (ref) => ref.watch(meterReminderRepositoryProvider).statusChanges,
+);
+
+final reminderStatusesProvider = FutureProvider<Map<String, ReminderStatus>>((
+  ref,
+) async {
+  ref.watch(reminderStatusChangesProvider);
+  final meters = await ref.watch(metersProvider.future);
+  return ref
+      .watch(meterReminderRepositoryProvider)
+      .loadStatuses(meters.map((meter) => meter.id));
+});
 
 final meterByIdProvider = FutureProvider.family<Meter?, String>(
   (ref, id) => ref.watch(meterRepositoryProvider).findById(id),

@@ -31,6 +31,7 @@ void main() {
     final meters = MemoryMeterRepository()..items[meter.id] = meter;
     final readings = MemoryReadingRepository();
     final photos = _FixedPhotoRepository();
+    final reminders = NoopMeterReminderRepository();
 
     await tester.pumpWidget(
       ProviderScope(
@@ -44,9 +45,7 @@ void main() {
           meterOcrRepositoryProvider.overrideWithValue(
             const _FixedOcrRepository(),
           ),
-          meterReminderRepositoryProvider.overrideWithValue(
-            NoopMeterReminderRepository(),
-          ),
+          meterReminderRepositoryProvider.overrideWithValue(reminders),
         ],
         child: const MeterReadingLogApp(),
       ),
@@ -98,9 +97,17 @@ void main() {
     for (var attempt = 0; attempt < 30 && readings.items.isEmpty; attempt++) {
       await tester.pump(const Duration(milliseconds: 100));
     }
+    for (
+      var attempt = 0;
+      attempt < 30 && reminders.acknowledgedMeterIds.isEmpty;
+      attempt++
+    ) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
 
     expect(meters.items[meter.id]!.unit, 'kWh');
     expect(readings.items.values.single.meter.unit, 'kWh');
+    expect(reminders.acknowledgedMeterIds, [meter.id]);
     await tester.pumpAndSettle();
     expect(find.widgetWithText(OutlinedButton, 'Korrigieren'), findsOneWidget);
     expect(

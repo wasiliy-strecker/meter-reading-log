@@ -1,72 +1,99 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:flutter_timezone/flutter_timezone.dart';
-import 'package:timezone/data/latest_all.dart' as tz_data;
-import 'package:timezone/timezone.dart' as tz;
 
 import '../../features/meters/domain/meter.dart';
 
 enum ReminderPermissionStatus { granted, denied, unknown, unsupported }
 
+class ReminderStatus {
+  const ReminderStatus({
+    required this.meterId,
+    required this.isNotificationActive,
+    this.lastTriggeredAt,
+  });
+
+  final String meterId;
+  final bool isNotificationActive;
+  final DateTime? lastTriggeredAt;
+}
+
 abstract interface class MeterReminderRepository {
+  Stream<int> get statusChanges;
+
+  Stream<String> get notificationOpened;
+
+  Future<void> initialize();
+
+  Future<ReminderPermissionStatus> permissionStatus();
+
+  Future<ReminderPermissionStatus> requestPermission();
+
+  Future<bool> canScheduleExactAlarms();
+
+  Future<bool> requestExactAlarmPermission();
+
   Future<void> schedule(Meter meter);
 
   Future<void> cancel(String meterId);
+
+  Future<void> acknowledge(String meterId);
+
+  Future<Map<String, ReminderStatus>> loadStatuses(Iterable<String> meterIds);
+
+  Future<void> showAlarmTest();
+
+  Future<String?> consumeInitialMeterId();
+
+  void refreshStatuses();
 }
 
 class LocalNotificationReminderRepository implements MeterReminderRepository {
   LocalNotificationReminderRepository._();
 
   static final instance = LocalNotificationReminderRepository._();
+  static const _channel = MethodChannel(
+    'com.appfactory.meter_reading_log/reminders',
+  );
 
-  static const _icon = 'ic_stat_meter';
-  static const _channelId = 'meter_reading_reminders';
-  static const _channelName = 'Zählerablesungen';
-  static const _channelDescription =
-      'Optionale Erinnerungen für regelmäßige Zählerablesungen.';
-
-  final FlutterLocalNotificationsPlugin _plugin =
-      FlutterLocalNotificationsPlugin();
+  final _statusChanges = StreamController<int>.broadcast();
+  final _notificationOpened = StreamController<String>.broadcast();
+  int _statusRevision = 0;
   bool _initialized = false;
 
+  @override
+  Stream<int> get statusChanges => _statusChanges.stream;
+
+  @override
+  Stream<String> get notificationOpened => _notificationOpened.stream;
+
+  @override
   Future<void> initialize() async {
-    if (_initialized) {
-      return;
-    }
+    if (_initialized) return;
     _initialized = true;
-    tz_data.initializeTimeZones();
-    try {
-      final timezone = await FlutterTimezone.getLocalTimezone();
-      tz.setLocalLocation(tz.getLocation(timezone.identifier));
-    } on Object {
-      tz.setLocalLocation(tz.UTC);
-    }
-    if (!_supportsNotifications) {
-      return;
-    }
-    try {
-      await _plugin.initialize(
-        settings: const InitializationSettings(
-          android: AndroidInitializationSettings(_icon),
-        ),
-      );
-    } on MissingPluginException {
-      return;
-    } on PlatformException {
-      return;
-    } on Object {
-      return;
-    }
+    if (!_supportsNotifications) return;
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == 'statusChanged') {
+        refreshStatuses();
+      } else if (call.method == 'notificationOpened') {
+        final meterId = call.arguments as String?;
+        if (meterId != null && meterId.isNotEmpty) {
+          _notificationOpened.add(meterId);
+          refreshStatuses();
+        }
+      }
+    });
   }
 
+  @override
   Future<ReminderPermissionStatus> permissionStatus() async {
     await initialize();
-    if (!_supportsNotifications) {
-      return ReminderPermissionStatus.unsupported;
-    }
+    if (!_supportsNotifications) return ReminderPermissionStatus.unsupported;
     try {
-      final enabled = await _androidPlugin()?.areNotificationsEnabled();
+      final enabled = await _channel.invokeMethod<bool>(
+        'areNotificationsEnabled',
+      );
       return switch (enabled) {
         true => ReminderPermissionStatus.granted,
         false => ReminderPermissionStatus.denied,
@@ -77,13 +104,14 @@ class LocalNotificationReminderRepository implements MeterReminderRepository {
     }
   }
 
+  @override
   Future<ReminderPermissionStatus> requestPermission() async {
     await initialize();
-    if (!_supportsNotifications) {
-      return ReminderPermissionStatus.unsupported;
-    }
+    if (!_supportsNotifications) return ReminderPermissionStatus.unsupported;
     try {
-      final granted = await _androidPlugin()?.requestNotificationsPermission();
+      final granted = await _channel.invokeMethod<bool>(
+        'requestNotificationPermission',
+      );
       return granted == true
           ? ReminderPermissionStatus.granted
           : ReminderPermissionStatus.denied;
@@ -93,44 +121,55 @@ class LocalNotificationReminderRepository implements MeterReminderRepository {
   }
 
   @override
+  Future<bool> canScheduleExactAlarms() async {
+    await initialize();
+    if (!_supportsNotifications) return false;
+    try {
+      return await _channel.invokeMethod<bool>('canScheduleExactAlarms') ??
+          false;
+    } on Object {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> requestExactAlarmPermission() async {
+    await initialize();
+    if (!_supportsNotifications) return false;
+    try {
+      return await _channel.invokeMethod<bool>('requestExactAlarmPermission') ??
+          false;
+    } on Object {
+      return false;
+    }
+  }
+
+  @override
   Future<void> schedule(Meter meter) async {
     await initialize();
-    await cancel(meter.id);
     final schedule = meter.reminder;
-    if (schedule == null || !_supportsNotifications) {
+    if (schedule == null) {
+      await cancel(meter.id);
       return;
     }
+    if (!_supportsNotifications) return;
     var permission = await permissionStatus();
     if (permission != ReminderPermissionStatus.granted) {
       permission = await requestPermission();
     }
-    if (permission != ReminderPermissionStatus.granted) {
-      return;
-    }
-
-    final next = nextReminderDate(schedule, DateTime.now());
-    final components = reminderDateTimeComponents(schedule.interval);
+    if (permission != ReminderPermissionStatus.granted) return;
     try {
-      await _plugin.zonedSchedule(
-        id: stableNotificationId(meter.id),
-        title: '${meter.label} ablesen',
-        body: 'Jetzt Zählerstand fotografieren und Verlauf aktualisieren.',
-        scheduledDate: tz.TZDateTime.from(next, tz.local),
-        notificationDetails: const NotificationDetails(
-          android: AndroidNotificationDetails(
-            _channelId,
-            _channelName,
-            channelDescription: _channelDescription,
-            icon: _icon,
-            importance: Importance.high,
-            priority: Priority.high,
-            category: AndroidNotificationCategory.reminder,
-          ),
-        ),
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-        payload: 'meter:${meter.id}',
-        matchDateTimeComponents: components,
-      );
+      await _channel.invokeMethod<void>('schedule', {
+        'meterId': meter.id,
+        'label': meter.label,
+        'interval': schedule.interval.name,
+        'day': schedule.day,
+        'month': schedule.month,
+        'hour': schedule.hour,
+        'minute': schedule.minute,
+        'deliveryMode': schedule.deliveryMode.name,
+      });
+      refreshStatuses();
     } on Object {
       return;
     }
@@ -138,21 +177,94 @@ class LocalNotificationReminderRepository implements MeterReminderRepository {
 
   @override
   Future<void> cancel(String meterId) async {
-    if (!_supportsNotifications) {
-      return;
-    }
+    await initialize();
+    if (!_supportsNotifications) return;
     try {
-      await _plugin.cancel(id: stableNotificationId(meterId));
+      await _channel.invokeMethod<void>('cancel', {'meterId': meterId});
+      refreshStatuses();
     } on Object {
       return;
     }
   }
 
-  AndroidFlutterLocalNotificationsPlugin? _androidPlugin() {
-    return _plugin
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >();
+  @override
+  Future<void> acknowledge(String meterId) async {
+    await initialize();
+    if (!_supportsNotifications) return;
+    try {
+      await _channel.invokeMethod<void>('acknowledge', {'meterId': meterId});
+      refreshStatuses();
+    } on Object {
+      return;
+    }
+  }
+
+  @override
+  Future<Map<String, ReminderStatus>> loadStatuses(
+    Iterable<String> meterIds,
+  ) async {
+    await initialize();
+    final ids = meterIds.toList(growable: false);
+    if (!_supportsNotifications || ids.isEmpty) return const {};
+    try {
+      final result = await _channel.invokeListMethod<Object?>('getStatuses', {
+        'meterIds': ids,
+      });
+      final statuses = <String, ReminderStatus>{};
+      for (final raw in result ?? const []) {
+        if (raw is! Map) continue;
+        final values = Map<Object?, Object?>.from(raw);
+        final meterId = values['meterId'] as String?;
+        if (meterId == null) continue;
+        final lastTriggeredMillis = values['lastTriggeredAtMillis'] as int?;
+        statuses[meterId] = ReminderStatus(
+          meterId: meterId,
+          isNotificationActive:
+              values['isNotificationActive'] as bool? ?? false,
+          lastTriggeredAt: lastTriggeredMillis == null
+              ? null
+              : DateTime.fromMillisecondsSinceEpoch(
+                  lastTriggeredMillis,
+                  isUtc: true,
+                ),
+        );
+      }
+      return statuses;
+    } on Object {
+      return const {};
+    }
+  }
+
+  @override
+  Future<void> showAlarmTest() async {
+    await initialize();
+    if (!_supportsNotifications) return;
+    var permission = await permissionStatus();
+    if (permission != ReminderPermissionStatus.granted) {
+      permission = await requestPermission();
+    }
+    if (permission != ReminderPermissionStatus.granted) return;
+    try {
+      await _channel.invokeMethod<void>('showAlarmTest');
+    } on Object {
+      return;
+    }
+  }
+
+  @override
+  Future<String?> consumeInitialMeterId() async {
+    await initialize();
+    if (!_supportsNotifications) return null;
+    try {
+      return await _channel.invokeMethod<String>('consumeInitialMeterId');
+    } on Object {
+      return null;
+    }
+  }
+
+  @override
+  void refreshStatuses() {
+    if (!_statusChanges.isClosed) _statusChanges.add(++_statusRevision);
   }
 
   bool get _supportsNotifications =>
@@ -250,26 +362,7 @@ DateTime nextReminderDate(ReadingReminderSchedule schedule, DateTime now) {
   return candidate;
 }
 
-DateTimeComponents reminderDateTimeComponents(ReminderInterval interval) {
-  return switch (interval) {
-    ReminderInterval.daily => DateTimeComponents.time,
-    ReminderInterval.weekly => DateTimeComponents.dayOfWeekAndTime,
-    ReminderInterval.monthly => DateTimeComponents.dayOfMonthAndTime,
-    ReminderInterval.yearly => DateTimeComponents.dateAndTime,
-  };
-}
-
 DateTime _safeDate(int year, int month, int day, int hour, int minute) {
   final lastDay = DateTime(year, month + 1, 0).day;
   return DateTime(year, month, day.clamp(1, lastDay), hour, minute);
-}
-
-int stableNotificationId(String value) {
-  const prime = 0x01000193;
-  var hash = 0x811c9dc5;
-  for (final codeUnit in value.codeUnits) {
-    hash ^= codeUnit;
-    hash = (hash * prime) & 0x7fffffff;
-  }
-  return hash == 0 ? 1 : hash;
 }

@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:meter_reading_log/core/reminders/local_notification_reminder_repository.dart';
 import 'package:meter_reading_log/features/meters/domain/meter.dart';
 
@@ -69,22 +68,30 @@ void main() {
     );
   });
 
-  test('maps every interval to the matching recurring date components', () {
-    expect(
-      reminderDateTimeComponents(ReminderInterval.daily),
-      DateTimeComponents.time,
+  test('old schedules default to a normal reminder', () {
+    final schedule = ReadingReminderSchedule.fromJson(const {
+      'interval': 'daily',
+      'day': 1,
+      'hour': 9,
+      'minute': 30,
+      'month': null,
+    });
+
+    expect(schedule.deliveryMode, ReminderDeliveryMode.normal);
+  });
+
+  test('punctual reminder mode survives serialization', () {
+    const schedule = ReadingReminderSchedule(
+      interval: ReminderInterval.weekly,
+      day: DateTime.friday,
+      hour: 9,
+      minute: 30,
+      deliveryMode: ReminderDeliveryMode.punctualWithSound,
     );
+
     expect(
-      reminderDateTimeComponents(ReminderInterval.weekly),
-      DateTimeComponents.dayOfWeekAndTime,
-    );
-    expect(
-      reminderDateTimeComponents(ReminderInterval.monthly),
-      DateTimeComponents.dayOfMonthAndTime,
-    );
-    expect(
-      reminderDateTimeComponents(ReminderInterval.yearly),
-      DateTimeComponents.dateAndTime,
+      ReadingReminderSchedule.fromJson(schedule.toJson()).deliveryMode,
+      ReminderDeliveryMode.punctualWithSound,
     );
   });
 }

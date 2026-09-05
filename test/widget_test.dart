@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:meter_reading_log/app/app.dart';
 import 'package:meter_reading_log/app/app_providers.dart';
 import 'package:meter_reading_log/core/files/meter_photo_repository.dart';
+import 'package:meter_reading_log/core/reminders/local_notification_reminder_repository.dart';
 import 'package:meter_reading_log/features/meters/domain/meter.dart';
 import 'package:meter_reading_log/features/meters/domain/meter_reading.dart';
 import 'package:meter_reading_log/features/meters/domain/reading_value.dart';
@@ -104,6 +105,34 @@ void main() {
     final reminder = meters.items.values.single.reminder!;
     expect(reminder.interval, ReminderInterval.weekly);
     expect(reminder.day, DateTime.monday);
+  });
+
+  testWidgets('reminder offers punctual mode and alarm sound test', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(430, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final reminders = NoopMeterReminderRepository();
+    await tester.pumpWidget(_testApp(reminders: reminders));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Zähler anlegen'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Bezeichnung *'),
+      'Strom pünktlich',
+    );
+
+    await tester.tap(find.text('Ableseerinnerung'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Pünktlich mit Ton'));
+    await tester.tap(find.text('Pünktlich mit Ton'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ton jetzt testen'), findsOneWidget);
+    await tester.tap(find.text('Ton jetzt testen'));
+    await tester.pumpAndSettle();
+    expect(reminders.alarmTestCount, 1);
+    expect(find.text('Test-Erinnerung wurde ausgelöst.'), findsOneWidget);
   });
 
   testWidgets('meter form offers expanded types and matching units', (
@@ -364,11 +393,56 @@ void main() {
       lessThan(tester.getTopLeft(find.text('Beta Strom')).dy),
     );
   });
+
+  testWidgets('dashboard shows active reminder badge and last trigger time', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(430, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final meter =
+        _meter(
+          id: 'active_reminder',
+          label: 'Gas Keller',
+          type: MeterType.gas,
+          location: 'Keller',
+          updatedAt: DateTime(2026, 9, 4),
+        ).copyWith(
+          reminder: const ReadingReminderSchedule(
+            interval: ReminderInterval.daily,
+            day: 1,
+            hour: 6,
+            minute: 0,
+          ),
+        );
+    final meters = MemoryMeterRepository()..items[meter.id] = meter;
+    final reminders = NoopMeterReminderRepository(
+      statuses: {
+        meter.id: ReminderStatus(
+          meterId: meter.id,
+          isNotificationActive: true,
+          lastTriggeredAt: DateTime(2026, 9, 5, 6, 1),
+        ),
+      },
+    );
+
+    await tester.pumpWidget(_testApp(meters: meters, reminders: reminders));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Erinnern: täglich um 06:00 Uhr'), findsOneWidget);
+    expect(
+      find.text('Letzte Erinnerung: 05.09.2026, 06:01 Uhr'),
+      findsOneWidget,
+    );
+    final badge = tester.widget<Badge>(find.byType(Badge));
+    expect(badge.isLabelVisible, isTrue);
+    expect(find.text('1'), findsOneWidget);
+  });
 }
 
 Widget _testApp({
   MemoryMeterRepository? meters,
   MemoryReadingRepository? readings,
+  NoopMeterReminderRepository? reminders,
 }) {
   return ProviderScope(
     overrides: [
@@ -385,7 +459,7 @@ Widget _testApp({
         const UnsupportedMeterPhotoCaptureRepository(),
       ),
       meterReminderRepositoryProvider.overrideWithValue(
-        NoopMeterReminderRepository(),
+        reminders ?? NoopMeterReminderRepository(),
       ),
     ],
     child: const MeterReadingLogApp(),

@@ -345,7 +345,7 @@ class _MeterHeader extends StatelessWidget {
 String _reminderSummary(ReadingReminderSchedule reminder) {
   final time =
       '${reminder.hour.toString().padLeft(2, '0')}:${reminder.minute.toString().padLeft(2, '0')} Uhr';
-  return switch (reminder.interval) {
+  final schedule = switch (reminder.interval) {
     ReminderInterval.daily => 'täglich um $time',
     ReminderInterval.weekly =>
       'wöchentlich am ${reminderWeekdayLabel(reminder.day)} um $time',
@@ -353,6 +353,9 @@ String _reminderSummary(ReadingReminderSchedule reminder) {
     ReminderInterval.yearly =>
       'jährlich am ${reminder.day}.${(reminder.month ?? 1).toString().padLeft(2, '0')}. um $time',
   };
+  return reminder.deliveryMode == ReminderDeliveryMode.punctualWithSound
+      ? '$schedule · pünktlich mit Ton'
+      : schedule;
 }
 
 class _ReadingTile extends StatelessWidget {

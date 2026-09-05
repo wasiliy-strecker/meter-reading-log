@@ -57,7 +57,9 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
   late int _weekday;
   late int _month;
   late TimeOfDay _time;
+  late ReminderDeliveryMode _deliveryMode;
   bool _saving = false;
+  bool _testingSound = false;
 
   @override
   void initState() {
@@ -86,6 +88,7 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
         : now.weekday;
     _month = reminder?.month ?? now.month;
     _time = TimeOfDay(hour: reminder?.hour ?? 9, minute: reminder?.minute ?? 0);
+    _deliveryMode = reminder?.deliveryMode ?? ReminderDeliveryMode.normal;
   }
 
   @override
@@ -111,6 +114,7 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
           children: [
             DropdownButtonFormField<MeterType>(
               initialValue: _type,
+              isExpanded: true,
               decoration: const InputDecoration(labelText: 'Zählerart'),
               items: [
                 for (final type in MeterType.values)
@@ -179,6 +183,7 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
                       const Divider(),
                       DropdownButtonFormField<ReminderInterval>(
                         initialValue: _interval,
+                        isExpanded: true,
                         decoration: const InputDecoration(
                           labelText: 'Intervall',
                         ),
@@ -196,6 +201,7 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
                       if (_interval == ReminderInterval.yearly)
                         DropdownButtonFormField<int>(
                           initialValue: _month,
+                          isExpanded: true,
                           decoration: const InputDecoration(labelText: 'Monat'),
                           items: [
                             for (var month = 1; month <= 12; month++)
@@ -212,6 +218,7 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
                       if (_interval == ReminderInterval.weekly) ...[
                         DropdownButtonFormField<int>(
                           initialValue: _weekday,
+                          isExpanded: true,
                           decoration: const InputDecoration(
                             labelText: 'Wochentag',
                           ),
@@ -235,6 +242,7 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
                           _interval == ReminderInterval.yearly) ...[
                         DropdownButtonFormField<int>(
                           initialValue: _dayOfMonth,
+                          isExpanded: true,
                           decoration: const InputDecoration(labelText: 'Tag'),
                           items: [
                             for (var day = 1; day <= 28; day++)
@@ -275,6 +283,74 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
                           label: const Text('Uhrzeit ändern'),
                         ),
                       ),
+                      const SizedBox(height: 18),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Art der Erinnerung',
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _ReminderModeCard(
+                        title: 'Normale Erinnerung',
+                        description:
+                            'Android darf die Meldung etwas später anzeigen. „Nicht stören“ wird respektiert.',
+                        icon: Icons.notifications_outlined,
+                        selected: _deliveryMode == ReminderDeliveryMode.normal,
+                        onTap: _saving
+                            ? null
+                            : () => _selectDeliveryMode(
+                                ReminderDeliveryMode.normal,
+                              ),
+                      ),
+                      const SizedBox(height: 8),
+                      _ReminderModeCard(
+                        title: 'Pünktlich mit Ton',
+                        description:
+                            'Wird möglichst genau zur gewählten Uhrzeit wie ein Alarm ausgelöst.',
+                        icon: Icons.alarm_outlined,
+                        selected:
+                            _deliveryMode ==
+                            ReminderDeliveryMode.punctualWithSound,
+                        onTap: _saving
+                            ? null
+                            : () => _selectDeliveryMode(
+                                ReminderDeliveryMode.punctualWithSound,
+                              ),
+                      ),
+                      if (_deliveryMode ==
+                          ReminderDeliveryMode.punctualWithSound) ...[
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: _saving || _testingSound
+                                ? null
+                                : _testAlarmSound,
+                            icon: _testingSound
+                                ? const SizedBox.square(
+                                    dimension: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.volume_up_outlined),
+                            label: const Text('Ton jetzt testen'),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Der Test verschwindet nach zehn Sekunden und zählt nicht als Zählererinnerung.',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                        ),
+                      ],
                     ],
                   ],
                 ),
@@ -301,6 +377,20 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_reminderEnabled &&
+        _deliveryMode == ReminderDeliveryMode.punctualWithSound &&
+        !await ref
+            .read(meterReminderRepositoryProvider)
+            .canScheduleExactAlarms()) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        AppSnackBar(
+          message:
+              'Für „Pünktlich mit Ton“ fehlt die Android-Berechtigung. Bitte den Modus erneut auswählen und erlauben.',
+        ),
+      );
+      return;
+    }
     setState(() => _saving = true);
     final reminder = _reminderEnabled
         ? ReadingReminderSchedule(
@@ -314,6 +404,7 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
             month: _interval == ReminderInterval.yearly ? _month : null,
             hour: _time.hour,
             minute: _time.minute,
+            deliveryMode: _deliveryMode,
           )
         : null;
     try {
@@ -379,5 +470,107 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
     FocusScope.of(context).unfocus();
     final value = await showTimePicker(context: context, initialTime: _time);
     if (value != null && mounted) setState(() => _time = value);
+  }
+
+  Future<void> _selectDeliveryMode(ReminderDeliveryMode mode) async {
+    if (mode == ReminderDeliveryMode.normal) {
+      setState(() => _deliveryMode = mode);
+      return;
+    }
+    final reminders = ref.read(meterReminderRepositoryProvider);
+    if (await reminders.canScheduleExactAlarms()) {
+      if (mounted) setState(() => _deliveryMode = mode);
+      return;
+    }
+    await reminders.requestExactAlarmPermission();
+    if (!mounted) return;
+    if (await reminders.canScheduleExactAlarms()) {
+      if (!mounted) return;
+      setState(() => _deliveryMode = mode);
+      return;
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      AppSnackBar(
+        message:
+            'Erlaube „Alarme & Erinnerungen“ in Android und tippe danach erneut auf „Pünktlich mit Ton“.',
+      ),
+    );
+  }
+
+  Future<void> _testAlarmSound() async {
+    setState(() => _testingSound = true);
+    final reminders = ref.read(meterReminderRepositoryProvider);
+    await reminders.showAlarmTest();
+    if (!mounted) return;
+    setState(() => _testingSound = false);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(AppSnackBar(message: 'Test-Erinnerung wurde ausgelöst.'));
+  }
+}
+
+class _ReminderModeCard extends StatelessWidget {
+  const _ReminderModeCard({
+    required this.title,
+    required this.description,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String title;
+  final String description;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: selected ? scheme.primaryContainer : scheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: selected ? scheme.primary : scheme.outlineVariant,
+          width: selected ? 2 : 1,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: selected ? scheme.primary : null),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(description),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                selected ? Icons.check_circle : Icons.radio_button_unchecked,
+                color: selected ? scheme.primary : scheme.outline,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
