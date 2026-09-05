@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../app/app_providers.dart';
 import '../../../app/widgets/app_snack_bar.dart';
 import '../../../app/widgets/confirm_dialog.dart';
+import '../../../app/widgets/pdf_export_progress_dialog.dart';
 import '../../../core/integrity/integrity_copy.dart';
 import '../../../core/utils/formatters.dart';
 import '../application/reading_revision_photos.dart';
@@ -103,30 +104,14 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
           const SizedBox(height: 12),
           _CorrectionHistoryCard(reading: reading, revisions: revisions),
           const SizedBox(height: 20),
-          FilledButton.icon(
-            onPressed: _exporting ? null : () => _export(reading),
-            icon: _exporting
-                ? const SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.picture_as_pdf_outlined),
-            label: Text(
-              _exporting ? 'PDF wird erstellt …' : 'Einzelnachweis als PDF',
+          IgnorePointer(
+            ignoring: _exporting,
+            child: FilledButton.icon(
+              onPressed: () => _export(reading),
+              icon: const Icon(Icons.picture_as_pdf_outlined),
+              label: const Text('Einzelnachweis als PDF'),
             ),
           ),
-          if (_exporting) ...[
-            const SizedBox(height: 10),
-            const LinearProgressIndicator(),
-            const SizedBox(height: 8),
-            Semantics(
-              liveRegion: true,
-              child: const Text(
-                'Foto und Nachweisdaten werden verarbeitet.',
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ],
           const SizedBox(height: 10),
           const _PdfPurposeCard(),
         ],
@@ -135,17 +120,25 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
   }
 
   Future<void> _export(MeterReading reading) async {
+    if (_exporting) return;
     setState(() => _exporting = true);
     try {
-      await WidgetsBinding.instance.endOfFrame;
+      final report = await runWithPdfExportProgress(
+        context,
+        description:
+            'Foto und Nachweisdaten werden für die PDF zusammengestellt.',
+        operation: () async {
+          final revisions = await ref
+              .read(meterReadingRepositoryProvider)
+              .loadRevisions(reading.id);
+          return ref
+              .read(evidenceReportServiceProvider)
+              .createSingle(reading: reading, revisions: revisions);
+        },
+      );
       if (!mounted) return;
-      final revisions = await ref
-          .read(meterReadingRepositoryProvider)
-          .loadRevisions(reading.id);
-      final report = await ref
-          .read(evidenceReportServiceProvider)
-          .createSingle(reading: reading, revisions: revisions);
-      if (mounted) await context.pushNamed('evidencePreview', extra: report);
+      setState(() => _exporting = false);
+      await context.pushNamed('evidencePreview', extra: report);
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -153,7 +146,7 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
         );
       }
     } finally {
-      if (mounted) setState(() => _exporting = false);
+      if (mounted && _exporting) setState(() => _exporting = false);
     }
   }
 
