@@ -78,7 +78,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                   SizedBox(height: 8),
                   Text(
-                    'OCR, Fotos, Verlauf und PDF-Erstellung laufen lokal. Die App benötigt kein Benutzerkonto und überträgt keine Zählerdaten an einen Server.',
+                    'Fotos auswerten, Zählerstände speichern und PDFs erstellen – alles passiert lokal auf deinem Gerät. Die App überträgt deine Zählerdaten nicht an einen Server.',
                   ),
                   SizedBox(height: 10),
                   Text('Quellcode-Lizenz: Mozilla Public License 2.0'),

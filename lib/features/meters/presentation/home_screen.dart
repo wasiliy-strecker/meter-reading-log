@@ -519,7 +519,7 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Lege Strom-, Gas-, Wasser-, Wärme- oder weitere Haushaltszähler an. Fotos und OCR-Daten bleiben lokal auf deinem Gerät.',
+              'Lege Strom-, Gas-, Wasser-, Wärme- oder weitere Haushaltszähler an. Die gesamte Verarbeitung findet lokal auf deinem Gerät statt. Deine Fotos und Zählerdaten werden von der App nicht an einen Server gesendet.',
               textAlign: TextAlign.center,
             ),
           ],
