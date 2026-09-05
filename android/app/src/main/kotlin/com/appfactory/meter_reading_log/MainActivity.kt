@@ -155,6 +155,7 @@ class MainActivity : FlutterActivity() {
         val arguments = call.arguments as? Map<*, *>
         val meterId = arguments?.get("meterId") as? String
         val label = arguments?.get("label") as? String
+        val meterTypeLabel = arguments?.get("meterTypeLabel") as? String
         val interval = arguments?.get("interval") as? String
         val day = arguments?.get("day") as? Int
         val hour = arguments?.get("hour") as? Int
@@ -162,7 +163,8 @@ class MainActivity : FlutterActivity() {
         val deliveryMode = arguments?.get("deliveryMode") as? String
         if (
             meterId.isNullOrBlank() || label.isNullOrBlank() ||
-            interval.isNullOrBlank() || day == null || hour == null ||
+            meterTypeLabel.isNullOrBlank() || interval.isNullOrBlank() ||
+            day == null || hour == null ||
             minute == null || deliveryMode.isNullOrBlank()
         ) {
             result.error("invalid_schedule", "Erinnerungsdaten sind unvollständig.", null)
@@ -171,6 +173,9 @@ class MainActivity : FlutterActivity() {
         val reminder = StoredReminder(
             meterId = meterId,
             label = label,
+            meterTypeLabel = meterTypeLabel,
+            latestValue = arguments["latestValue"] as? String,
+            latestUnit = arguments["latestUnit"] as? String,
             interval = interval,
             day = day,
             month = arguments["month"] as? Int,

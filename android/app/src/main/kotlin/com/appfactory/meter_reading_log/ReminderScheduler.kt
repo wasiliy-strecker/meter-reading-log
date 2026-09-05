@@ -126,15 +126,22 @@ internal object ReminderNotifier {
         } else {
             NotificationCompat.CATEGORY_REMINDER
         }
+        val latestReading = if (
+            !reminder.latestValue.isNullOrBlank() &&
+            !reminder.latestUnit.isNullOrBlank()
+        ) {
+            "Letzter Stand: ${reminder.latestValue} ${reminder.latestUnit}"
+        } else {
+            "Noch keine Ablesung"
+        }
+        val summary = "${reminder.meterTypeLabel} · $latestReading"
         val notification = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_stat_meter)
-            .setContentTitle("${reminder.label} ablesen")
-            .setContentText(
-                "Jetzt Zählerstand fotografieren und Verlauf aktualisieren.",
-            )
+            .setContentTitle("${reminder.meterTypeLabel} · ${reminder.label}")
+            .setContentText(summary)
             .setStyle(
                 NotificationCompat.BigTextStyle().bigText(
-                    "Jetzt Zählerstand fotografieren und Verlauf aktualisieren.",
+                    "$latestReading\nJetzt ablesen oder fotografieren und den Verlauf aktualisieren.",
                 ),
             )
             .setPriority(NotificationCompat.PRIORITY_HIGH)

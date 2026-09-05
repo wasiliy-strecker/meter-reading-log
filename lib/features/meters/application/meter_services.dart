@@ -54,7 +54,10 @@ class MeterService {
   Future<void> update(Meter meter) async {
     final updated = meter.copyWith(updatedAt: DateTime.now().toUtc());
     await meters.save(updated);
-    await reminders.schedule(updated);
+    await reminders.schedule(
+      updated,
+      latestReading: _latestReading(await readings.loadForMeter(updated.id)),
+    );
   }
 
   Future<void> delete(String meterId) async {
@@ -80,12 +83,14 @@ class MeterService {
 
 class MeterReadingService {
   const MeterReadingService({
+    required this.meters,
     required this.readings,
     required this.photos,
     required this.reminders,
     this.integrity = const IntegrityService(),
   });
 
+  final MeterRepository meters;
   final MeterReadingRepository readings;
   final MeterPhotoCaptureRepository photos;
   final MeterReminderRepository reminders;
@@ -127,6 +132,7 @@ class MeterReadingService {
     );
     await readings.save(reading);
     await reminders.acknowledge(meter.id);
+    await _refreshReminderSummary(meter.id);
     return reading;
   }
 
@@ -235,6 +241,7 @@ class MeterReadingService {
         changes: changes,
       ),
     );
+    await _refreshReminderSummary(existing.meterId);
     return updated;
   }
 
@@ -243,6 +250,16 @@ class MeterReadingService {
       await photos.delete(path);
     }
     await readings.delete(reading.id);
+    await _refreshReminderSummary(reading.meterId);
+  }
+
+  Future<void> _refreshReminderSummary(String meterId) async {
+    final meter = await meters.findById(meterId);
+    if (meter == null || meter.reminder == null) return;
+    await reminders.schedule(
+      meter,
+      latestReading: _latestReading(await readings.loadForMeter(meterId)),
+    );
   }
 
   Future<MeterReading?> previousReading({
@@ -262,6 +279,13 @@ class MeterReadingService {
           ..sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
     return earlier.firstOrNull;
   }
+}
+
+MeterReading? _latestReading(List<MeterReading> readings) {
+  if (readings.isEmpty) return null;
+  return readings.reduce(
+    (left, right) => left.capturedAt.isAfter(right.capturedAt) ? left : right,
+  );
 }
 
 class EvidenceVerificationResult {

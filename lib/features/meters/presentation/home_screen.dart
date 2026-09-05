@@ -262,6 +262,10 @@ class _MeterCard extends StatelessWidget {
     final entry = _MeterListEntry(meter: meter, readings: readings);
     final latest = entry.latestReading;
     final color = meterColor(meter.type);
+    final reminder = meter.reminder;
+    final nextReminder = reminder == null
+        ? null
+        : nextReminderDate(reminder, DateTime.now());
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
@@ -318,12 +322,60 @@ class _MeterCard extends StatelessWidget {
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
-                    if (meter.reminder != null) ...[
+                    if (reminder != null && nextReminder != null) ...[
                       const SizedBox(height: 8),
                       Text(
-                        'Erinnern: ${_reminderSummary(meter.reminder!)}',
+                        'Erinnern: ${_reminderSummary(reminder)}',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        key: ValueKey('next-reminder-${meter.id}'),
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 9,
+                        ),
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: color.withValues(alpha: 0.35),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.schedule_outlined,
+                              size: 20,
+                              color: color,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Nächste Erinnerung',
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(
+                                          color: color,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                  ),
+                                  Text(
+                                    '${formatDateTime(nextReminder)} Uhr',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(fontWeight: FontWeight.w900),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 6),

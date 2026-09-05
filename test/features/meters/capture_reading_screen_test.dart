@@ -61,6 +61,15 @@ void main() {
     await tester.tap(find.text('Zähler fotografieren'));
     await tester.pumpAndSettle();
 
+    expect(await tester.binding.handlePopRoute(), isTrue);
+    await tester.pumpAndSettle();
+    expect(find.text('Ablesung verwerfen?'), findsOneWidget);
+    expect(find.text('Ablesung verwerfen'), findsOneWidget);
+    await tester.tap(find.text('Weiter bearbeiten'));
+    await tester.pumpAndSettle();
+    expect(find.text('Ablesen / Fotografieren'), findsWidgets);
+    expect(find.text('Neues Foto aufnehmen oder auswählen'), findsOneWidget);
+
     expect(find.text('Ersetzen'), findsNothing);
     expect(find.text('Neues Foto aufnehmen oder auswählen'), findsOneWidget);
     expect(find.text('Einheit des Zählerstands'), findsOneWidget);
@@ -179,6 +188,15 @@ void main() {
       'Grund der Korrektur *',
     );
     await tester.enterText(reasonField, 'Neues Nachweisfoto');
+
+    expect(await tester.binding.handlePopRoute(), isTrue);
+    await tester.pumpAndSettle();
+    expect(find.text('Korrektur verwerfen?'), findsOneWidget);
+    expect(find.text('Korrektur verwerfen'), findsOneWidget);
+    await tester.tap(find.text('Weiter bearbeiten'));
+    await tester.pumpAndSettle();
+    expect(find.text('Grund der Korrektur *'), findsOneWidget);
+
     final saveCorrection = find.text('Korrektur protokollieren');
     await tester.ensureVisible(saveCorrection);
     await tester.tap(saveCorrection);

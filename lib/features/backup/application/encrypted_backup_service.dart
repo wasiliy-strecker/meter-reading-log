@@ -215,7 +215,6 @@ class EncryptedBackupService {
         continue;
       }
       await meters.save(meter);
-      await reminders.schedule(meter);
       meterCount += 1;
     }
 
@@ -303,6 +302,18 @@ class EncryptedBackupService {
         ),
       );
       exportCount += 1;
+    }
+
+    for (final meter in await meters.loadAll()) {
+      if (meter.reminder == null) continue;
+      final meterReadings = await readings.loadForMeter(meter.id);
+      final latestReading = meterReadings.isEmpty
+          ? null
+          : meterReadings.reduce(
+              (left, right) =>
+                  left.capturedAt.isAfter(right.capturedAt) ? left : right,
+            );
+      await reminders.schedule(meter, latestReading: latestReading);
     }
     return BackupImportResult(
       meters: meterCount,

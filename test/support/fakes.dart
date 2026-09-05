@@ -11,6 +11,8 @@ class NoopMeterReminderRepository implements MeterReminderRepository {
 
   final Map<String, ReminderStatus> statuses;
   final List<String> acknowledgedMeterIds = [];
+  final List<Meter> scheduledMeters = [];
+  final List<MeterReading?> scheduledLatestReadings = [];
   int alarmTestCount = 0;
 
   @override
@@ -63,7 +65,10 @@ class NoopMeterReminderRepository implements MeterReminderRepository {
       ReminderPermissionStatus.granted;
 
   @override
-  Future<void> schedule(Meter meter) async {}
+  Future<void> schedule(Meter meter, {MeterReading? latestReading}) async {
+    scheduledMeters.add(meter);
+    scheduledLatestReadings.add(latestReading);
+  }
 
   @override
   Future<void> showAlarmTest() async {
