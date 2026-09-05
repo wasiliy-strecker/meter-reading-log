@@ -163,6 +163,7 @@ class LocalNotificationReminderRepository implements MeterReminderRepository {
       await _channel.invokeMethod<void>('schedule', {
         'meterId': meter.id,
         'label': meter.label,
+        'meterType': meter.type.wireName,
         'meterTypeLabel': meter.type.label,
         'latestValue': latestReading?.value.displayText,
         'latestUnit': latestReading?.meter.unit,

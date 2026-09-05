@@ -17,6 +17,7 @@ internal const val REMINDER_STATUS_CHANGED =
 internal data class StoredReminder(
     val meterId: String,
     val label: String,
+    val meterType: String,
     val meterTypeLabel: String,
     val latestValue: String?,
     val latestUnit: String?,
@@ -33,6 +34,7 @@ internal data class StoredReminder(
     fun toJson(): String = JSONObject()
         .put("meterId", meterId)
         .put("label", label)
+        .put("meterType", meterType)
         .put("meterTypeLabel", meterTypeLabel)
         .put("latestValue", latestValue)
         .put("latestUnit", latestUnit)
@@ -144,6 +146,7 @@ internal data class StoredReminder(
             StoredReminder(
                 meterId = json.getString("meterId"),
                 label = json.getString("label"),
+                meterType = json.optString("meterType", "other"),
                 meterTypeLabel = json.optString("meterTypeLabel", "Zähler"),
                 latestValue = json.optString("latestValue", "")
                     .takeIf { it.isNotBlank() },

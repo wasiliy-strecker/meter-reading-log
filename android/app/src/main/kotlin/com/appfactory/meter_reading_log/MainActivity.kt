@@ -155,6 +155,7 @@ class MainActivity : FlutterActivity() {
         val arguments = call.arguments as? Map<*, *>
         val meterId = arguments?.get("meterId") as? String
         val label = arguments?.get("label") as? String
+        val meterType = arguments?.get("meterType") as? String
         val meterTypeLabel = arguments?.get("meterTypeLabel") as? String
         val interval = arguments?.get("interval") as? String
         val day = arguments?.get("day") as? Int
@@ -163,7 +164,8 @@ class MainActivity : FlutterActivity() {
         val deliveryMode = arguments?.get("deliveryMode") as? String
         if (
             meterId.isNullOrBlank() || label.isNullOrBlank() ||
-            meterTypeLabel.isNullOrBlank() || interval.isNullOrBlank() ||
+            meterType.isNullOrBlank() || meterTypeLabel.isNullOrBlank() ||
+            interval.isNullOrBlank() ||
             day == null || hour == null ||
             minute == null || deliveryMode.isNullOrBlank()
         ) {
@@ -173,6 +175,7 @@ class MainActivity : FlutterActivity() {
         val reminder = StoredReminder(
             meterId = meterId,
             label = label,
+            meterType = meterType,
             meterTypeLabel = meterTypeLabel,
             latestValue = arguments["latestValue"] as? String,
             latestUnit = arguments["latestUnit"] as? String,
