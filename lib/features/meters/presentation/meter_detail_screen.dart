@@ -46,6 +46,8 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
     final readingsAsync = ref.watch(readingsForMeterProvider(meter.id));
     final exports =
         ref.watch(evidenceForMeterProvider(meter.id)).value ?? const [];
+    void openMeterEditor() =>
+        context.pushNamed('meterEdit', pathParameters: {'id': meter.id});
     return Scaffold(
       appBar: AppBar(title: Text(meter.label)),
       body: readingsAsync.when(
@@ -56,13 +58,14 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
         data: (readings) => ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 112),
           children: [
-            _MeterHeader(meter: meter, readings: readings),
+            _MeterHeader(
+              meter: meter,
+              readings: readings,
+              onTap: openMeterEditor,
+            ),
             const SizedBox(height: 12),
             _MeterActions(
-              onEdit: () => context.pushNamed(
-                'meterEdit',
-                pathParameters: {'id': meter.id},
-              ),
+              onEdit: openMeterEditor,
               onDelete: () => _deleteMeter(meter),
             ),
             const SizedBox(height: 18),
@@ -206,7 +209,7 @@ class _MeterActions extends StatelessWidget {
         OutlinedButton.icon(
           onPressed: onEdit,
           icon: const Icon(Icons.edit_outlined),
-          label: const Text('Bearbeiten'),
+          label: const Text('Zähler & Erinnerung bearbeiten'),
         ),
         const SizedBox(height: 8),
         OutlinedButton.icon(
@@ -284,58 +287,73 @@ class _HistoryPdfAction extends StatelessWidget {
 }
 
 class _MeterHeader extends StatelessWidget {
-  const _MeterHeader({required this.meter, required this.readings});
+  const _MeterHeader({
+    required this.meter,
+    required this.readings,
+    required this.onTap,
+  });
 
   final Meter meter;
   final List<MeterReading> readings;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final color = meterColor(meter.type);
     final latest = readings.firstOrNull;
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor: color.withValues(alpha: 0.12),
-                  foregroundColor: color,
-                  child: Icon(meterIcon(meter.type)),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    meter.type.label,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
+      key: ValueKey('meter-summary-${meter.id}'),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: color.withValues(alpha: 0.12),
+                    foregroundColor: color,
+                    child: Icon(meterIcon(meter.type)),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      meter.type.label,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Text(
-              latest == null
-                  ? 'Noch kein Zählerstand'
-                  : '${latest.value.displayText} ${latest.meter.unit}',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                color: color,
-                fontWeight: FontWeight.w900,
+                  Icon(
+                    Icons.chevron_right,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ],
               ),
-            ),
-            if (latest != null)
-              Text('Zuletzt am ${formatDateTime(latest.capturedAt)}'),
-            const SizedBox(height: 10),
-            if (meter.meterNumber.isNotEmpty)
-              Text('Zählernummer: ${meter.meterNumber}'),
-            if (meter.location.isNotEmpty) Text('Standort: ${meter.location}'),
-            if (meter.reminder != null)
-              Text('Erinnerung: ${_reminderSummary(meter.reminder!)}'),
-          ],
+              const SizedBox(height: 14),
+              Text(
+                latest == null
+                    ? 'Noch kein Zählerstand'
+                    : '${latest.value.displayText} ${latest.meter.unit}',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              if (latest != null)
+                Text('Zuletzt am ${formatDateTime(latest.capturedAt)}'),
+              const SizedBox(height: 10),
+              if (meter.meterNumber.isNotEmpty)
+                Text('Zählernummer: ${meter.meterNumber}'),
+              if (meter.location.isNotEmpty)
+                Text('Standort: ${meter.location}'),
+              if (meter.reminder != null)
+                Text('Erinnerung: ${_reminderSummary(meter.reminder!)}'),
+            ],
+          ),
         ),
       ),
     );

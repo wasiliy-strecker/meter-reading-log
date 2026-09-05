@@ -305,7 +305,10 @@ void main() {
     await tester.tap(find.text('Wasser Garten'));
     await tester.pumpAndSettle();
 
-    final edit = find.widgetWithText(OutlinedButton, 'Bearbeiten');
+    final edit = find.widgetWithText(
+      OutlinedButton,
+      'Zähler & Erinnerung bearbeiten',
+    );
     final delete = find.widgetWithText(OutlinedButton, 'Zähler löschen');
     expect(edit, findsOneWidget);
     expect(delete, findsOneWidget);
@@ -322,6 +325,10 @@ void main() {
       tester.getTopLeft(delete).dy,
       lessThan(tester.getTopLeft(find.text('Verlauf')).dy),
     );
+
+    await tester.tap(find.byKey(const ValueKey('meter-summary-weekly_meter')));
+    await tester.pumpAndSettle();
+    expect(find.text('Zähler bearbeiten'), findsOneWidget);
   });
 
   testWidgets('meter edit keeps save visible and protects unsaved changes', (
@@ -343,7 +350,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Strom Keller'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Bearbeiten'));
+    await tester.tap(find.text('Zähler & Erinnerung bearbeiten'));
     await tester.pumpAndSettle();
 
     final savedButton = find.widgetWithText(FilledButton, 'Alles gespeichert');
@@ -414,7 +421,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Strom täglich'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Bearbeiten'));
+    await tester.tap(find.text('Zähler & Erinnerung bearbeiten'));
     await tester.pumpAndSettle();
 
     expect(
