@@ -11,18 +11,21 @@ class NoopMeterReminderRepository implements MeterReminderRepository {
     this.statuses = const {},
     this.reminderTestResult = true,
     this.permission = ReminderPermissionStatus.granted,
+    this.exactAlarmPermissionGranted = true,
     String? initialMeterId,
   }) : _initialMeterId = initialMeterId;
 
   final Map<String, ReminderStatus> statuses;
   final bool reminderTestResult;
   final ReminderPermissionStatus permission;
+  bool exactAlarmPermissionGranted;
   String? _initialMeterId;
   final List<String> acknowledgedMeterIds = [];
   final List<Meter> scheduledMeters = [];
   final List<MeterReading?> scheduledLatestReadings = [];
   final List<MeterReminderTestRequest> reminderTests = [];
   int exactAlarmSettingsOpenCount = 0;
+  int exactAlarmPermissionRequestCount = 0;
 
   @override
   Stream<String> get notificationOpened => const Stream.empty();
@@ -44,7 +47,7 @@ class NoopMeterReminderRepository implements MeterReminderRepository {
   }
 
   @override
-  Future<bool> canScheduleExactAlarms() async => true;
+  Future<bool> canScheduleExactAlarms() async => exactAlarmPermissionGranted;
 
   @override
   Future<void> cancel(String meterId) async {}
@@ -84,7 +87,10 @@ class NoopMeterReminderRepository implements MeterReminderRepository {
   void refreshStatuses() {}
 
   @override
-  Future<bool> requestExactAlarmPermission() async => true;
+  Future<bool> requestExactAlarmPermission() async {
+    exactAlarmPermissionRequestCount += 1;
+    return true;
+  }
 
   @override
   Future<ReminderPermissionStatus> requestPermission() async => permission;
