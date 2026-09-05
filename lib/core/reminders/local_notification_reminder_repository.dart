@@ -20,6 +20,24 @@ class ReminderStatus {
   final DateTime? lastTriggeredAt;
 }
 
+class MeterReminderTestRequest {
+  const MeterReminderTestRequest({
+    required this.label,
+    required this.meterType,
+    required this.deliveryMode,
+    this.meterId,
+    this.latestValue,
+    this.latestUnit,
+  });
+
+  final String label;
+  final MeterType meterType;
+  final ReminderDeliveryMode deliveryMode;
+  final String? meterId;
+  final String? latestValue;
+  final String? latestUnit;
+}
+
 abstract interface class MeterReminderRepository {
   Stream<int> get statusChanges;
 
@@ -43,7 +61,7 @@ abstract interface class MeterReminderRepository {
 
   Future<Map<String, ReminderStatus>> loadStatuses(Iterable<String> meterIds);
 
-  Future<void> showAlarmTest();
+  Future<bool> showReminderTest(MeterReminderTestRequest request);
 
   Future<String?> consumeInitialMeterId();
 
@@ -241,18 +259,27 @@ class LocalNotificationReminderRepository implements MeterReminderRepository {
   }
 
   @override
-  Future<void> showAlarmTest() async {
+  Future<bool> showReminderTest(MeterReminderTestRequest request) async {
     await initialize();
-    if (!_supportsNotifications) return;
+    if (!_supportsNotifications) return false;
     var permission = await permissionStatus();
     if (permission != ReminderPermissionStatus.granted) {
       permission = await requestPermission();
     }
-    if (permission != ReminderPermissionStatus.granted) return;
+    if (permission != ReminderPermissionStatus.granted) return false;
     try {
-      await _channel.invokeMethod<void>('showAlarmTest');
+      return await _channel.invokeMethod<bool>('showReminderTest', {
+            'meterId': request.meterId,
+            'label': request.label,
+            'meterType': request.meterType.wireName,
+            'meterTypeLabel': request.meterType.label,
+            'latestValue': request.latestValue,
+            'latestUnit': request.latestUnit,
+            'deliveryMode': request.deliveryMode.name,
+          }) ??
+          false;
     } on Object {
-      return;
+      return false;
     }
   }
 

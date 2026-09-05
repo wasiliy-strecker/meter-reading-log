@@ -6,7 +6,9 @@ import 'package:go_router/go_router.dart';
 import '../../../app/app_providers.dart';
 import '../../../app/widgets/app_snack_bar.dart';
 import '../../../app/widgets/confirm_dialog.dart';
+import '../../../core/reminders/local_notification_reminder_repository.dart';
 import '../domain/meter.dart';
+import '../domain/meter_reading.dart';
 import 'meter_unit_field.dart';
 
 typedef _MeterFormSnapshot = ({
@@ -77,7 +79,7 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
   late ReminderDeliveryMode _deliveryMode;
   late final _MeterFormSnapshot _initialSnapshot;
   bool _saving = false;
-  bool _testingSound = false;
+  bool _testingReminder = false;
   bool _discardDialogOpen = false;
   bool _allowPop = false;
 
@@ -380,37 +382,24 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
                                   ReminderDeliveryMode.punctualWithSound,
                                 ),
                         ),
-                        if (_deliveryMode ==
-                            ReminderDeliveryMode.punctualWithSound) ...[
-                          const SizedBox(height: 10),
-                          SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton.icon(
-                              onPressed: _saving || _testingSound
-                                  ? null
-                                  : _testAlarmSound,
-                              icon: _testingSound
-                                  ? const SizedBox.square(
-                                      dimension: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Icon(Icons.volume_up_outlined),
-                              label: const Text('Ton jetzt testen'),
-                            ),
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: _saving || _testingReminder
+                                ? null
+                                : _testReminderNow,
+                            icon: _testingReminder
+                                ? const SizedBox.square(
+                                    dimension: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.notification_add_outlined),
+                            label: const Text('Erinnerung jetzt testen'),
                           ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Der Test verschwindet nach zehn Sekunden und zählt nicht als Zählererinnerung.',
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurfaceVariant,
-                                ),
-                          ),
-                        ],
+                        ),
                       ],
                     ],
                   ),
@@ -639,15 +628,61 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
     );
   }
 
-  Future<void> _testAlarmSound() async {
-    setState(() => _testingSound = true);
+  Future<void> _testReminderNow() async {
+    if (_testingReminder) return;
+    setState(() => _testingReminder = true);
     final reminders = ref.read(meterReminderRepositoryProvider);
-    await reminders.showAlarmTest();
+    var displayed = false;
+    try {
+      final meter = widget.meter;
+      final readings = meter == null
+          ? const <MeterReading>[]
+          : await ref
+                .read(meterReadingRepositoryProvider)
+                .loadForMeter(meter.id);
+      if (!mounted) return;
+      final latest = readings.isEmpty
+          ? null
+          : readings.reduce(
+              (left, right) =>
+                  left.capturedAt.isAfter(right.capturedAt) ? left : right,
+            );
+      displayed = await reminders.showReminderTest(
+        MeterReminderTestRequest(
+          meterId: meter?.id,
+          label: _label.text.trim().isEmpty ? _type.label : _label.text.trim(),
+          meterType: _type,
+          latestValue: latest?.value.displayText,
+          latestUnit: latest?.meter.unit,
+          deliveryMode: _deliveryMode,
+        ),
+      );
+    } on Object {
+      displayed = false;
+    }
     if (!mounted) return;
-    setState(() => _testingSound = false);
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(AppSnackBar(message: 'Test-Erinnerung wurde ausgelöst.'));
+    var permission = ReminderPermissionStatus.unknown;
+    if (!displayed) {
+      try {
+        permission = await reminders.permissionStatus();
+      } on Object {
+        permission = ReminderPermissionStatus.unknown;
+      }
+    }
+    if (!mounted) return;
+    setState(() => _testingReminder = false);
+    final message = displayed
+        ? 'Test-Erinnerung wurde ausgelöst.'
+        : switch (permission) {
+            ReminderPermissionStatus.denied =>
+              'Benachrichtigungen sind nicht erlaubt.',
+            ReminderPermissionStatus.unsupported =>
+              'Test-Erinnerungen werden auf diesem Gerät nicht unterstützt.',
+            ReminderPermissionStatus.granted ||
+            ReminderPermissionStatus.unknown =>
+              'Test-Erinnerung konnte nicht angezeigt werden.',
+          };
+    ScaffoldMessenger.of(context).showSnackBar(AppSnackBar(message: message));
   }
 }
 

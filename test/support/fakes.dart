@@ -7,13 +7,19 @@ import 'package:meter_reading_log/features/meters/domain/meter_repositories.dart
 import 'package:meter_reading_log/core/reminders/local_notification_reminder_repository.dart';
 
 class NoopMeterReminderRepository implements MeterReminderRepository {
-  NoopMeterReminderRepository({this.statuses = const {}});
+  NoopMeterReminderRepository({
+    this.statuses = const {},
+    this.reminderTestResult = true,
+    this.permission = ReminderPermissionStatus.granted,
+  });
 
   final Map<String, ReminderStatus> statuses;
+  final bool reminderTestResult;
+  final ReminderPermissionStatus permission;
   final List<String> acknowledgedMeterIds = [];
   final List<Meter> scheduledMeters = [];
   final List<MeterReading?> scheduledLatestReadings = [];
-  int alarmTestCount = 0;
+  final List<MeterReminderTestRequest> reminderTests = [];
 
   @override
   Stream<String> get notificationOpened => const Stream.empty();
@@ -51,8 +57,7 @@ class NoopMeterReminderRepository implements MeterReminderRepository {
   }
 
   @override
-  Future<ReminderPermissionStatus> permissionStatus() async =>
-      ReminderPermissionStatus.granted;
+  Future<ReminderPermissionStatus> permissionStatus() async => permission;
 
   @override
   void refreshStatuses() {}
@@ -61,8 +66,7 @@ class NoopMeterReminderRepository implements MeterReminderRepository {
   Future<bool> requestExactAlarmPermission() async => true;
 
   @override
-  Future<ReminderPermissionStatus> requestPermission() async =>
-      ReminderPermissionStatus.granted;
+  Future<ReminderPermissionStatus> requestPermission() async => permission;
 
   @override
   Future<void> schedule(Meter meter, {MeterReading? latestReading}) async {
@@ -71,8 +75,9 @@ class NoopMeterReminderRepository implements MeterReminderRepository {
   }
 
   @override
-  Future<void> showAlarmTest() async {
-    alarmTestCount += 1;
+  Future<bool> showReminderTest(MeterReminderTestRequest request) async {
+    reminderTests.add(request);
+    return reminderTestResult;
   }
 }
 
