@@ -328,7 +328,7 @@ class _MeterFormState extends ConsumerState<_MeterForm>
                               const SizedBox(width: 10),
                               const Expanded(
                                 child: Text(
-                                  'Dev-Modus: Die nächste Erinnerung wird zum Beginn der nächsten Minute geplant. Normale Erinnerungen kann Android verzögern.',
+                                  'Dev-Modus: Die nächste Erinnerung wird zum Beginn der nächsten Minute geplant. Normale Erinnerungen können leicht verzögert erscheinen.',
                                 ),
                               ),
                             ],
@@ -375,7 +375,7 @@ class _MeterFormState extends ConsumerState<_MeterForm>
                           key: const ValueKey('reminder-mode-normal'),
                           title: 'Normale Erinnerung',
                           description:
-                              'Android darf die Meldung etwas später anzeigen. „Nicht stören“ wird respektiert.',
+                              'Kann leicht verzögert erscheinen. Die Systemeinstellung „Nicht stören“ wird berücksichtigt.',
                           icon: Icons.notifications_outlined,
                           selected:
                               _deliveryMode == ReminderDeliveryMode.normal,

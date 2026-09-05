@@ -81,6 +81,12 @@ void main() {
 
     await tester.tap(find.text('Ableseerinnerung'));
     await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Kann leicht verzögert erscheinen. Die Systemeinstellung „Nicht stören“ wird berücksichtigt.',
+      ),
+      findsOneWidget,
+    );
     final intervalField = find.byType(
       DropdownButtonFormField<ReminderInterval>,
     );
@@ -93,7 +99,12 @@ void main() {
 
     await tester.tap(find.text('Minütlich (Dev)'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Die nächste Erinnerung'), findsOneWidget);
+    expect(
+      find.text(
+        'Dev-Modus: Die nächste Erinnerung wird zum Beginn der nächsten Minute geplant. Normale Erinnerungen können leicht verzögert erscheinen.',
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Uhrzeit ändern'), findsNothing);
 
     await tester.tap(intervalField);
