@@ -1,7 +1,7 @@
 const correctionHistoryTitle = 'Korrekturverlauf';
 
 const correctionHistoryText =
-    'Hier findest du jede gespeicherte Korrektur mit Zeitpunkt, Grund und den geänderten Angaben.';
+    'Hier findest du jede gespeicherte Korrektur mit Zeitpunkt, den geänderten Angaben und – falls angegeben – einem Grund.';
 
 const pdfPurposeTitle = 'Wozu dient der PDF-Nachweis?';
 

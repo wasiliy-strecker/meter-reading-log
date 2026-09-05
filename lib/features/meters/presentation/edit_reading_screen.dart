@@ -128,7 +128,7 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
               child: Padding(
                 padding: const EdgeInsets.all(14),
                 child: Text(
-                  'Nach dem Speichern findest du diese Änderung unter „Korrekturverlauf“. Dort stehen der Grund und die geänderten Angaben mit „Vorher“ und „Neu“.',
+                  'Nach dem Speichern findest du diese Änderung unter „Korrekturverlauf“. Dort siehst du die geänderten Angaben mit „Vorher“ und „Neu“ sowie – falls angegeben – deinen Grund.',
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
@@ -184,15 +184,12 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
             TextFormField(
               controller: _reason,
               decoration: const InputDecoration(
-                labelText: 'Grund der Korrektur *',
+                labelText: 'Grund der Korrektur (optional)',
                 hintText: 'z. B. Tippfehler beim Bestätigen',
               ),
               maxLines: 2,
               onChanged: (_) => setState(() {}),
               onTapOutside: (_) => FocusScope.of(context).unfocus(),
-              validator: (value) => value == null || value.trim().isEmpty
-                  ? 'Bitte den Korrekturgrund angeben.'
-                  : null,
             ),
             const SizedBox(height: 22),
             FilledButton.icon(

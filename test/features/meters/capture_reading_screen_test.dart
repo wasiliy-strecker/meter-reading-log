@@ -180,15 +180,12 @@ void main() {
     );
 
     await tester.scrollUntilVisible(
-      find.text('Grund der Korrektur *'),
+      find.text('Grund der Korrektur (optional)'),
       300,
       scrollable: find.byType(Scrollable).last,
     );
-    final reasonField = find.widgetWithText(
-      TextFormField,
-      'Grund der Korrektur *',
-    );
-    await tester.enterText(reasonField, 'Neues Nachweisfoto');
+    expect(find.text('Grund der Korrektur *'), findsNothing);
+    expect(find.text('Bitte den Korrekturgrund angeben.'), findsNothing);
 
     expect(await tester.binding.handlePopRoute(), isTrue);
     await tester.pumpAndSettle();
@@ -196,7 +193,7 @@ void main() {
     expect(find.text('Korrektur verwerfen'), findsOneWidget);
     await tester.tap(find.text('Weiter bearbeiten'));
     await tester.pumpAndSettle();
-    expect(find.text('Grund der Korrektur *'), findsOneWidget);
+    expect(find.text('Grund der Korrektur (optional)'), findsOneWidget);
 
     final saveCorrection = find.text('Korrektur protokollieren');
     await tester.ensureVisible(saveCorrection);
@@ -205,6 +202,8 @@ void main() {
 
     expect(find.text('Ablesung'), findsOneWidget);
     expect(readings.revisions.values.single, hasLength(1));
+    expect(readings.revisions.values.single.single.reason, isEmpty);
+    expect(find.textContaining('Grund:'), findsNothing);
 
     expect(await tester.binding.handlePopRoute(), isTrue);
     await tester.pumpAndSettle();
