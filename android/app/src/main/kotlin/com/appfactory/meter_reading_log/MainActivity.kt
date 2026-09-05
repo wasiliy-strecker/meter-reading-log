@@ -95,6 +95,7 @@ class MainActivity : FlutterActivity() {
             "canScheduleExactAlarms" ->
                 result.success(ReminderScheduler.canScheduleExact(this))
             "requestExactAlarmPermission" -> requestExactAlarmPermission(result)
+            "openExactAlarmSettings" -> result.success(openExactAlarmSettings())
             "schedule" -> schedule(call, result)
             "cancel" -> cancel(call, result)
             "acknowledge" -> acknowledge(call, result)
@@ -133,19 +134,28 @@ class MainActivity : FlutterActivity() {
             result.success(true)
             return
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        openExactAlarmSettings()
+        result.success(false)
+    }
+
+    private fun openExactAlarmSettings(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return false
+        return try {
+            startActivity(
+                Intent(
+                    Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                    Uri.parse("package:$packageName"),
+                ),
+            )
+            true
+        } catch (_: Exception) {
             try {
-                startActivity(
-                    Intent(
-                        Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
-                        Uri.parse("package:$packageName"),
-                    ),
-                )
-            } catch (_: Exception) {
                 startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
+                true
+            } catch (_: Exception) {
+                false
             }
         }
-        result.success(false)
     }
 
     private fun schedule(call: MethodCall, result: MethodChannel.Result) {

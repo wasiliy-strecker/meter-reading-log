@@ -53,6 +53,8 @@ abstract interface class MeterReminderRepository {
 
   Future<bool> requestExactAlarmPermission();
 
+  Future<bool> openExactAlarmSettings();
+
   Future<void> schedule(Meter meter, {MeterReading? latestReading});
 
   Future<void> cancel(String meterId);
@@ -157,6 +159,18 @@ class LocalNotificationReminderRepository implements MeterReminderRepository {
     if (!_supportsNotifications) return false;
     try {
       return await _channel.invokeMethod<bool>('requestExactAlarmPermission') ??
+          false;
+    } on Object {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> openExactAlarmSettings() async {
+    await initialize();
+    if (!_supportsNotifications) return false;
+    try {
+      return await _channel.invokeMethod<bool>('openExactAlarmSettings') ??
           false;
     } on Object {
       return false;

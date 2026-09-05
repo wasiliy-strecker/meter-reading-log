@@ -32,16 +32,45 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final meterAsync = ref.watch(meterByIdProvider(widget.meterId));
-    return meterAsync.when(
-      loading: () =>
-          const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (_, _) => const Scaffold(
-        body: Center(child: Text('Zähler konnte nicht geladen werden.')),
+    return PopScope<void>(
+      canPop: context.canPop(),
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) context.goNamed('home');
+      },
+      child: meterAsync.when(
+        loading: () => Scaffold(
+          appBar: _appBar('Zähler'),
+          body: const Center(child: CircularProgressIndicator()),
+        ),
+        error: (_, _) => Scaffold(
+          appBar: _appBar('Zähler'),
+          body: const Center(
+            child: Text('Zähler konnte nicht geladen werden.'),
+          ),
+        ),
+        data: (meter) => meter == null
+            ? Scaffold(
+                appBar: _appBar('Zähler'),
+                body: const Center(child: Text('Zähler nicht gefunden.')),
+              )
+            : _buildContent(meter),
       ),
-      data: (meter) => meter == null
-          ? const Scaffold(body: Center(child: Text('Zähler nicht gefunden.')))
-          : _buildContent(meter),
     );
+  }
+
+  AppBar _appBar(String title) {
+    return AppBar(
+      leading: BackButton(onPressed: _leaveDetail),
+      title: Text(title),
+    );
+  }
+
+  void _leaveDetail() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.goNamed('home');
+    }
   }
 
   Widget _buildContent(Meter meter) {
@@ -54,7 +83,7 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
     void openMeterEditor() =>
         context.pushNamed('meterEdit', pathParameters: {'id': meter.id});
     return Scaffold(
-      appBar: AppBar(title: Text(meter.label)),
+      appBar: _appBar(meter.label),
       body: readingsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, _) => const Center(

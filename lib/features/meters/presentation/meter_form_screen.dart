@@ -382,6 +382,24 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
                                   ReminderDeliveryMode.punctualWithSound,
                                 ),
                         ),
+                        if (kDebugMode &&
+                            !kIsWeb &&
+                            defaultTargetPlatform ==
+                                TargetPlatform.android) ...[
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: _saving
+                                  ? null
+                                  : _openExactAlarmSettings,
+                              icon: const Icon(Icons.open_in_new_outlined),
+                              label: const Text(
+                                '„Alarme & Erinnerungen“ öffnen',
+                              ),
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 10),
                         SizedBox(
                           width: double.infinity,
@@ -624,6 +642,19 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
       AppSnackBar(
         message:
             'Erlaube „Alarme & Erinnerungen“ in Android und tippe danach erneut auf „Pünktlich mit Ton“.',
+      ),
+    );
+  }
+
+  Future<void> _openExactAlarmSettings() async {
+    final opened = await ref
+        .read(meterReminderRepositoryProvider)
+        .openExactAlarmSettings();
+    if (!mounted || opened) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      AppSnackBar(
+        message:
+            'Die Android-Einstellung „Alarme & Erinnerungen“ ist auf diesem Gerät nicht verfügbar.',
       ),
     );
   }
