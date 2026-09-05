@@ -203,6 +203,7 @@ void main() {
       final reminders = NoopMeterReminderRepository(
         reminderTestResult: false,
         permission: ReminderPermissionStatus.denied,
+        exactAlarmPermissionGranted: false,
       );
       await tester.pumpWidget(_testApp(reminders: reminders));
       await tester.pumpAndSettle();
@@ -219,6 +220,15 @@ void main() {
       await tester.tap(find.text('Pünktlich mit Ton'));
       await tester.pumpAndSettle();
 
+      final punctualMode = find.byKey(const ValueKey('reminder-mode-punctual'));
+      expect(
+        find.descendant(
+          of: punctualMode,
+          matching: find.byIcon(Icons.check_circle),
+        ),
+        findsOneWidget,
+      );
+      expect(reminders.exactAlarmPermissionRequestCount, 1);
       final alarmSettings = find.widgetWithText(
         OutlinedButton,
         '„Alarme & Erinnerungen“ öffnen',

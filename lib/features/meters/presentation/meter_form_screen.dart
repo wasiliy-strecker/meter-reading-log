@@ -355,6 +355,7 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
                         ),
                         const SizedBox(height: 8),
                         _ReminderModeCard(
+                          key: const ValueKey('reminder-mode-normal'),
                           title: 'Normale Erinnerung',
                           description:
                               'Android darf die Meldung etwas später anzeigen. „Nicht stören“ wird respektiert.',
@@ -369,6 +370,7 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
                         ),
                         const SizedBox(height: 8),
                         _ReminderModeCard(
+                          key: const ValueKey('reminder-mode-punctual'),
                           title: 'Pünktlich mit Ton',
                           description:
                               'Wird möglichst genau zur gewählten Uhrzeit wie ein Alarm ausgelöst.',
@@ -625,23 +627,15 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
       setState(() => _deliveryMode = mode);
       return;
     }
+    setState(() => _deliveryMode = mode);
     final reminders = ref.read(meterReminderRepositoryProvider);
-    if (await reminders.canScheduleExactAlarms()) {
-      if (mounted) setState(() => _deliveryMode = mode);
-      return;
-    }
-    await reminders.requestExactAlarmPermission();
-    if (!mounted) return;
-    if (await reminders.canScheduleExactAlarms()) {
-      if (!mounted) return;
-      setState(() => _deliveryMode = mode);
-      return;
-    }
-    if (!mounted) return;
+    if (await reminders.canScheduleExactAlarms()) return;
+    final opened = await reminders.requestExactAlarmPermission();
+    if (!mounted || opened) return;
     ScaffoldMessenger.of(context).showSnackBar(
       AppSnackBar(
         message:
-            'Erlaube „Alarme & Erinnerungen“ in Android und tippe danach erneut auf „Pünktlich mit Ton“.',
+            'Die Android-Einstellung „Alarme & Erinnerungen“ konnte nicht geöffnet werden. „Pünktlich mit Ton“ bleibt ausgewählt.',
       ),
     );
   }
@@ -719,6 +713,7 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
 
 class _ReminderModeCard extends StatelessWidget {
   const _ReminderModeCard({
+    super.key,
     required this.title,
     required this.description,
     required this.icon,

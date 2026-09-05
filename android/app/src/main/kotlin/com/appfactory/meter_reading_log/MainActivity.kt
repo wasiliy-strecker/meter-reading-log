@@ -134,8 +134,7 @@ class MainActivity : FlutterActivity() {
             result.success(true)
             return
         }
-        openExactAlarmSettings()
-        result.success(false)
+        result.success(openExactAlarmSettings())
     }
 
     private fun openExactAlarmSettings(): Boolean {
