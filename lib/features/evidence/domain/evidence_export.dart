@@ -1,5 +1,28 @@
 enum EvidenceExportKind { singleReading, meterHistory }
 
+enum EvidencePhotoMode {
+  withoutPhotos,
+  currentPhotos,
+  allPhotos;
+
+  String labelFor(EvidenceExportKind kind) => switch (this) {
+    withoutPhotos => 'Kompakt ohne Fotos',
+    currentPhotos when kind == EvidenceExportKind.singleReading =>
+      'Mit aktuellem Foto',
+    currentPhotos => 'Mit aktuellen Fotos',
+    allPhotos => 'Mit allen Fotos (ältere Version)',
+  };
+
+  static EvidencePhotoMode fromStoredName(Object? value) {
+    if (value is String) {
+      for (final mode in values) {
+        if (mode.name == value) return mode;
+      }
+    }
+    return EvidencePhotoMode.allPhotos;
+  }
+}
+
 class EvidenceExportRecord {
   const EvidenceExportRecord({
     required this.id,
@@ -11,6 +34,7 @@ class EvidenceExportRecord {
     required this.filePath,
     required this.pdfSha256,
     required this.manifestSha256,
+    this.photoMode = EvidencePhotoMode.allPhotos,
   });
 
   final String id;
@@ -22,6 +46,7 @@ class EvidenceExportRecord {
   final String filePath;
   final String pdfSha256;
   final String manifestSha256;
+  final EvidencePhotoMode photoMode;
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -33,6 +58,7 @@ class EvidenceExportRecord {
     'filePath': filePath,
     'pdfSha256': pdfSha256,
     'manifestSha256': manifestSha256,
+    'photoMode': photoMode.name,
   };
 
   factory EvidenceExportRecord.fromJson(Map<String, dynamic> json) {
@@ -46,6 +72,7 @@ class EvidenceExportRecord {
       filePath: json['filePath'] as String,
       pdfSha256: json['pdfSha256'] as String,
       manifestSha256: json['manifestSha256'] as String,
+      photoMode: EvidencePhotoMode.fromStoredName(json['photoMode']),
     );
   }
 }

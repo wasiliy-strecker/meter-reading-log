@@ -75,6 +75,7 @@ class EvidenceExportRecords extends Table {
   TextColumn get filePath => text()();
   TextColumn get pdfSha256 => text()();
   TextColumn get manifestSha256 => text()();
+  TextColumn get photoMode => text().withDefault(const Constant('allPhotos'))();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -96,7 +97,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.withExecutor(super.executor);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -110,6 +111,12 @@ class AppDatabase extends _$AppDatabase {
         await migrator.addColumn(
           readingRecords,
           readingRecords.photoHistoryJson,
+        );
+      }
+      if (from < 3) {
+        await migrator.addColumn(
+          evidenceExportRecords,
+          evidenceExportRecords.photoMode,
         );
       }
     },

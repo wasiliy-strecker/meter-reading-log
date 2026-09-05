@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:meter_reading_log/core/files/evidence_photo_asset_repository.dart';
 import 'package:meter_reading_log/core/files/meter_photo_repository.dart';
 import 'package:meter_reading_log/core/ocr/meter_ocr_repository.dart';
 import 'package:meter_reading_log/features/meters/application/meter_services.dart';
@@ -16,11 +17,13 @@ void main() {
       final meters = MemoryMeterRepository();
       final photos = _TrackingPhotoRepository();
       final reminders = NoopMeterReminderRepository();
+      final evidencePhotos = _TrackingEvidencePhotos();
       final service = MeterReadingService(
         meters: meters,
         readings: repository,
         photos: photos,
         reminders: reminders,
+        evidencePhotos: evidencePhotos,
       );
       final existing = _reading();
       meters.items[existing.meterId] = Meter(
@@ -69,6 +72,7 @@ void main() {
       expect(updated.manifestSha256, hasLength(64));
       expect(photos.deleted, isEmpty);
       expect(reminders.scheduledLatestReadings.last?.id, updated.id);
+      expect(evidencePhotos.preparedSha256, ['c' * 64]);
 
       final revisions = await repository.loadRevisions(existing.id);
       expect(revisions, hasLength(1));
@@ -83,9 +87,29 @@ void main() {
         photos.deleted,
         containsAll(['/tmp/original.jpg', '/tmp/new.jpg']),
       );
+      expect(evidencePhotos.deletedSha256, containsAll(['a' * 64, 'c' * 64]));
       expect(reminders.scheduledLatestReadings.last, isNull);
     },
   );
+}
+
+class _TrackingEvidencePhotos implements EvidencePhotoAssetRepository {
+  final List<String> preparedSha256 = [];
+  final List<String> deletedSha256 = [];
+
+  @override
+  Future<String?> prepare({
+    required String path,
+    required String sha256,
+  }) async {
+    preparedSha256.add(sha256);
+    return path;
+  }
+
+  @override
+  Future<void> delete(String sha256) async {
+    deletedSha256.add(sha256);
+  }
 }
 
 class _TrackingPhotoRepository implements MeterPhotoCaptureRepository {

@@ -13,6 +13,7 @@ import '../../../core/utils/formatters.dart';
 import '../../evidence/application/evidence_report_service.dart';
 import '../../evidence/domain/evidence_export.dart';
 import '../../evidence/presentation/evidence_export_card.dart';
+import '../../evidence/presentation/evidence_photo_mode_sheet.dart';
 import '../application/reading_revision_photos.dart';
 import '../domain/meter.dart';
 import '../domain/meter_reading.dart';
@@ -75,11 +76,23 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
     final checkingCurrentEvidence =
         exportsAsync.isLoading || manifestAsync.isLoading;
     final evidenceCheckFailed = exportsAsync.hasError || manifestAsync.hasError;
-    final hasCurrentEvidence = matchingExports.any(
-      (export) => availableFiles[export.id] == true,
-    );
+    final currentEvidenceModes = matchingExports
+        .where((export) => availableFiles[export.id] == true)
+        .map((export) => export.photoMode)
+        .where(
+          (mode) =>
+              mode == EvidencePhotoMode.withoutPhotos ||
+              mode == EvidencePhotoMode.currentPhotos,
+        )
+        .toSet();
+    final hasAnyCurrentEvidence = currentEvidenceModes.isNotEmpty;
+    final hasBothCurrentEvidence =
+        currentEvidenceModes.contains(EvidencePhotoMode.withoutPhotos) &&
+        currentEvidenceModes.contains(EvidencePhotoMode.currentPhotos);
     final canCreateEvidence =
-        !checkingCurrentEvidence && !evidenceCheckFailed && !hasCurrentEvidence;
+        !checkingCurrentEvidence &&
+        !evidenceCheckFailed &&
+        !hasBothCurrentEvidence;
     return Scaffold(
       appBar: AppBar(title: const Text('Ablesung')),
       body: ListView(
@@ -149,7 +162,7 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
                 export: export,
                 title: 'Einzelnachweis',
                 detail:
-                    'Zählerstand: ${reading.value.displayText} ${reading.meter.unit}',
+                    'Zählerstand: ${reading.value.displayText} ${reading.meter.unit}\n${export.photoMode.labelFor(export.kind)}',
                 fileAvailable: availableFiles[export.id] == true,
                 onTap: availableFiles[export.id] != true
                     ? null
@@ -159,28 +172,30 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
           ],
           FilledButton.icon(
             onPressed: canCreateEvidence && !_exporting
-                ? () => _export(reading)
+                ? () => _export(reading, currentEvidenceModes)
                 : null,
             icon: Icon(
-              hasCurrentEvidence
+              hasBothCurrentEvidence
                   ? Icons.check_circle_outline
                   : checkingCurrentEvidence
                   ? Icons.hourglass_top_rounded
                   : Icons.picture_as_pdf_outlined,
             ),
             label: Text(
-              hasCurrentEvidence
-                  ? 'Aktueller Einzelnachweis bereits erstellt'
+              hasBothCurrentEvidence
+                  ? 'Beide aktuellen Varianten bereits erstellt'
                   : checkingCurrentEvidence
                   ? 'Vorhandene Nachweise werden geprüft'
                   : 'Einzelnachweis als PDF erstellen',
               textAlign: TextAlign.center,
             ),
           ),
-          if (hasCurrentEvidence) ...[
+          if (hasAnyCurrentEvidence) ...[
             const SizedBox(height: 8),
             Text(
-              'Seit diesem Nachweis wurde die Ablesung nicht geändert. Nach einer Korrektur kannst du einen neuen erstellen.',
+              hasBothCurrentEvidence
+                  ? 'Seit diesen Nachweisen wurde die Ablesung nicht geändert. Nach einer Korrektur kannst du beide Varianten neu erstellen.'
+                  : 'Eine aktuelle Variante ist bereits gespeichert. Die andere kannst du weiterhin erstellen.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -202,21 +217,35 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
     );
   }
 
-  Future<void> _export(MeterReading reading) async {
+  Future<void> _export(
+    MeterReading reading,
+    Set<EvidencePhotoMode> unavailableModes,
+  ) async {
     if (_exporting) return;
+    final photoMode = await showEvidencePhotoModeSheet(
+      context,
+      kind: EvidenceExportKind.singleReading,
+      unavailableModes: unavailableModes,
+    );
+    if (photoMode == null || !mounted) return;
     setState(() => _exporting = true);
     try {
       final report = await runWithPdfExportProgress(
         context,
-        description:
-            'Foto und Nachweisdaten werden für die PDF zusammengestellt.',
+        description: photoMode == EvidencePhotoMode.withoutPhotos
+            ? 'Nachweisdaten und Korrekturen werden für die kompakte PDF zusammengestellt.'
+            : 'Das aktuelle Foto und die Nachweisdaten werden für die PDF zusammengestellt.',
         operation: () async {
           final revisions = await ref
               .read(meterReadingRepositoryProvider)
               .loadRevisions(reading.id);
           return ref
               .read(evidenceReportServiceProvider)
-              .createSingle(reading: reading, revisions: revisions);
+              .createSingle(
+                reading: reading,
+                revisions: revisions,
+                photoMode: photoMode,
+              );
         },
       );
       if (!mounted) return;

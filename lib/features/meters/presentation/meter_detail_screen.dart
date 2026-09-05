@@ -13,6 +13,7 @@ import '../../../core/utils/formatters.dart';
 import '../../evidence/application/evidence_report_service.dart';
 import '../../evidence/domain/evidence_export.dart';
 import '../../evidence/presentation/evidence_export_card.dart';
+import '../../evidence/presentation/evidence_photo_mode_sheet.dart';
 import '../domain/meter.dart';
 import '../domain/meter_reading.dart';
 import 'meter_visuals.dart';
@@ -146,7 +147,8 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
                 EvidenceExportCard(
                   export: export,
                   title: 'Zählerverlaufsnachweis',
-                  detail: _readingCountLabel(export.readingIds.length),
+                  detail:
+                      '${_readingCountLabel(export.readingIds.length)}\n${export.photoMode.labelFor(export.kind)}',
                   onTap: () => _openExport(export),
                 ),
             ],
@@ -166,21 +168,34 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
 
   Future<void> _exportHistory(List<MeterReading> readings) async {
     if (_exporting) return;
+    final photoMode = await showEvidencePhotoModeSheet(
+      context,
+      kind: EvidenceExportKind.meterHistory,
+    );
+    if (photoMode == null || !mounted) return;
     setState(() => _exporting = true);
     try {
       final report = await runWithPdfExportProgress(
         context,
-        description:
-            'Ablesungen, Fotos und Korrekturen werden für die PDF zusammengestellt.',
+        description: photoMode == EvidencePhotoMode.withoutPhotos
+            ? 'Ablesungen und Korrekturen werden für die kompakte PDF zusammengestellt.'
+            : 'Ablesungen, aktuelle Fotos und Korrekturen werden für die PDF zusammengestellt.',
         operation: () async {
           final repository = ref.read(meterReadingRepositoryProvider);
-          final revisions = <String, List<ReadingRevision>>{};
-          for (final reading in readings) {
-            revisions[reading.id] = await repository.loadRevisions(reading.id);
-          }
+          final revisionLists = await Future.wait(
+            readings.map((reading) => repository.loadRevisions(reading.id)),
+          );
+          final revisions = <String, List<ReadingRevision>>{
+            for (var index = 0; index < readings.length; index++)
+              readings[index].id: revisionLists[index],
+          };
           return ref
               .read(evidenceReportServiceProvider)
-              .createHistory(readings: readings, revisions: revisions);
+              .createHistory(
+                readings: readings,
+                revisions: revisions,
+                photoMode: photoMode,
+              );
         },
       );
       if (!mounted) return;

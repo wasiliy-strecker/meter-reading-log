@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/files/meter_photo_repository.dart';
+import '../core/files/evidence_photo_asset_repository.dart';
 import '../core/files/photo_capture_factory.dart';
 import '../core/integrity/integrity_service.dart';
 import '../core/ocr/meter_ocr_repository.dart';
@@ -49,6 +50,11 @@ final meterPhotoCaptureRepositoryProvider =
           createPhotoCaptureRepository(ref.watch(integrityServiceProvider)),
     );
 
+final evidencePhotoAssetRepositoryProvider =
+    Provider<EvidencePhotoAssetRepository>(
+      (ref) => LocalEvidencePhotoAssetRepository(),
+    );
+
 final meterOcrRepositoryProvider = Provider<MeterOcrRepository>((ref) {
   if (kIsWeb) {
     return const UnsupportedMeterOcrRepository();
@@ -63,6 +69,7 @@ final meterServiceProvider = Provider<MeterService>(
     exports: ref.watch(evidenceExportRepositoryProvider),
     photos: ref.watch(meterPhotoCaptureRepositoryProvider),
     reminders: ref.watch(meterReminderRepositoryProvider),
+    evidencePhotos: ref.watch(evidencePhotoAssetRepositoryProvider),
   ),
 );
 
@@ -73,6 +80,7 @@ final meterReadingServiceProvider = Provider<MeterReadingService>(
     photos: ref.watch(meterPhotoCaptureRepositoryProvider),
     integrity: ref.watch(integrityServiceProvider),
     reminders: ref.watch(meterReminderRepositoryProvider),
+    evidencePhotos: ref.watch(evidencePhotoAssetRepositoryProvider),
   ),
 );
 
@@ -80,6 +88,7 @@ final evidenceReportServiceProvider = Provider<EvidenceReportService>(
   (ref) => EvidenceReportService(
     exports: ref.watch(evidenceExportRepositoryProvider),
     integrity: ref.watch(integrityServiceProvider),
+    photoAssets: ref.watch(evidencePhotoAssetRepositoryProvider),
   ),
 );
 

@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:universal_io/io.dart';
 
+import '../../../core/files/evidence_photo_asset_repository.dart';
 import '../../../core/files/meter_photo_repository.dart';
 import '../../../core/integrity/integrity_service.dart';
 import '../../../core/ocr/meter_ocr_repository.dart';
@@ -17,6 +20,7 @@ class MeterService {
     required this.exports,
     required this.photos,
     required this.reminders,
+    this.evidencePhotos = const NoopEvidencePhotoAssetRepository(),
   });
 
   final MeterRepository meters;
@@ -24,6 +28,7 @@ class MeterService {
   final EvidenceExportRepository exports;
   final MeterPhotoCaptureRepository photos;
   final MeterReminderRepository reminders;
+  final EvidencePhotoAssetRepository evidencePhotos;
 
   Future<Meter> create({
     required String label,
@@ -66,6 +71,10 @@ class MeterService {
       for (final path in reading.allPhotoPaths) {
         await photos.delete(path);
       }
+      for (final sha256
+          in reading.allPhotoVersions.map((photo) => photo.sha256).toSet()) {
+        await evidencePhotos.delete(sha256);
+      }
       await readings.delete(reading.id);
     }
     for (final export in evidenceExports) {
@@ -87,6 +96,7 @@ class MeterReadingService {
     required this.photos,
     required this.reminders,
     this.integrity = const IntegrityService(),
+    this.evidencePhotos = const NoopEvidencePhotoAssetRepository(),
   });
 
   final MeterRepository meters;
@@ -94,6 +104,7 @@ class MeterReadingService {
   final MeterPhotoCaptureRepository photos;
   final MeterReminderRepository reminders;
   final IntegrityService integrity;
+  final EvidencePhotoAssetRepository evidencePhotos;
 
   Future<MeterReading> create({
     required Meter meter,
@@ -130,6 +141,7 @@ class MeterReadingService {
       manifestSha256: await integrity.readingManifestHash(reading),
     );
     await readings.save(reading);
+    _prewarmEvidencePhoto(reading.currentPhotoVersion);
     await reminders.acknowledge(meter.id);
     await _refreshReminderSummary(meter.id);
     return reading;
@@ -240,6 +252,9 @@ class MeterReadingService {
         changes: changes,
       ),
     );
+    if (replacementPhoto != null) {
+      _prewarmEvidencePhoto(updated.currentPhotoVersion);
+    }
     await _refreshReminderSummary(existing.meterId);
     return updated;
   }
@@ -248,8 +263,20 @@ class MeterReadingService {
     for (final path in reading.allPhotoPaths) {
       await photos.delete(path);
     }
+    for (final sha256
+        in reading.allPhotoVersions.map((photo) => photo.sha256).toSet()) {
+      await evidencePhotos.delete(sha256);
+    }
     await readings.delete(reading.id);
     await _refreshReminderSummary(reading.meterId);
+  }
+
+  void _prewarmEvidencePhoto(ReadingPhotoVersion photo) {
+    unawaited(
+      evidencePhotos
+          .prepare(path: photo.path, sha256: photo.sha256)
+          .then<void>((_) {}, onError: (_) {}),
+    );
   }
 
   Future<void> _refreshReminderSummary(String meterId) async {

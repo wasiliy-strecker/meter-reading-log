@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:meter_reading_log/core/persistence/app_database.dart';
 import 'package:meter_reading_log/features/meters/data/drift_meter_repositories.dart';
+import 'package:meter_reading_log/features/evidence/domain/evidence_export.dart';
 import 'package:meter_reading_log/features/meters/domain/meter.dart';
 import 'package:meter_reading_log/features/meters/domain/meter_reading.dart';
 import 'package:meter_reading_log/features/meters/domain/reading_value.dart';
@@ -49,6 +50,29 @@ void main() {
     final revisions = await readings.loadRevisions(reading.id);
     expect(revisions, hasLength(1));
     expect(revisions.single.reason, 'Tippfehler');
+  });
+
+  test('persists the PDF photo mode', () async {
+    final exports = DriftEvidenceExportRepository(database);
+    await exports.save(
+      EvidenceExportRecord(
+        id: 'export_1',
+        meterId: 'meter_1',
+        kind: EvidenceExportKind.meterHistory,
+        readingIds: const ['reading_1'],
+        createdAt: DateTime.utc(2026, 9, 5),
+        fileName: 'history.pdf',
+        filePath: '/tmp/history.pdf',
+        pdfSha256: 'a' * 64,
+        manifestSha256: 'b' * 64,
+        photoMode: EvidencePhotoMode.currentPhotos,
+      ),
+    );
+
+    expect(
+      (await exports.loadAll()).single.photoMode,
+      EvidencePhotoMode.currentPhotos,
+    );
   });
 }
 

@@ -295,13 +295,20 @@ void main() {
     );
 
     await tester.tap(find.text('Einzelnachweis als PDF erstellen'));
+    await tester.pumpAndSettle();
+    expect(find.text('PDF-Inhalt wählen'), findsOneWidget);
+    expect(find.text('Kompakt ohne Fotos'), findsOneWidget);
+    expect(find.text('Mit aktuellem Foto'), findsOneWidget);
+    await tester.tap(find.text('Mit aktuellem Foto'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('PDF-Nachweis wird erstellt'), findsOneWidget);
     expect(find.byKey(const ValueKey('pdf-export-progress')), findsOneWidget);
     expect(
-      find.text('Foto und Nachweisdaten werden für die PDF zusammengestellt.'),
+      find.text(
+        'Das aktuelle Foto und die Nachweisdaten werden für die PDF zusammengestellt.',
+      ),
       findsOneWidget,
     );
     expect(find.text('Einzelnachweis als PDF erstellen'), findsOneWidget);
@@ -333,6 +340,19 @@ void main() {
       filePath: pdf.path,
       pdfSha256: 'c' * 64,
       manifestSha256: unchangedReadingManifest,
+      photoMode: EvidencePhotoMode.withoutPhotos,
+    );
+    exports.items['single_current_photo'] = EvidenceExportRecord(
+      id: 'single_current_photo',
+      meterId: reading.meterId,
+      kind: EvidenceExportKind.singleReading,
+      readingIds: [reading.id],
+      createdAt: DateTime.utc(2026, 9, 5, 10, 1),
+      fileName: 'single-photo.pdf',
+      filePath: pdf.path,
+      pdfSha256: 'f' * 64,
+      manifestSha256: unchangedReadingManifest,
+      photoMode: EvidencePhotoMode.currentPhotos,
     );
     exports.items['history'] = EvidenceExportRecord(
       id: 'history',
@@ -375,17 +395,21 @@ void main() {
       find.byKey(const ValueKey('evidence-export-single_current')),
       findsOneWidget,
     );
+    expect(
+      find.byKey(const ValueKey('evidence-export-single_current_photo')),
+      findsOneWidget,
+    );
     expect(find.byKey(const ValueKey('evidence-export-history')), findsNothing);
     final blockedButton = tester.widget<FilledButton>(
       find.widgetWithText(
         FilledButton,
-        'Aktueller Einzelnachweis bereits erstellt',
+        'Beide aktuellen Varianten bereits erstellt',
       ),
     );
     expect(blockedButton.onPressed, isNull);
     expect(
       tester
-          .widget<Text>(find.text('Aktueller Einzelnachweis bereits erstellt'))
+          .widget<Text>(find.text('Beide aktuellen Varianten bereits erstellt'))
           .textAlign,
       TextAlign.center,
     );
@@ -400,14 +424,14 @@ void main() {
             .getTopLeft(
               find.widgetWithText(
                 FilledButton,
-                'Aktueller Einzelnachweis bereits erstellt',
+                'Beide aktuellen Varianten bereits erstellt',
               ),
             )
             .dy,
       ),
     );
     expect(
-      find.textContaining('Nach einer Korrektur kannst du einen neuen'),
+      find.textContaining('Nach einer Korrektur kannst du beide Varianten'),
       findsOneWidget,
     );
   });
@@ -547,6 +571,7 @@ class _PendingEvidenceReportService extends EvidenceReportService {
   Future<GeneratedEvidenceReport> createSingle({
     required MeterReading reading,
     required List<ReadingRevision> revisions,
+    EvidencePhotoMode photoMode = EvidencePhotoMode.allPhotos,
   }) {
     return pending.future;
   }

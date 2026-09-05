@@ -299,6 +299,7 @@ class EncryptedBackupService {
           filePath: restoredPath,
           pdfSha256: item.pdfSha256,
           manifestSha256: item.manifestSha256,
+          photoMode: item.photoMode,
         ),
       );
       exportCount += 1;

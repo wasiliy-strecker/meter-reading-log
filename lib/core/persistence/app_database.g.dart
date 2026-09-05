@@ -2268,6 +2268,18 @@ class $EvidenceExportRecordsTable extends EvidenceExportRecords
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _photoModeMeta = const VerificationMeta(
+    'photoMode',
+  );
+  @override
+  late final GeneratedColumn<String> photoMode = GeneratedColumn<String>(
+    'photo_mode',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('allPhotos'),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -2279,6 +2291,7 @@ class $EvidenceExportRecordsTable extends EvidenceExportRecords
     filePath,
     pdfSha256,
     manifestSha256,
+    photoMode,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2370,6 +2383,12 @@ class $EvidenceExportRecordsTable extends EvidenceExportRecords
     } else if (isInserting) {
       context.missing(_manifestSha256Meta);
     }
+    if (data.containsKey('photo_mode')) {
+      context.handle(
+        _photoModeMeta,
+        photoMode.isAcceptableOrUnknown(data['photo_mode']!, _photoModeMeta),
+      );
+    }
     return context;
   }
 
@@ -2418,6 +2437,10 @@ class $EvidenceExportRecordsTable extends EvidenceExportRecords
         DriftSqlType.string,
         data['${effectivePrefix}manifest_sha256'],
       )!,
+      photoMode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}photo_mode'],
+      )!,
     );
   }
 
@@ -2438,6 +2461,7 @@ class StoredEvidenceExportRecord extends DataClass
   final String filePath;
   final String pdfSha256;
   final String manifestSha256;
+  final String photoMode;
   const StoredEvidenceExportRecord({
     required this.id,
     required this.meterId,
@@ -2448,6 +2472,7 @@ class StoredEvidenceExportRecord extends DataClass
     required this.filePath,
     required this.pdfSha256,
     required this.manifestSha256,
+    required this.photoMode,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2461,6 +2486,7 @@ class StoredEvidenceExportRecord extends DataClass
     map['file_path'] = Variable<String>(filePath);
     map['pdf_sha256'] = Variable<String>(pdfSha256);
     map['manifest_sha256'] = Variable<String>(manifestSha256);
+    map['photo_mode'] = Variable<String>(photoMode);
     return map;
   }
 
@@ -2475,6 +2501,7 @@ class StoredEvidenceExportRecord extends DataClass
       filePath: Value(filePath),
       pdfSha256: Value(pdfSha256),
       manifestSha256: Value(manifestSha256),
+      photoMode: Value(photoMode),
     );
   }
 
@@ -2493,6 +2520,7 @@ class StoredEvidenceExportRecord extends DataClass
       filePath: serializer.fromJson<String>(json['filePath']),
       pdfSha256: serializer.fromJson<String>(json['pdfSha256']),
       manifestSha256: serializer.fromJson<String>(json['manifestSha256']),
+      photoMode: serializer.fromJson<String>(json['photoMode']),
     );
   }
   @override
@@ -2508,6 +2536,7 @@ class StoredEvidenceExportRecord extends DataClass
       'filePath': serializer.toJson<String>(filePath),
       'pdfSha256': serializer.toJson<String>(pdfSha256),
       'manifestSha256': serializer.toJson<String>(manifestSha256),
+      'photoMode': serializer.toJson<String>(photoMode),
     };
   }
 
@@ -2521,6 +2550,7 @@ class StoredEvidenceExportRecord extends DataClass
     String? filePath,
     String? pdfSha256,
     String? manifestSha256,
+    String? photoMode,
   }) => StoredEvidenceExportRecord(
     id: id ?? this.id,
     meterId: meterId ?? this.meterId,
@@ -2531,6 +2561,7 @@ class StoredEvidenceExportRecord extends DataClass
     filePath: filePath ?? this.filePath,
     pdfSha256: pdfSha256 ?? this.pdfSha256,
     manifestSha256: manifestSha256 ?? this.manifestSha256,
+    photoMode: photoMode ?? this.photoMode,
   );
   StoredEvidenceExportRecord copyWithCompanion(
     EvidenceExportRecordsCompanion data,
@@ -2551,6 +2582,7 @@ class StoredEvidenceExportRecord extends DataClass
       manifestSha256: data.manifestSha256.present
           ? data.manifestSha256.value
           : this.manifestSha256,
+      photoMode: data.photoMode.present ? data.photoMode.value : this.photoMode,
     );
   }
 
@@ -2565,7 +2597,8 @@ class StoredEvidenceExportRecord extends DataClass
           ..write('fileName: $fileName, ')
           ..write('filePath: $filePath, ')
           ..write('pdfSha256: $pdfSha256, ')
-          ..write('manifestSha256: $manifestSha256')
+          ..write('manifestSha256: $manifestSha256, ')
+          ..write('photoMode: $photoMode')
           ..write(')'))
         .toString();
   }
@@ -2581,6 +2614,7 @@ class StoredEvidenceExportRecord extends DataClass
     filePath,
     pdfSha256,
     manifestSha256,
+    photoMode,
   );
   @override
   bool operator ==(Object other) =>
@@ -2594,7 +2628,8 @@ class StoredEvidenceExportRecord extends DataClass
           other.fileName == this.fileName &&
           other.filePath == this.filePath &&
           other.pdfSha256 == this.pdfSha256 &&
-          other.manifestSha256 == this.manifestSha256);
+          other.manifestSha256 == this.manifestSha256 &&
+          other.photoMode == this.photoMode);
 }
 
 class EvidenceExportRecordsCompanion
@@ -2608,6 +2643,7 @@ class EvidenceExportRecordsCompanion
   final Value<String> filePath;
   final Value<String> pdfSha256;
   final Value<String> manifestSha256;
+  final Value<String> photoMode;
   final Value<int> rowid;
   const EvidenceExportRecordsCompanion({
     this.id = const Value.absent(),
@@ -2619,6 +2655,7 @@ class EvidenceExportRecordsCompanion
     this.filePath = const Value.absent(),
     this.pdfSha256 = const Value.absent(),
     this.manifestSha256 = const Value.absent(),
+    this.photoMode = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   EvidenceExportRecordsCompanion.insert({
@@ -2631,6 +2668,7 @@ class EvidenceExportRecordsCompanion
     required String filePath,
     required String pdfSha256,
     required String manifestSha256,
+    this.photoMode = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        meterId = Value(meterId),
@@ -2651,6 +2689,7 @@ class EvidenceExportRecordsCompanion
     Expression<String>? filePath,
     Expression<String>? pdfSha256,
     Expression<String>? manifestSha256,
+    Expression<String>? photoMode,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2663,6 +2702,7 @@ class EvidenceExportRecordsCompanion
       if (filePath != null) 'file_path': filePath,
       if (pdfSha256 != null) 'pdf_sha256': pdfSha256,
       if (manifestSha256 != null) 'manifest_sha256': manifestSha256,
+      if (photoMode != null) 'photo_mode': photoMode,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2677,6 +2717,7 @@ class EvidenceExportRecordsCompanion
     Value<String>? filePath,
     Value<String>? pdfSha256,
     Value<String>? manifestSha256,
+    Value<String>? photoMode,
     Value<int>? rowid,
   }) {
     return EvidenceExportRecordsCompanion(
@@ -2689,6 +2730,7 @@ class EvidenceExportRecordsCompanion
       filePath: filePath ?? this.filePath,
       pdfSha256: pdfSha256 ?? this.pdfSha256,
       manifestSha256: manifestSha256 ?? this.manifestSha256,
+      photoMode: photoMode ?? this.photoMode,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2723,6 +2765,9 @@ class EvidenceExportRecordsCompanion
     if (manifestSha256.present) {
       map['manifest_sha256'] = Variable<String>(manifestSha256.value);
     }
+    if (photoMode.present) {
+      map['photo_mode'] = Variable<String>(photoMode.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2741,6 +2786,7 @@ class EvidenceExportRecordsCompanion
           ..write('filePath: $filePath, ')
           ..write('pdfSha256: $pdfSha256, ')
           ..write('manifestSha256: $manifestSha256, ')
+          ..write('photoMode: $photoMode, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -3828,6 +3874,7 @@ typedef $$EvidenceExportRecordsTableCreateCompanionBuilder =
       required String filePath,
       required String pdfSha256,
       required String manifestSha256,
+      Value<String> photoMode,
       Value<int> rowid,
     });
 typedef $$EvidenceExportRecordsTableUpdateCompanionBuilder =
@@ -3841,6 +3888,7 @@ typedef $$EvidenceExportRecordsTableUpdateCompanionBuilder =
       Value<String> filePath,
       Value<String> pdfSha256,
       Value<String> manifestSha256,
+      Value<String> photoMode,
       Value<int> rowid,
     });
 
@@ -3895,6 +3943,11 @@ class $$EvidenceExportRecordsTableFilterComposer
 
   ColumnFilters<String> get manifestSha256 => $composableBuilder(
     column: $table.manifestSha256,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get photoMode => $composableBuilder(
+    column: $table.photoMode,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -3952,6 +4005,11 @@ class $$EvidenceExportRecordsTableOrderingComposer
     column: $table.manifestSha256,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get photoMode => $composableBuilder(
+    column: $table.photoMode,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$EvidenceExportRecordsTableAnnotationComposer
@@ -3995,6 +4053,9 @@ class $$EvidenceExportRecordsTableAnnotationComposer
     column: $table.manifestSha256,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get photoMode =>
+      $composableBuilder(column: $table.photoMode, builder: (column) => column);
 }
 
 class $$EvidenceExportRecordsTableTableManager
@@ -4052,6 +4113,7 @@ class $$EvidenceExportRecordsTableTableManager
                 Value<String> filePath = const Value.absent(),
                 Value<String> pdfSha256 = const Value.absent(),
                 Value<String> manifestSha256 = const Value.absent(),
+                Value<String> photoMode = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => EvidenceExportRecordsCompanion(
                 id: id,
@@ -4063,6 +4125,7 @@ class $$EvidenceExportRecordsTableTableManager
                 filePath: filePath,
                 pdfSha256: pdfSha256,
                 manifestSha256: manifestSha256,
+                photoMode: photoMode,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -4076,6 +4139,7 @@ class $$EvidenceExportRecordsTableTableManager
                 required String filePath,
                 required String pdfSha256,
                 required String manifestSha256,
+                Value<String> photoMode = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => EvidenceExportRecordsCompanion.insert(
                 id: id,
@@ -4087,6 +4151,7 @@ class $$EvidenceExportRecordsTableTableManager
                 filePath: filePath,
                 pdfSha256: pdfSha256,
                 manifestSha256: manifestSha256,
+                photoMode: photoMode,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

@@ -2,7 +2,6 @@ import 'package:universal_io/io.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:image/image.dart' as img;
 import 'package:intl/intl.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -11,6 +10,7 @@ import 'package:pdf/widgets.dart' as pw;
 
 import '../../../core/integrity/integrity_copy.dart';
 import '../../../core/integrity/integrity_service.dart';
+import '../../../core/files/evidence_photo_asset_repository.dart';
 import '../../../core/utils/id_generator.dart';
 import '../../meters/application/reading_revision_photos.dart';
 import '../../meters/domain/meter.dart';
@@ -37,16 +37,20 @@ class EvidenceReportService {
     required this.exports,
     this.integrity = const IntegrityService(),
     DocumentsDirectoryProvider? documentsDirectoryProvider,
+    EvidencePhotoAssetRepository? photoAssets,
   }) : _documentsDirectoryProvider =
-           documentsDirectoryProvider ?? getApplicationDocumentsDirectory;
+           documentsDirectoryProvider ?? getApplicationDocumentsDirectory,
+       photoAssets = photoAssets ?? LocalEvidencePhotoAssetRepository();
 
   final EvidenceExportRepository exports;
   final IntegrityService integrity;
   final DocumentsDirectoryProvider _documentsDirectoryProvider;
+  final EvidencePhotoAssetRepository photoAssets;
 
   Future<GeneratedEvidenceReport> createSingle({
     required MeterReading reading,
     required List<ReadingRevision> revisions,
+    EvidencePhotoMode photoMode = EvidencePhotoMode.allPhotos,
   }) async {
     final manifestSha = await singleReadingManifestSha256(
       reading: reading,
@@ -58,7 +62,8 @@ class EvidenceReportService {
           export.kind == EvidenceExportKind.singleReading &&
           export.readingIds.length == 1 &&
           export.readingIds.single == reading.id &&
-          export.manifestSha256 == manifestSha;
+          export.manifestSha256 == manifestSha &&
+          export.photoMode == photoMode;
       if (matchesCurrentReading && await File(export.filePath).exists()) {
         throw StateError(
           'Für den aktuellen Stand dieser Ablesung wurde bereits ein Einzelnachweis erstellt.',
@@ -69,6 +74,7 @@ class EvidenceReportService {
       readings: [reading],
       revisions: {reading.id: revisions},
       kind: EvidenceExportKind.singleReading,
+      photoMode: photoMode,
       manifestSha256: manifestSha,
     );
   }
@@ -83,6 +89,7 @@ class EvidenceReportService {
   Future<GeneratedEvidenceReport> createHistory({
     required List<MeterReading> readings,
     required Map<String, List<ReadingRevision>> revisions,
+    EvidencePhotoMode photoMode = EvidencePhotoMode.allPhotos,
   }) async {
     if (readings.isEmpty) {
       throw StateError('Für diesen Zähler gibt es noch keine Ablesungen.');
@@ -92,6 +99,7 @@ class EvidenceReportService {
         ..sort((left, right) => left.capturedAt.compareTo(right.capturedAt)),
       revisions: revisions,
       kind: EvidenceExportKind.meterHistory,
+      photoMode: photoMode,
     );
   }
 
@@ -99,10 +107,15 @@ class EvidenceReportService {
     required List<MeterReading> readings,
     required Map<String, List<ReadingRevision>> revisions,
     required EvidenceExportKind kind,
+    required EvidencePhotoMode photoMode,
     String? manifestSha256,
   }) async {
     final createdAt = DateTime.now();
     final fonts = await _loadFontBytes();
+    final preparedPhotoPaths = await _preparePhotos(
+      readings: readings,
+      photoMode: photoMode,
+    );
     final buildResult = await compute(_buildPdfInBackground, <String, Object?>{
       'readings': readings.map((reading) => reading.toJson()).toList(),
       'revisions': <String, Object?>{
@@ -110,6 +123,8 @@ class EvidenceReportService {
           entry.key: entry.value.map((revision) => revision.toJson()).toList(),
       },
       'kind': kind.name,
+      'photoMode': photoMode.name,
+      'preparedPhotoPaths': preparedPhotoPaths,
       'createdAtMicroseconds': createdAt.microsecondsSinceEpoch,
       'manifestSha256': manifestSha256,
       'regularFontBytes': fonts.regular,
@@ -122,9 +137,14 @@ class EvidenceReportService {
     final id = newLocalId('evidence');
     final safeLabel = _safeFilePart(meter.label);
     final stamp = DateFormat('yyyyMMdd_HHmmss').format(createdAt);
+    final variant = switch (photoMode) {
+      EvidencePhotoMode.withoutPhotos => 'kompakt',
+      EvidencePhotoMode.currentPhotos => 'mit_fotos',
+      EvidencePhotoMode.allPhotos => 'alle_fotos',
+    };
     final fileName = kind == EvidenceExportKind.singleReading
-        ? 'zaehlerstand_${safeLabel}_$stamp.pdf'
-        : 'zaehlerverlauf_${safeLabel}_$stamp.pdf';
+        ? 'zaehlerstand_${safeLabel}_${variant}_$stamp.pdf'
+        : 'zaehlerverlauf_${safeLabel}_${variant}_$stamp.pdf';
     final directory = Directory(
       p.join((await _documentsDirectoryProvider()).path, 'evidence_reports'),
     );
@@ -141,9 +161,52 @@ class EvidenceReportService {
       filePath: file.path,
       pdfSha256: pdfSha,
       manifestSha256: manifestSha,
+      photoMode: photoMode,
     );
     await exports.save(record);
     return GeneratedEvidenceReport(record: record, bytes: bytes);
+  }
+
+  Future<Map<String, String>> _preparePhotos({
+    required List<MeterReading> readings,
+    required EvidencePhotoMode photoMode,
+  }) async {
+    if (photoMode == EvidencePhotoMode.withoutPhotos) {
+      return const <String, String>{};
+    }
+    final versions = <ReadingPhotoVersion>[
+      for (final reading in readings)
+        if (photoMode == EvidencePhotoMode.currentPhotos)
+          reading.currentPhotoVersion
+        else
+          ...reading.allPhotoVersions,
+    ];
+    final versionsByHash = <String, List<ReadingPhotoVersion>>{};
+    for (final version in versions) {
+      versionsByHash.putIfAbsent(version.sha256, () => []).add(version);
+    }
+    final prepared = <String, String>{};
+    final groups = versionsByHash.entries.toList(growable: false);
+    for (var offset = 0; offset < groups.length; offset += 2) {
+      final batch = groups.skip(offset).take(2).toList(growable: false);
+      final paths = await Future.wait(
+        batch.map((group) {
+          final representative = group.value.first;
+          return photoAssets.prepare(
+            path: representative.path,
+            sha256: representative.sha256,
+          );
+        }),
+      );
+      for (var index = 0; index < batch.length; index++) {
+        final path = paths[index];
+        if (path == null) continue;
+        for (final version in batch[index].value) {
+          prepared[version.path] = path;
+        }
+      }
+    }
+    return prepared;
   }
 
   static Future<Map<String, Object?>> _buildPdfInBackground(
@@ -169,6 +232,12 @@ class EvidenceReportService {
             .toList(growable: false),
     };
     final kind = EvidenceExportKind.values.byName(message['kind']! as String);
+    final photoMode = EvidencePhotoMode.values.byName(
+      message['photoMode']! as String,
+    );
+    final photoAssets = _PdfPhotoAssets(
+      Map<String, String>.from(message['preparedPhotoPaths']! as Map),
+    );
     final createdAt = DateTime.fromMicrosecondsSinceEpoch(
       message['createdAtMicroseconds']! as int,
     );
@@ -235,6 +304,8 @@ class EvidenceReportService {
           ),
           pw.SizedBox(height: 18),
           _meterTable(readings.first),
+          pw.SizedBox(height: 12),
+          _photoModeBox(photoMode),
           pw.SizedBox(height: 14),
           if (kind == EvidenceExportKind.meterHistory)
             _historyTable(readings, date),
@@ -244,11 +315,15 @@ class EvidenceReportService {
               revisions: revisions[readings.single.id] ?? const [],
               date: date,
               includeHeading: false,
+              photoMode: photoMode,
+              photoAssets: photoAssets,
             ),
           if (kind == EvidenceExportKind.meterHistory) ...[
             pw.NewPage(),
             pw.Text(
-              'Fotoanhang und Details',
+              photoMode == EvidencePhotoMode.withoutPhotos
+                  ? 'Details und Korrekturen'
+                  : 'Aktuelle Fotos und Details',
               style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
             ),
             pw.SizedBox(height: 12),
@@ -258,12 +333,19 @@ class EvidenceReportService {
                 revisions: revisions[reading.id] ?? const [],
                 date: date,
                 includeHeading: true,
+                photoMode: photoMode,
+                photoAssets: photoAssets,
               ),
               pw.SizedBox(height: 20),
             ],
           ],
           pw.SizedBox(height: 18),
-          _documentInfoBox(generatedAt: createdAt, date: date),
+          _documentInfoBox(
+            generatedAt: createdAt,
+            date: date,
+            photoMode: photoMode,
+            kind: kind,
+          ),
         ],
       ),
     );
@@ -350,6 +432,8 @@ class EvidenceReportService {
     required List<ReadingRevision> revisions,
     required DateFormat date,
     required bool includeHeading,
+    required EvidencePhotoMode photoMode,
+    required _PdfPhotoAssets photoAssets,
   }) {
     return [
       if (includeHeading)
@@ -358,15 +442,18 @@ class EvidenceReportService {
           style: pw.TextStyle(fontSize: 15, fontWeight: pw.FontWeight.bold),
         ),
       if (includeHeading) pw.SizedBox(height: 8),
-      pw.Text(
-        reading.photoHistory.isEmpty
-            ? 'Nachweisfoto'
-            : 'Aktuelles Nachweisfoto',
-        style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-      ),
-      pw.SizedBox(height: 6),
-      _photo(reading.photoPath),
-      pw.SizedBox(height: 10),
+      if (photoMode != EvidencePhotoMode.withoutPhotos) ...[
+        pw.Text(
+          photoMode == EvidencePhotoMode.allPhotos &&
+                  reading.photoHistory.isEmpty
+              ? 'Nachweisfoto'
+              : 'Aktuelles Nachweisfoto',
+          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+        ),
+        pw.SizedBox(height: 6),
+        _photo(reading.photoPath, photoAssets),
+        pw.SizedBox(height: 10),
+      ],
       pw.TableHelper.fromTextArray(
         cellPadding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 5),
         data: [
@@ -411,7 +498,13 @@ class EvidenceReportService {
         for (final revision in ([
           ...revisions,
         ]..sort((left, right) => right.changedAt.compareTo(left.changedAt))))
-          _revisionSection(revision: revision, reading: reading, date: date),
+          _revisionSection(
+            revision: revision,
+            reading: reading,
+            date: date,
+            photoMode: photoMode,
+            photoAssets: photoAssets,
+          ),
       ],
     ];
   }
@@ -420,6 +513,8 @@ class EvidenceReportService {
     required ReadingRevision revision,
     required MeterReading reading,
     required DateFormat date,
+    required EvidencePhotoMode photoMode,
+    required _PdfPhotoAssets photoAssets,
   }) {
     final visibleChanges = visibleRevisionChanges(
       revision,
@@ -462,9 +557,20 @@ class EvidenceReportService {
               style: const pw.TextStyle(fontSize: 9),
             ),
           ],
-          if (revisionPhotos != null) ...[
+          if (revisionPhotos != null &&
+              photoMode == EvidencePhotoMode.allPhotos) ...[
             pw.SizedBox(height: 4),
-            _revisionPhotoComparison(photos: revisionPhotos, date: date),
+            _revisionPhotoComparison(
+              photos: revisionPhotos,
+              date: date,
+              photoAssets: photoAssets,
+            ),
+          ] else if (revisionPhotos != null) ...[
+            pw.SizedBox(height: 4),
+            pw.Text(
+              'Nachweisfoto geändert',
+              style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+            ),
           ],
         ],
       ),
@@ -474,6 +580,7 @@ class EvidenceReportService {
   static pw.Widget _revisionPhotoComparison({
     required ReadingRevisionPhotos photos,
     required DateFormat date,
+    required _PdfPhotoAssets photoAssets,
   }) {
     final before = photos.before;
     final after = photos.after;
@@ -496,6 +603,7 @@ class EvidenceReportService {
                   label: 'Vorheriges Foto',
                   photo: before,
                   date: date,
+                  photoAssets: photoAssets,
                 ),
               ),
             if (before != null && after != null) pw.SizedBox(width: 8),
@@ -505,6 +613,7 @@ class EvidenceReportService {
                   label: 'Neues Foto',
                   photo: after,
                   date: date,
+                  photoAssets: photoAssets,
                 ),
               ),
           ],
@@ -517,6 +626,7 @@ class EvidenceReportService {
     required String label,
     required ReadingPhotoVersion photo,
     required DateFormat date,
+    required _PdfPhotoAssets photoAssets,
   }) {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -526,7 +636,7 @@ class EvidenceReportService {
           style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
         ),
         pw.SizedBox(height: 4),
-        _photo(photo.path, height: 120),
+        _photo(photo.path, photoAssets, height: 120),
         pw.SizedBox(height: 3),
         pw.Text(
           '${photo.source.label} · ${date.format(photo.addedAt.toLocal())}',
@@ -551,21 +661,20 @@ class EvidenceReportService {
     return value;
   }
 
-  static pw.Widget _photo(String path, {double height = 280}) {
+  static pw.Widget _photo(
+    String path,
+    _PdfPhotoAssets photoAssets, {
+    double height = 280,
+  }) {
     try {
-      final bytes = File(path).readAsBytesSync();
-      final decoded = img.decodeImage(bytes);
-      if (decoded == null) {
-        throw const FormatException('Bildformat nicht lesbar');
-      }
-      final normalized = img.encodeJpg(decoded, quality: 88);
+      final image = photoAssets.image(path);
       return pw.Container(
         height: height,
         alignment: pw.Alignment.center,
         decoration: pw.BoxDecoration(
           border: pw.Border.all(color: PdfColors.grey400),
         ),
-        child: pw.Image(pw.MemoryImage(normalized), fit: pw.BoxFit.contain),
+        child: pw.Image(image, fit: pw.BoxFit.contain),
       );
     } on Object {
       return pw.Container(
@@ -580,6 +689,8 @@ class EvidenceReportService {
   static pw.Widget _documentInfoBox({
     required DateTime generatedAt,
     required DateFormat date,
+    required EvidencePhotoMode photoMode,
+    required EvidenceExportKind kind,
   }) {
     return pw.Container(
       padding: const pw.EdgeInsets.all(12),
@@ -596,6 +707,7 @@ class EvidenceReportService {
           ),
           pw.SizedBox(height: 4),
           pw.Text('PDF erstellt am ${date.format(generatedAt)}'),
+          pw.Text('Variante: ${photoMode.labelFor(kind)}'),
           pw.SizedBox(height: 6),
           pw.Text(
             privateDocumentationText,
@@ -603,6 +715,23 @@ class EvidenceReportService {
           ),
         ],
       ),
+    );
+  }
+
+  static pw.Widget _photoModeBox(EvidencePhotoMode photoMode) {
+    final text = switch (photoMode) {
+      EvidencePhotoMode.withoutPhotos =>
+        'Kompakte Variante: Die gespeicherten Foto-Dateien sind nicht in dieser PDF enthalten.',
+      EvidencePhotoMode.currentPhotos =>
+        'Foto-Variante: Pro Ablesung ist das aktuell zugeordnete Nachweisfoto enthalten.',
+      EvidencePhotoMode.allPhotos =>
+        'Ältere Foto-Variante: Aktuelle und frühere Nachweisfotos können enthalten sein.',
+    };
+    return pw.Container(
+      width: double.infinity,
+      padding: const pw.EdgeInsets.all(9),
+      color: PdfColors.grey200,
+      child: pw.Text(text, style: const pw.TextStyle(fontSize: 9)),
     );
   }
 
@@ -650,4 +779,21 @@ class _ReportFontBytes {
 
   final Uint8List regular;
   final Uint8List bold;
+}
+
+class _PdfPhotoAssets {
+  _PdfPhotoAssets(this.preparedPaths);
+
+  final Map<String, String> preparedPaths;
+  final Map<String, pw.MemoryImage> _images = {};
+
+  pw.MemoryImage image(String originalPath) {
+    return _images.putIfAbsent(originalPath, () {
+      final preparedPath = preparedPaths[originalPath];
+      if (preparedPath == null) {
+        throw StateError('Keine vorbereitete Fotodatei vorhanden.');
+      }
+      return pw.MemoryImage(File(preparedPath).readAsBytesSync());
+    });
+  }
 }

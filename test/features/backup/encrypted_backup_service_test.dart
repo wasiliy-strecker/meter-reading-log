@@ -69,6 +69,7 @@ void main() {
         filePath: pdf.path,
         pdfSha256: pdfHash,
         manifestSha256: 'manifest',
+        photoMode: EvidencePhotoMode.currentPhotos,
       ),
     );
 
@@ -127,6 +128,10 @@ void main() {
       isTrue,
     );
     expect(restoredReading.photoHistory.single.sha256, olderPhotoHash);
+    expect(
+      (await targetExports.loadAll()).single.photoMode,
+      EvidencePhotoMode.currentPhotos,
+    );
 
     await expectLater(
       target.inspect(backup.path, 'falsches-passwort'),

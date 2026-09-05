@@ -349,6 +349,7 @@ class DriftEvidenceExportRepository implements EvidenceExportRepository {
             filePath: record.filePath,
             pdfSha256: record.pdfSha256,
             manifestSha256: record.manifestSha256,
+            photoMode: Value(record.photoMode.name),
           ),
         );
   }
@@ -374,6 +375,7 @@ class DriftEvidenceExportRepository implements EvidenceExportRepository {
       filePath: row.filePath,
       pdfSha256: row.pdfSha256,
       manifestSha256: row.manifestSha256,
+      photoMode: EvidencePhotoMode.fromStoredName(row.photoMode),
     );
   }
 }

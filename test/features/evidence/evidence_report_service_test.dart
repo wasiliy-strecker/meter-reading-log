@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
+import 'package:meter_reading_log/core/files/evidence_photo_asset_repository.dart';
 import 'package:meter_reading_log/features/evidence/application/evidence_report_service.dart';
 import 'package:meter_reading_log/features/evidence/domain/evidence_export.dart';
 import 'package:meter_reading_log/features/meters/domain/meter.dart';
@@ -12,6 +13,22 @@ import '../../support/fakes.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('older export JSON defaults to the legacy all-photo mode', () {
+    final record = EvidenceExportRecord.fromJson({
+      'id': 'legacy',
+      'meterId': 'meter',
+      'kind': 'singleReading',
+      'readingIds': <String>['reading'],
+      'createdAt': DateTime.utc(2026, 9, 1).toIso8601String(),
+      'fileName': 'legacy.pdf',
+      'filePath': '/tmp/legacy.pdf',
+      'pdfSha256': 'a' * 64,
+      'manifestSha256': 'b' * 64,
+    });
+
+    expect(record.photoMode, EvidencePhotoMode.allPhotos);
+  });
 
   test(
     'creates a persistent single-reading PDF with internal hashes',
@@ -277,6 +294,126 @@ void main() {
     expect(report.bytes.take(4), [0x25, 0x50, 0x44, 0x46]);
     expect(await File(report.record.filePath).exists(), isTrue);
   });
+
+  test('compact PDFs never prepare or read a photo', () async {
+    final temp = await Directory.systemTemp.createTemp('compact_pdf_test_');
+    addTearDown(() => temp.delete(recursive: true));
+    final photoAssets = _RecordingPhotoAssets();
+    final service = EvidenceReportService(
+      exports: MemoryEvidenceExportRepository(),
+      documentsDirectoryProvider: () async => temp,
+      photoAssets: photoAssets,
+    );
+
+    final report = await service.createSingle(
+      reading: _reading('${temp.path}/does-not-exist.jpg'),
+      revisions: const [],
+      photoMode: EvidencePhotoMode.withoutPhotos,
+    );
+
+    expect(photoAssets.prepared, isEmpty);
+    expect(report.record.photoMode, EvidencePhotoMode.withoutPhotos);
+    expect(report.record.fileName, contains('_kompakt_'));
+    expect(report.bytes.take(4), [0x25, 0x50, 0x44, 0x46]);
+  });
+
+  test('current-photo PDFs prepare only the current photo', () async {
+    final temp = await Directory.systemTemp.createTemp('current_pdf_test_');
+    addTearDown(() => temp.delete(recursive: true));
+    final current = File('${temp.path}/current.jpg');
+    final archived = File('${temp.path}/archived.jpg');
+    await current.writeAsBytes(img.encodeJpg(img.Image(width: 20, height: 20)));
+    await archived.writeAsBytes(
+      img.encodeJpg(img.Image(width: 18, height: 18)),
+    );
+    final reading = _reading(current.path).copyWith(
+      photoHistory: [
+        ReadingPhotoVersion(
+          id: 'archived',
+          path: archived.path,
+          sha256: 'c' * 64,
+          source: ReadingSource.gallery,
+          addedAt: DateTime.utc(2026, 9, 1),
+          ocrRawText: '',
+          ocrCandidate: '',
+        ),
+      ],
+    );
+    final photoAssets = _RecordingPhotoAssets();
+    final service = EvidenceReportService(
+      exports: MemoryEvidenceExportRepository(),
+      documentsDirectoryProvider: () async => temp,
+      photoAssets: photoAssets,
+    );
+
+    final report = await service.createSingle(
+      reading: reading,
+      revisions: const [],
+      photoMode: EvidencePhotoMode.currentPhotos,
+    );
+
+    expect(photoAssets.prepared, [(path: current.path, sha256: 'a' * 64)]);
+    expect(report.record.fileName, contains('_mit_fotos_'));
+  });
+
+  test('duplicate detection is separate for compact and photo PDFs', () async {
+    final temp = await Directory.systemTemp.createTemp('variant_pdf_test_');
+    addTearDown(() => temp.delete(recursive: true));
+    final photo = File('${temp.path}/photo.jpg');
+    await photo.writeAsBytes(img.encodeJpg(img.Image(width: 20, height: 20)));
+    final repository = MemoryEvidenceExportRepository();
+    final service = EvidenceReportService(
+      exports: repository,
+      documentsDirectoryProvider: () async => temp,
+      photoAssets: _RecordingPhotoAssets(),
+    );
+    final reading = _reading(photo.path);
+
+    await service.createSingle(
+      reading: reading,
+      revisions: const [],
+      photoMode: EvidencePhotoMode.withoutPhotos,
+    );
+    await service.createSingle(
+      reading: reading,
+      revisions: const [],
+      photoMode: EvidencePhotoMode.currentPhotos,
+    );
+
+    expect(repository.items, hasLength(2));
+    await expectLater(
+      service.createSingle(
+        reading: reading,
+        revisions: const [],
+        photoMode: EvidencePhotoMode.withoutPhotos,
+      ),
+      throwsStateError,
+    );
+    await expectLater(
+      service.createSingle(
+        reading: reading,
+        revisions: const [],
+        photoMode: EvidencePhotoMode.currentPhotos,
+      ),
+      throwsStateError,
+    );
+  });
+}
+
+class _RecordingPhotoAssets implements EvidencePhotoAssetRepository {
+  final List<({String path, String sha256})> prepared = [];
+
+  @override
+  Future<String?> prepare({
+    required String path,
+    required String sha256,
+  }) async {
+    prepared.add((path: path, sha256: sha256));
+    return path;
+  }
+
+  @override
+  Future<void> delete(String sha256) async {}
 }
 
 MeterReading _reading(

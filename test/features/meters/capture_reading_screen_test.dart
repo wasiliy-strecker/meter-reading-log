@@ -297,7 +297,7 @@ void main() {
     );
     expect(find.text('PDF-Nachweis des Zählerverlaufs'), findsOneWidget);
     expect(
-      find.textContaining('alle Ablesungen, Fotos und Korrekturen'),
+      find.textContaining('kompakt ohne Fotos oder mit dem aktuellen'),
       findsOneWidget,
     );
     final readingCard = find.byKey(const ValueKey('reading-card-reading_pdf'));
@@ -363,7 +363,7 @@ void main() {
       findsNothing,
     );
     expect(find.text('Zählerverlaufsnachweis'), findsOneWidget);
-    expect(find.text('1 Ablesung enthalten'), findsOneWidget);
+    expect(find.textContaining('1 Ablesung enthalten'), findsOneWidget);
     expect(find.text('Einzelnachweis'), findsNothing);
     expect(find.text('Zählerstand: 42,1 m³'), findsNothing);
     expect(find.text('Lokal gespeichert'), findsOneWidget);
@@ -395,13 +395,18 @@ void main() {
       scrollable: find.byType(Scrollable).last,
     );
     await tester.tap(find.text('Zählerverlauf als PDF erstellen'));
+    await tester.pumpAndSettle();
+    expect(find.text('PDF-Inhalt wählen'), findsOneWidget);
+    expect(find.text('Kompakt ohne Fotos'), findsOneWidget);
+    expect(find.text('Mit aktuellen Fotos'), findsOneWidget);
+    await tester.tap(find.text('Kompakt ohne Fotos'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('PDF-Nachweis wird erstellt'), findsOneWidget);
     expect(
       find.text(
-        'Ablesungen, Fotos und Korrekturen werden für die PDF zusammengestellt.',
+        'Ablesungen und Korrekturen werden für die kompakte PDF zusammengestellt.',
       ),
       findsOneWidget,
     );

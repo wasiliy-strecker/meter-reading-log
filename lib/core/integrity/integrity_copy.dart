@@ -6,13 +6,13 @@ const correctionHistoryText =
 const pdfPurposeTitle = 'Wozu dient der PDF-Nachweis?';
 
 const pdfPurposeText =
-    'Die PDF bündelt diesen Zählerstand, das Nachweisfoto und alle Korrekturen in einer Datei zum Speichern, Drucken oder Teilen.';
+    'Du wählst vor dem Erstellen: kompakt ohne Fotos oder mit dem aktuellen Nachweisfoto. Angaben und Korrekturen sind in beiden Varianten enthalten – zum Speichern, Drucken oder Teilen.';
 
 const privateDocumentationText =
     'Sie dokumentiert deine Angaben und ist keine amtliche Bestätigung.';
 
 const historyPdfPurposeText =
-    'Die PDF bündelt alle Ablesungen, Fotos und Korrekturen in einer Datei zum Speichern, Drucken oder Teilen.';
+    'Die PDF bündelt alle Ablesungen und Korrekturen. Du wählst: kompakt ohne Fotos oder mit dem aktuellen Nachweisfoto jeder Ablesung – zum Speichern, Drucken oder Teilen.';
 
 const pdfPrivateDocumentationText =
     'Private Dokumentation · Keine amtliche Bestätigung.';
