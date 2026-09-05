@@ -389,6 +389,12 @@ void main() {
     expect(blockedButton.onPressed, isNull);
     expect(
       tester
+          .widget<Text>(find.text('Aktueller Einzelnachweis bereits erstellt'))
+          .textAlign,
+      TextAlign.center,
+    );
+    expect(
+      tester
           .getTopLeft(
             find.byKey(const ValueKey('evidence-export-single_current')),
           )
