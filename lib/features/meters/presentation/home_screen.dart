@@ -6,7 +6,7 @@ import '../../../app/app_providers.dart';
 import '../../../core/reminders/local_notification_reminder_repository.dart';
 import '../../../core/utils/formatters.dart';
 import '../domain/meter.dart';
-import '../domain/meter_reading.dart';
+import '../domain/meter_dashboard_item.dart';
 import 'meter_visuals.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -42,7 +42,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
-    final meters = ref.watch(metersProvider);
+    final dashboardItems = ref.watch(meterDashboardItemsProvider);
     final reminderStatuses =
         ref.watch(reminderStatusesProvider).value ?? const {};
     return Scaffold(
@@ -56,13 +56,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ),
         ],
       ),
-      body: meters.when(
+      body: dashboardItems.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) =>
-            _ErrorState(onRetry: () => ref.invalidate(metersProvider)),
+        error: (error, _) => _ErrorState(
+          onRetry: () => ref.invalidate(meterDashboardItemsProvider),
+        ),
         data: (items) => items.isEmpty
             ? const _EmptyState()
-            : _MeterList(meters: items, reminderStatuses: reminderStatuses),
+            : _MeterList(items: items, reminderStatuses: reminderStatuses),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.pushNamed('meterNew'),
@@ -84,9 +85,9 @@ extension on _MeterSort {
 }
 
 class _MeterList extends ConsumerStatefulWidget {
-  const _MeterList({required this.meters, required this.reminderStatuses});
+  const _MeterList({required this.items, required this.reminderStatuses});
 
-  final List<Meter> meters;
+  final List<MeterDashboardItem> items;
   final Map<String, ReminderStatus> reminderStatuses;
 
   @override
@@ -106,13 +107,8 @@ class _MeterListState extends ConsumerState<_MeterList> {
   @override
   Widget build(BuildContext context) {
     final query = _search.text.trim().toLowerCase();
-    final entries = widget.meters
-        .map((meter) {
-          final readings =
-              ref.watch(readingsForMeterProvider(meter.id)).value ?? const [];
-          return _MeterListEntry(meter: meter, readings: readings);
-        })
-        .where((entry) => entry.matches(query))
+    final entries = widget.items
+        .where((entry) => _matches(entry, query))
         .toList();
     entries.sort(
       (left, right) => switch (_sort) {
@@ -126,94 +122,112 @@ class _MeterListState extends ConsumerState<_MeterList> {
       },
     );
 
-    return ListView(
+    return ListView.builder(
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-      children: [
-        Text(
-          'Deine Zähler',
-          style: Theme.of(
-            context,
-          ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Fotografieren, lokal erkennen und nachvollziehbar dokumentieren.',
-          style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 16),
-        TextField(
-          controller: _search,
-          decoration: InputDecoration(
-            labelText: 'Zähler suchen',
-            hintText: 'Name, Art, Nummer, Standort oder Einheit',
-            prefixIcon: const Icon(Icons.search),
-            suffixIcon: query.isEmpty
-                ? null
-                : IconButton(
-                    tooltip: 'Suche löschen',
-                    onPressed: () {
-                      _search.clear();
-                      setState(() {});
-                    },
-                    icon: const Icon(Icons.clear),
-                  ),
-          ),
-          textInputAction: TextInputAction.search,
-          onChanged: (_) => setState(() {}),
-          onTapOutside: (_) => FocusScope.of(context).unfocus(),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                query.isEmpty
-                    ? '${entries.length} Zähler'
-                    : '${entries.length} Treffer',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+      itemCount: entries.isEmpty ? 1 : entries.length + 1,
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Deine Zähler',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Fotografieren, lokal erkennen und nachvollziehbar dokumentieren.',
+                style: TextStyle(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
-            ),
-            MenuAnchor(
-              builder: (context, controller, _) => OutlinedButton.icon(
-                onPressed: () =>
-                    controller.isOpen ? controller.close() : controller.open(),
-                icon: const Icon(Icons.sort, size: 19),
-                label: Text(_sort.label),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _search,
+                decoration: InputDecoration(
+                  labelText: 'Zähler suchen',
+                  hintText: 'Name, Art, Nummer, Standort oder Einheit',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: query.isEmpty
+                      ? null
+                      : IconButton(
+                          tooltip: 'Suche löschen',
+                          onPressed: () {
+                            _search.clear();
+                            setState(() {});
+                          },
+                          icon: const Icon(Icons.clear),
+                        ),
+                ),
+                textInputAction: TextInputAction.search,
+                onChanged: (_) => setState(() {}),
+                onTapOutside: (_) => FocusScope.of(context).unfocus(),
               ),
-              menuChildren: [
-                for (final option in _MeterSort.values)
-                  MenuItemButton(
-                    leadingIcon: option == _sort
-                        ? const Icon(Icons.check)
-                        : const SizedBox(width: 24),
-                    onPressed: () => setState(() => _sort = option),
-                    child: Text(option.label),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      query.isEmpty
+                          ? '${entries.length} Zähler'
+                          : '${entries.length} Treffer',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                   ),
-              ],
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        if (entries.isEmpty)
-          const _NoSearchResults()
-        else
-          for (final entry in entries)
-            _MeterCard(
-              meter: entry.meter,
-              readings: entry.readings,
-              reminderStatus: widget.reminderStatuses[entry.meter.id],
-              onTap: () => _openMeter(
-                entry.meter.id,
-                widget.reminderStatuses[entry.meter.id],
+                  MenuAnchor(
+                    builder: (context, controller, _) => OutlinedButton.icon(
+                      onPressed: () => controller.isOpen
+                          ? controller.close()
+                          : controller.open(),
+                      icon: const Icon(Icons.sort, size: 19),
+                      label: Text(_sort.label),
+                    ),
+                    menuChildren: [
+                      for (final option in _MeterSort.values)
+                        MenuItemButton(
+                          leadingIcon: option == _sort
+                              ? const Icon(Icons.check)
+                              : const SizedBox(width: 24),
+                          onPressed: () => setState(() => _sort = option),
+                          child: Text(option.label),
+                        ),
+                    ],
+                  ),
+                ],
               ),
-            ),
-      ],
+              const SizedBox(height: 12),
+              if (entries.isEmpty) const _NoSearchResults(),
+            ],
+          );
+        }
+        final entry = entries[index - 1];
+        return _MeterCard(
+          item: entry,
+          reminderStatus: widget.reminderStatuses[entry.meter.id],
+          onTap: () => _openMeter(
+            entry.meter.id,
+            widget.reminderStatuses[entry.meter.id],
+          ),
+        );
+      },
     );
+  }
+
+  bool _matches(MeterDashboardItem entry, String query) {
+    if (query.isEmpty) return true;
+    return [
+      entry.meter.label,
+      entry.meter.type.label,
+      entry.meter.meterNumber,
+      entry.meter.location,
+      entry.meter.unit,
+      if (entry.latestValue != null) entry.latestValue!.displayText,
+    ].any((value) => value.toLowerCase().contains(query));
   }
 
   Future<void> _openMeter(
@@ -233,62 +247,27 @@ class _MeterListState extends ConsumerState<_MeterList> {
   }
 }
 
-class _MeterListEntry {
-  const _MeterListEntry({required this.meter, required this.readings});
-
-  final Meter meter;
-  final List<MeterReading> readings;
-
-  MeterReading? get latestReading {
-    if (readings.isEmpty) return null;
-    return readings.reduce(
-      (left, right) => left.capturedAt.isAfter(right.capturedAt) ? left : right,
-    );
-  }
-
-  DateTime get lastEdited => readings.fold<DateTime>(
-    meter.updatedAt,
-    (latest, reading) =>
-        reading.updatedAt.isAfter(latest) ? reading.updatedAt : latest,
-  );
-
-  bool matches(String query) {
-    if (query.isEmpty) return true;
-    final latest = latestReading;
-    return [
-      meter.label,
-      meter.type.label,
-      meter.meterNumber,
-      meter.location,
-      meter.unit,
-      if (latest != null) latest.value.displayText,
-    ].any((value) => value.toLowerCase().contains(query));
-  }
-}
-
 class _MeterCard extends StatelessWidget {
   const _MeterCard({
-    required this.meter,
-    required this.readings,
+    required this.item,
     required this.onTap,
     this.reminderStatus,
   });
 
-  final Meter meter;
-  final List<MeterReading> readings;
+  final MeterDashboardItem item;
   final ReminderStatus? reminderStatus;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final entry = _MeterListEntry(meter: meter, readings: readings);
-    final latest = entry.latestReading;
+    final meter = item.meter;
     final color = meterColor(meter.type);
     final reminder = meter.reminder;
     final nextReminder = reminder == null
         ? null
         : nextReminderDate(reminder, DateTime.now());
     return Card(
+      key: ValueKey('dashboard-meter-${meter.id}'),
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
@@ -328,9 +307,9 @@ class _MeterCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      latest == null
+                      item.latestValue == null
                           ? 'Noch keine Ablesung'
-                          : '${latest.value.displayText} ${latest.meter.unit}',
+                          : '${item.latestValue!.displayText} ${item.latestUnit ?? meter.unit}',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         color: color,
                         fontWeight: FontWeight.w800,
@@ -338,7 +317,7 @@ class _MeterCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Zuletzt bearbeitet: ${formatDateTime(entry.lastEdited)}',
+                      'Zuletzt bearbeitet: ${formatDateTime(item.lastEdited)}',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),

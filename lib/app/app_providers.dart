@@ -14,7 +14,9 @@ import '../features/evidence/application/evidence_report_service.dart';
 import '../features/backup/application/encrypted_backup_service.dart';
 import '../features/evidence/domain/evidence_export.dart';
 import '../features/meters/application/meter_services.dart';
+import '../features/meters/data/dashboard_repository_factory.dart';
 import '../features/meters/domain/meter.dart';
+import '../features/meters/domain/meter_dashboard_item.dart';
 import '../features/meters/domain/meter_reading.dart';
 import '../features/meters/domain/meter_repositories.dart';
 
@@ -34,6 +36,13 @@ final meterReadingRepositoryProvider = Provider<MeterReadingRepository>(
 
 final evidenceExportRepositoryProvider = Provider<EvidenceExportRepository>(
   (ref) => ref.watch(persistenceBundleProvider).exports,
+);
+
+final meterDashboardRepositoryProvider = Provider<MeterDashboardRepository>(
+  (ref) => createMeterDashboardRepository(
+    meters: ref.watch(meterRepositoryProvider),
+    readings: ref.watch(meterReadingRepositoryProvider),
+  ),
 );
 
 final integrityServiceProvider = Provider<IntegrityService>(
@@ -106,6 +115,10 @@ final metersProvider = StreamProvider<List<Meter>>(
   (ref) => ref.watch(meterRepositoryProvider).watchAll(),
 );
 
+final meterDashboardItemsProvider = StreamProvider<List<MeterDashboardItem>>(
+  (ref) => ref.watch(meterDashboardRepositoryProvider).watchAll(),
+);
+
 final reminderStatusChangesProvider = StreamProvider<int>(
   (ref) => ref.watch(meterReminderRepositoryProvider).statusChanges,
 );
@@ -114,10 +127,10 @@ final reminderStatusesProvider = FutureProvider<Map<String, ReminderStatus>>((
   ref,
 ) async {
   ref.watch(reminderStatusChangesProvider);
-  final meters = await ref.watch(metersProvider.future);
+  final dashboardItems = await ref.watch(meterDashboardItemsProvider.future);
   return ref
       .watch(meterReminderRepositoryProvider)
-      .loadStatuses(meters.map((meter) => meter.id));
+      .loadStatuses(dashboardItems.map((item) => item.meter.id));
 });
 
 final meterByIdProvider = FutureProvider.family<Meter?, String>(

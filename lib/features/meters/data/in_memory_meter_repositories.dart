@@ -2,6 +2,7 @@ import 'dart:async';
 
 import '../../evidence/domain/evidence_export.dart';
 import '../domain/meter.dart';
+import '../domain/meter_dashboard_item.dart';
 import '../domain/meter_reading.dart';
 import '../domain/meter_repositories.dart';
 
@@ -45,6 +46,14 @@ class InMemoryMeterReadingRepository implements MeterReadingRepository {
   final Map<String, MeterReading> _items = {};
   final Map<String, List<ReadingRevision>> _revisions = {};
   final StreamController<void> _changes = StreamController.broadcast();
+
+  @override
+  Stream<List<MeterReading>> watchAll() async* {
+    yield _items.values.toList();
+    await for (final _ in _changes.stream) {
+      yield _items.values.toList();
+    }
+  }
 
   @override
   Stream<List<MeterReading>> watchForMeter(String meterId) async* {
@@ -102,6 +111,80 @@ class InMemoryMeterReadingRepository implements MeterReadingRepository {
   }
 
   Future<void> dispose() => _changes.close();
+}
+
+class CombinedMeterDashboardRepository implements MeterDashboardRepository {
+  const CombinedMeterDashboardRepository({
+    required this.meters,
+    required this.readings,
+  });
+
+  final MeterRepository meters;
+  final MeterReadingRepository readings;
+
+  @override
+  Stream<List<MeterDashboardItem>> watchAll() {
+    late final StreamController<List<MeterDashboardItem>> output;
+    StreamSubscription<List<Meter>>? meterSubscription;
+    StreamSubscription<List<MeterReading>>? readingSubscription;
+    List<Meter>? meterItems;
+    List<MeterReading>? readingItems;
+
+    void emit() {
+      final currentMeters = meterItems;
+      final currentReadings = readingItems;
+      if (currentMeters == null || currentReadings == null) return;
+      output.add(_dashboardItems(currentMeters, currentReadings));
+    }
+
+    output = StreamController<List<MeterDashboardItem>>(
+      onListen: () {
+        meterSubscription = meters.watchAll().listen((items) {
+          meterItems = items;
+          emit();
+        }, onError: output.addError);
+        readingSubscription = readings.watchAll().listen((items) {
+          readingItems = items;
+          emit();
+        }, onError: output.addError);
+      },
+      onCancel: () async {
+        await meterSubscription?.cancel();
+        await readingSubscription?.cancel();
+      },
+    );
+    return output.stream;
+  }
+
+  static List<MeterDashboardItem> _dashboardItems(
+    List<Meter> meters,
+    List<MeterReading> readings,
+  ) {
+    final latestByMeter = <String, MeterReading>{};
+    final lastEditedByMeter = <String, DateTime>{};
+    for (final reading in readings) {
+      final latest = latestByMeter[reading.meterId];
+      if (latest == null || reading.capturedAt.isAfter(latest.capturedAt)) {
+        latestByMeter[reading.meterId] = reading;
+      }
+      final lastEdited = lastEditedByMeter[reading.meterId];
+      if (lastEdited == null || reading.updatedAt.isAfter(lastEdited)) {
+        lastEditedByMeter[reading.meterId] = reading.updatedAt;
+      }
+    }
+    return [
+      for (final meter in meters)
+        MeterDashboardItem(
+          meter: meter,
+          latestValue: latestByMeter[meter.id]?.value,
+          latestUnit: latestByMeter[meter.id]?.meter.unit,
+          lastEdited:
+              (lastEditedByMeter[meter.id]?.isAfter(meter.updatedAt) ?? false)
+              ? lastEditedByMeter[meter.id]!
+              : meter.updatedAt,
+        ),
+    ];
+  }
 }
 
 class InMemoryEvidenceExportRepository implements EvidenceExportRepository {

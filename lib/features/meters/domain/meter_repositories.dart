@@ -1,5 +1,6 @@
 import '../../evidence/domain/evidence_export.dart';
 import 'meter.dart';
+import 'meter_dashboard_item.dart';
 import 'meter_reading.dart';
 
 abstract interface class MeterRepository {
@@ -11,6 +12,7 @@ abstract interface class MeterRepository {
 }
 
 abstract interface class MeterReadingRepository {
+  Stream<List<MeterReading>> watchAll();
   Stream<List<MeterReading>> watchForMeter(String meterId);
   Future<List<MeterReading>> loadAll();
   Future<List<MeterReading>> loadForMeter(String meterId);
@@ -23,6 +25,10 @@ abstract interface class MeterReadingRepository {
   Future<List<ReadingRevision>> loadRevisions(String readingId);
   Future<void> saveRevision(ReadingRevision revision);
   Future<void> delete(String id);
+}
+
+abstract interface class MeterDashboardRepository {
+  Stream<List<MeterDashboardItem>> watchAll();
 }
 
 abstract interface class EvidenceExportRepository {

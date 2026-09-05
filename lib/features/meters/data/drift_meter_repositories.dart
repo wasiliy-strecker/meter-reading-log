@@ -5,6 +5,7 @@ import 'package:drift/drift.dart';
 import '../../../core/persistence/app_database.dart';
 import '../../evidence/domain/evidence_export.dart';
 import '../domain/meter.dart';
+import '../domain/meter_dashboard_item.dart';
 import '../domain/meter_reading.dart';
 import '../domain/meter_repositories.dart';
 import '../domain/reading_value.dart';
@@ -96,6 +97,13 @@ class DriftMeterReadingRepository implements MeterReadingRepository {
   const DriftMeterReadingRepository(this.database);
 
   final AppDatabase database;
+
+  @override
+  Stream<List<MeterReading>> watchAll() {
+    final query = database.select(database.readingRecords)
+      ..orderBy([(row) => OrderingTerm.desc(row.capturedAtMillis)]);
+    return query.watch().map((rows) => rows.map(_readingFromRow).toList());
+  }
 
   @override
   Stream<List<MeterReading>> watchForMeter(String meterId) {
@@ -305,6 +313,114 @@ class DriftMeterReadingRepository implements MeterReadingRepository {
     );
   }
 }
+
+class DriftMeterDashboardRepository implements MeterDashboardRepository {
+  const DriftMeterDashboardRepository(this.database);
+
+  final AppDatabase database;
+
+  @override
+  Stream<List<MeterDashboardItem>> watchAll() {
+    return database
+        .customSelect(
+          _dashboardQuery,
+          readsFrom: {database.meterRecords, database.readingRecords},
+        )
+        .watch()
+        .map((rows) => rows.map(_fromRow).toList(growable: false));
+  }
+
+  MeterDashboardItem _fromRow(QueryRow row) {
+    final reminderJson = row.readNullable<String>('dashboard_reminder_json');
+    final meter = Meter(
+      id: row.read<String>('dashboard_meter_id'),
+      label: row.read<String>('dashboard_label'),
+      type: MeterType.values.byName(row.read<String>('dashboard_type')),
+      unit: row.read<String>('dashboard_unit'),
+      meterNumber: row.read<String>('dashboard_meter_number'),
+      location: row.read<String>('dashboard_location'),
+      createdAt: DateTime.fromMillisecondsSinceEpoch(
+        row.read<int>('dashboard_created_at_millis'),
+        isUtc: true,
+      ),
+      updatedAt: DateTime.fromMillisecondsSinceEpoch(
+        row.read<int>('dashboard_meter_updated_at_millis'),
+        isUtc: true,
+      ),
+      reminder: reminderJson == null
+          ? null
+          : ReadingReminderSchedule.fromJson(
+              jsonDecode(reminderJson) as Map<String, dynamic>,
+            ),
+    );
+    final latestDigits = row.readNullable<String>('dashboard_latest_digits');
+    final latestSnapshot = row.readNullable<String>(
+      'dashboard_latest_meter_snapshot_json',
+    );
+    final latestValue = latestDigits == null
+        ? null
+        : ReadingValue(
+            displayText: row.read<String>('dashboard_latest_display_value'),
+            digits: latestDigits,
+            scale: row.read<int>('dashboard_latest_scale'),
+          );
+    var latestUnit = meter.unit;
+    if (latestSnapshot != null) {
+      final snapshot = jsonDecode(latestSnapshot) as Map<String, dynamic>;
+      latestUnit = snapshot['unit'] as String? ?? meter.unit;
+    }
+    return MeterDashboardItem(
+      meter: meter,
+      latestValue: latestValue,
+      latestUnit: latestValue == null ? null : latestUnit,
+      lastEdited: DateTime.fromMillisecondsSinceEpoch(
+        row.read<int>('dashboard_last_edited_millis'),
+        isUtc: true,
+      ),
+    );
+  }
+}
+
+const _dashboardQuery = '''
+SELECT
+  meter.id AS dashboard_meter_id,
+  meter.label AS dashboard_label,
+  meter.type AS dashboard_type,
+  meter.unit AS dashboard_unit,
+  meter.meter_number AS dashboard_meter_number,
+  meter.location AS dashboard_location,
+  meter.created_at_millis AS dashboard_created_at_millis,
+  meter.updated_at_millis AS dashboard_meter_updated_at_millis,
+  meter.reminder_json AS dashboard_reminder_json,
+  latest.display_value AS dashboard_latest_display_value,
+  latest.value_digits AS dashboard_latest_digits,
+  latest.value_scale AS dashboard_latest_scale,
+  latest.meter_snapshot_json AS dashboard_latest_meter_snapshot_json,
+  MAX(
+    meter.updated_at_millis,
+    COALESCE(
+      (
+        SELECT MAX(history.updated_at_millis)
+        FROM reading_records AS history
+        WHERE history.meter_id = meter.id
+      ),
+      meter.updated_at_millis
+    )
+  ) AS dashboard_last_edited_millis
+FROM meter_records AS meter
+LEFT JOIN reading_records AS latest
+  ON latest.id = (
+    SELECT candidate.id
+    FROM reading_records AS candidate
+    WHERE candidate.meter_id = meter.id
+    ORDER BY
+      candidate.captured_at_millis DESC,
+      candidate.stored_at_millis DESC,
+      candidate.id DESC
+    LIMIT 1
+  )
+ORDER BY meter.label COLLATE NOCASE, meter.id
+''';
 
 class DriftEvidenceExportRepository implements EvidenceExportRepository {
   const DriftEvidenceExportRepository(this.database);

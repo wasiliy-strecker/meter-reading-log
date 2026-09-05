@@ -166,6 +166,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (!confirmed) return;
       final result = await service.restore(path, password);
       ref.invalidate(metersProvider);
+      ref.invalidate(meterDashboardItemsProvider);
       if (mounted) {
         _showMessage(
           '${result.meters} Zähler und ${result.readings} Ablesungen wiederhergestellt; ${result.skipped} neuere Einträge übersprungen.',

@@ -714,6 +714,49 @@ void main() {
     );
   });
 
+  testWidgets('dashboard lazily renders and searches 500 meters', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(430, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final meters = MemoryMeterRepository();
+    final readings = _CountingMemoryReadingRepository();
+    for (var index = 0; index < 500; index++) {
+      final id = 'large_$index';
+      meters.items[id] = _meter(
+        id: id,
+        label: 'Zähler ${index.toString().padLeft(4, '0')}',
+        type: MeterType.electricity,
+        location: 'Test',
+        updatedAt: DateTime.utc(2026, 9, 1),
+      );
+    }
+
+    await tester.pumpWidget(_testApp(meters: meters, readings: readings));
+    await tester.pumpAndSettle();
+
+    expect(find.text('500 Zähler'), findsOneWidget);
+    expect(readings.watchForMeterCalls, 0);
+    final renderedCards = find.byWidgetPredicate(
+      (widget) =>
+          widget.key is ValueKey<String> &&
+          (widget.key! as ValueKey<String>).value.startsWith(
+            'dashboard-meter-',
+          ),
+    );
+    expect(renderedCards.evaluate().length, lessThan(30));
+
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Zähler suchen'),
+      '0499',
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('1 Treffer'), findsOneWidget);
+    expect(find.text('Zähler 0499'), findsOneWidget);
+    expect(readings.watchForMeterCalls, 0);
+  });
+
   testWidgets(
     'dashboard card acknowledges active reminder and keeps trigger time',
     (tester) async {
@@ -790,6 +833,16 @@ void main() {
       expect(nextReminder, findsOneWidget);
     },
   );
+}
+
+class _CountingMemoryReadingRepository extends MemoryReadingRepository {
+  int watchForMeterCalls = 0;
+
+  @override
+  Stream<List<MeterReading>> watchForMeter(String meterId) {
+    watchForMeterCalls += 1;
+    return super.watchForMeter(meterId);
+  }
 }
 
 Widget _testApp({

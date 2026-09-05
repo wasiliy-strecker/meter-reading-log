@@ -132,6 +132,9 @@ class MemoryReadingRepository implements MeterReadingRepository {
   final Map<String, List<ReadingRevision>> revisions = {};
 
   @override
+  Stream<List<MeterReading>> watchAll() => Stream.value(items.values.toList());
+
+  @override
   Future<void> delete(String id) async {
     items.remove(id);
     revisions.remove(id);

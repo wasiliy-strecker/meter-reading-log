@@ -2803,6 +2803,14 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   );
   late final $EvidenceExportRecordsTable evidenceExportRecords =
       $EvidenceExportRecordsTable(this);
+  late final Index readingMeterCapturedIdx = Index(
+    'reading_meter_captured_idx',
+    'CREATE INDEX reading_meter_captured_idx ON reading_records (meter_id, captured_at_millis, stored_at_millis)',
+  );
+  late final Index readingMeterUpdatedIdx = Index(
+    'reading_meter_updated_idx',
+    'CREATE INDEX reading_meter_updated_idx ON reading_records (meter_id, updated_at_millis)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2812,6 +2820,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     readingRecords,
     revisionRecords,
     evidenceExportRecords,
+    readingMeterCapturedIdx,
+    readingMeterUpdatedIdx,
   ];
 }
 

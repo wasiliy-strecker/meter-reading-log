@@ -25,6 +25,14 @@ class MeterRecords extends Table {
 }
 
 @DataClassName('StoredReadingRecord')
+@TableIndex(
+  name: 'reading_meter_captured_idx',
+  columns: {#meterId, #capturedAtMillis, #storedAtMillis},
+)
+@TableIndex(
+  name: 'reading_meter_updated_idx',
+  columns: {#meterId, #updatedAtMillis},
+)
 class ReadingRecords extends Table {
   TextColumn get id => text()();
   TextColumn get meterId => text()();
@@ -97,7 +105,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.withExecutor(super.executor);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -117,6 +125,17 @@ class AppDatabase extends _$AppDatabase {
         await migrator.addColumn(
           evidenceExportRecords,
           evidenceExportRecords.photoMode,
+        );
+      }
+      if (from < 4) {
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS reading_meter_captured_idx '
+          'ON reading_records '
+          '(meter_id, captured_at_millis, stored_at_millis)',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS reading_meter_updated_idx '
+          'ON reading_records (meter_id, updated_at_millis)',
         );
       }
     },
