@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 Future<T> runWithPdfExportProgress<T>(
@@ -6,16 +8,22 @@ Future<T> runWithPdfExportProgress<T>(
   required Future<T> Function() operation,
 }) async {
   BuildContext? dialogContext;
+  final presented = Completer<void>();
   final dialogClosed = showDialog<void>(
     context: context,
     barrierDismissible: false,
     builder: (context) {
       dialogContext = context;
-      return PdfExportProgressDialog(description: description);
+      return PdfExportProgressDialog(
+        description: description,
+        onPresented: () {
+          if (!presented.isCompleted) presented.complete();
+        },
+      );
     },
   );
 
-  await WidgetsBinding.instance.endOfFrame;
+  await presented.future;
   try {
     return await operation();
   } finally {
@@ -27,10 +35,29 @@ Future<T> runWithPdfExportProgress<T>(
   }
 }
 
-class PdfExportProgressDialog extends StatelessWidget {
-  const PdfExportProgressDialog({super.key, required this.description});
+class PdfExportProgressDialog extends StatefulWidget {
+  const PdfExportProgressDialog({
+    super.key,
+    required this.description,
+    this.onPresented,
+  });
 
   final String description;
+  final VoidCallback? onPresented;
+
+  @override
+  State<PdfExportProgressDialog> createState() =>
+      _PdfExportProgressDialogState();
+}
+
+class _PdfExportProgressDialogState extends State<PdfExportProgressDialog> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.onPresented?.call();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -53,7 +80,7 @@ class PdfExportProgressDialog extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(description, textAlign: TextAlign.center),
+              Text(widget.description, textAlign: TextAlign.center),
               const SizedBox(height: 20),
               LinearProgressIndicator(
                 key: const ValueKey('pdf-export-progress'),
