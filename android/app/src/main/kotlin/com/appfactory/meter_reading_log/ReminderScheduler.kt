@@ -204,23 +204,61 @@ internal object ReminderNotifier {
         }
     }
 
-    fun showTest(context: Context) {
-        if (!notificationsEnabled(context)) return
+    fun showTest(
+        context: Context,
+        meterId: String?,
+        label: String,
+        meterType: String,
+        meterTypeLabel: String,
+        latestValue: String?,
+        latestUnit: String?,
+        punctual: Boolean,
+    ): Boolean {
+        if (!notificationsEnabled(context)) return false
         ensureChannels(context)
-        val notification = NotificationCompat.Builder(context, alarmChannelId)
-            .setSmallIcon(R.drawable.ic_stat_meter)
-            .setContentTitle("Test-Erinnerung")
-            .setContentText("So klingt „Pünktlich mit Ton“.")
+        val latestReading = if (!latestValue.isNullOrBlank() && !latestUnit.isNullOrBlank()) {
+            "Letzter Stand: $latestValue $latestUnit"
+        } else {
+            "Noch keine Ablesung"
+        }
+        val target = if (meterId.isNullOrBlank()) "die App" else "die Zählerkarte"
+        val notification = NotificationCompat.Builder(
+            context,
+            if (punctual) alarmChannelId else normalChannelId,
+        )
+            .setSmallIcon(notificationIcon(meterType))
+            .setColor(notificationColor(meterType))
+            .setContentTitle("Test: $meterTypeLabel · $label")
+            .setContentText(latestReading)
+            .setStyle(
+                NotificationCompat.BigTextStyle().bigText(
+                    "$latestReading\nDas ist eine Test-Erinnerung. Tippen öffnet $target.",
+                ),
+            )
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setCategory(
+                if (punctual) {
+                    NotificationCompat.CATEGORY_ALARM
+                } else {
+                    NotificationCompat.CATEGORY_REMINDER
+                },
+            )
             .setAutoCancel(true)
             .setTimeoutAfter(10_000L)
+            .setContentIntent(
+                if (meterId.isNullOrBlank()) {
+                    openAppIntent(context)
+                } else {
+                    openMeterIntent(context, meterId)
+                },
+            )
             .build()
         context.getSystemService(NotificationManager::class.java).notify(
             testTag,
             testNotificationId,
             notification,
         )
+        return true
     }
 
     fun acknowledge(context: Context, meterId: String) {
@@ -286,6 +324,17 @@ internal object ReminderNotifier {
         return PendingIntent.getActivity(
             context,
             stableRequestCode(meterId, 1),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+    }
+
+    private fun openAppIntent(context: Context): PendingIntent {
+        val intent = Intent(context, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        return PendingIntent.getActivity(
+            context,
+            stableRequestCode(testTag, 1),
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )

@@ -99,10 +99,7 @@ class MainActivity : FlutterActivity() {
             "cancel" -> cancel(call, result)
             "acknowledge" -> acknowledge(call, result)
             "getStatuses" -> getStatuses(call, result)
-            "showAlarmTest" -> {
-                ReminderNotifier.showTest(this)
-                result.success(null)
-            }
+            "showReminderTest" -> showReminderTest(call, result)
             "consumeInitialMeterId" -> result.success(consumeMeterId(intent))
             else -> result.notImplemented()
         }
@@ -229,6 +226,33 @@ class MainActivity : FlutterActivity() {
             )
         }
         result.success(statuses)
+    }
+
+    private fun showReminderTest(call: MethodCall, result: MethodChannel.Result) {
+        val arguments = call.arguments as? Map<*, *>
+        val label = arguments?.get("label") as? String
+        val meterType = arguments?.get("meterType") as? String
+        val meterTypeLabel = arguments?.get("meterTypeLabel") as? String
+        val deliveryMode = arguments?.get("deliveryMode") as? String
+        if (
+            label.isNullOrBlank() || meterType.isNullOrBlank() ||
+            meterTypeLabel.isNullOrBlank() || deliveryMode.isNullOrBlank()
+        ) {
+            result.error("invalid_test", "Testdaten sind unvollständig.", null)
+            return
+        }
+        result.success(
+            ReminderNotifier.showTest(
+                context = this,
+                meterId = arguments["meterId"] as? String,
+                label = label,
+                meterType = meterType,
+                meterTypeLabel = meterTypeLabel,
+                latestValue = arguments["latestValue"] as? String,
+                latestUnit = arguments["latestUnit"] as? String,
+                punctual = deliveryMode == "punctualWithSound",
+            ),
+        )
     }
 
     private fun meterIdFrom(call: MethodCall): String? {
