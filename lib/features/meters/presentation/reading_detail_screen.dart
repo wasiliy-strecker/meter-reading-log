@@ -10,6 +10,9 @@ import '../../../app/widgets/confirm_dialog.dart';
 import '../../../app/widgets/pdf_export_progress_dialog.dart';
 import '../../../core/integrity/integrity_copy.dart';
 import '../../../core/utils/formatters.dart';
+import '../../evidence/application/evidence_report_service.dart';
+import '../../evidence/domain/evidence_export.dart';
+import '../../evidence/presentation/evidence_export_card.dart';
 import '../application/reading_revision_photos.dart';
 import '../domain/meter.dart';
 import '../domain/meter_reading.dart';
@@ -48,6 +51,35 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
 
   Widget _buildContent(MeterReading reading) {
     final revisions = ref.watch(revisionsForReadingProvider(reading.id));
+    final exportsAsync = ref.watch(evidenceForMeterProvider(reading.meterId));
+    final singleExports = [
+      ...?exportsAsync.value?.where(
+        (export) =>
+            export.kind == EvidenceExportKind.singleReading &&
+            export.readingIds.contains(reading.id),
+      ),
+    ]..sort((left, right) => right.createdAt.compareTo(left.createdAt));
+    final manifestAsync = singleExports.isEmpty
+        ? const AsyncValue<String?>.data(null)
+        : ref.watch(singleReadingEvidenceManifestProvider(reading.id));
+    final availableFiles = <String, bool>{
+      for (final export in singleExports)
+        export.id: File(export.filePath).existsSync(),
+    };
+    final currentManifest = manifestAsync.value;
+    final matchingExports = currentManifest == null
+        ? const <EvidenceExportRecord>[]
+        : singleExports
+              .where((export) => export.manifestSha256 == currentManifest)
+              .toList(growable: false);
+    final checkingCurrentEvidence =
+        exportsAsync.isLoading || manifestAsync.isLoading;
+    final evidenceCheckFailed = exportsAsync.hasError || manifestAsync.hasError;
+    final hasCurrentEvidence = matchingExports.any(
+      (export) => availableFiles[export.id] == true,
+    );
+    final canCreateEvidence =
+        !checkingCurrentEvidence && !evidenceCheckFailed && !hasCurrentEvidence;
     return Scaffold(
       appBar: AppBar(title: const Text('Ablesung')),
       body: ListView(
@@ -104,14 +136,64 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
           const SizedBox(height: 12),
           _CorrectionHistoryCard(reading: reading, revisions: revisions),
           const SizedBox(height: 20),
-          IgnorePointer(
-            ignoring: _exporting,
-            child: FilledButton.icon(
-              onPressed: () => _export(reading),
-              icon: const Icon(Icons.picture_as_pdf_outlined),
-              label: const Text('Einzelnachweis als PDF'),
+          if (singleExports.isNotEmpty) ...[
+            Text(
+              'Gespeicherte Einzelnachweise',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 8),
+            for (final export in singleExports)
+              EvidenceExportCard(
+                export: export,
+                title: 'Einzelnachweis',
+                detail:
+                    'Zählerstand: ${reading.value.displayText} ${reading.meter.unit}',
+                fileAvailable: availableFiles[export.id] == true,
+                onTap: availableFiles[export.id] != true
+                    ? null
+                    : () => _openExport(export),
+              ),
+            const SizedBox(height: 10),
+          ],
+          FilledButton.icon(
+            onPressed: canCreateEvidence && !_exporting
+                ? () => _export(reading)
+                : null,
+            icon: Icon(
+              hasCurrentEvidence
+                  ? Icons.check_circle_outline
+                  : checkingCurrentEvidence
+                  ? Icons.hourglass_top_rounded
+                  : Icons.picture_as_pdf_outlined,
+            ),
+            label: Text(
+              hasCurrentEvidence
+                  ? 'Aktueller Einzelnachweis bereits erstellt'
+                  : checkingCurrentEvidence
+                  ? 'Vorhandene Nachweise werden geprüft'
+                  : 'Einzelnachweis als PDF erstellen',
             ),
           ),
+          if (hasCurrentEvidence) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Seit diesem Nachweis wurde die Ablesung nicht geändert. Nach einer Korrektur kannst du einen neuen erstellen.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+          if (evidenceCheckFailed) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Die gespeicherten Nachweise konnten gerade nicht geprüft werden.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ],
           const SizedBox(height: 10),
           const _PdfPurposeCard(),
         ],
@@ -148,6 +230,24 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
     } finally {
       if (mounted && _exporting) setState(() => _exporting = false);
     }
+  }
+
+  Future<void> _openExport(EvidenceExportRecord record) async {
+    final file = File(record.filePath);
+    if (!await file.exists()) {
+      if (mounted) {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          AppSnackBar(message: 'Die gespeicherte PDF-Datei fehlt.'),
+        );
+      }
+      return;
+    }
+    final report = GeneratedEvidenceReport(
+      record: record,
+      bytes: await file.readAsBytes(),
+    );
+    if (mounted) await context.pushNamed('evidencePreview', extra: report);
   }
 
   Future<void> _delete(MeterReading reading) async {

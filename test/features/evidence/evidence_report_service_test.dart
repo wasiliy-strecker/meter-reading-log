@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:meter_reading_log/features/evidence/application/evidence_report_service.dart';
+import 'package:meter_reading_log/features/evidence/domain/evidence_export.dart';
 import 'package:meter_reading_log/features/meters/domain/meter.dart';
 import 'package:meter_reading_log/features/meters/domain/meter_reading.dart';
 import 'package:meter_reading_log/features/meters/domain/reading_value.dart';
@@ -68,6 +69,106 @@ void main() {
     final changed = await service.verify(report.record.filePath);
     expect(changed.status.name, 'changed');
   });
+
+  test(
+    'rejects a duplicate single-reading PDF for unchanged evidence',
+    () async {
+      final temp = await Directory.systemTemp.createTemp(
+        'duplicate_evidence_test_',
+      );
+      addTearDown(() => temp.delete(recursive: true));
+      final photo = File('${temp.path}/photo.jpg');
+      await photo.writeAsBytes(img.encodeJpg(img.Image(width: 20, height: 20)));
+      final repository = MemoryEvidenceExportRepository();
+      final service = EvidenceReportService(
+        exports: repository,
+        documentsDirectoryProvider: () async => temp,
+      );
+      final reading = _reading(photo.path);
+
+      await service.createSingle(reading: reading, revisions: const []);
+
+      await expectLater(
+        service.createSingle(reading: reading, revisions: const []),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            contains('bereits ein Einzelnachweis erstellt'),
+          ),
+        ),
+      );
+      expect(repository.items, hasLength(1));
+    },
+  );
+
+  test('a correction changes the single-reading evidence manifest', () async {
+    final reading = _reading('/tmp/photo.jpg');
+    final service = EvidenceReportService(
+      exports: MemoryEvidenceExportRepository(),
+    );
+    final before = await service.singleReadingManifestSha256(
+      reading: reading,
+      revisions: const [],
+    );
+    final after = await service.singleReadingManifestSha256(
+      reading: reading,
+      revisions: [
+        ReadingRevision(
+          id: 'revision_after_export',
+          readingId: reading.id,
+          changedAt: DateTime.utc(2026, 9, 5, 11),
+          reason: 'Zählerstand korrigiert',
+          changes: const {
+            'Zählerstand': ReadingChange(before: '00123,3', after: '00123,4'),
+          },
+        ),
+      ],
+    );
+
+    expect(after, isNot(before));
+  });
+
+  test(
+    'allows recreation when a matching single-reading PDF is missing',
+    () async {
+      final temp = await Directory.systemTemp.createTemp(
+        'missing_evidence_test_',
+      );
+      addTearDown(() => temp.delete(recursive: true));
+      final photo = File('${temp.path}/photo.jpg');
+      await photo.writeAsBytes(img.encodeJpg(img.Image(width: 20, height: 20)));
+      final repository = MemoryEvidenceExportRepository();
+      final service = EvidenceReportService(
+        exports: repository,
+        documentsDirectoryProvider: () async => temp,
+      );
+      final reading = _reading(photo.path);
+      final manifest = await service.singleReadingManifestSha256(
+        reading: reading,
+        revisions: const [],
+      );
+      repository.items['missing'] = EvidenceExportRecord(
+        id: 'missing',
+        meterId: reading.meterId,
+        kind: EvidenceExportKind.singleReading,
+        readingIds: [reading.id],
+        createdAt: DateTime.utc(2026, 9, 5, 10),
+        fileName: 'missing.pdf',
+        filePath: '${temp.path}/missing.pdf',
+        pdfSha256: 'c' * 64,
+        manifestSha256: manifest,
+      );
+
+      final report = await service.createSingle(
+        reading: reading,
+        revisions: const [],
+      );
+
+      expect(await File(report.record.filePath).exists(), isTrue);
+      expect(repository.items, hasLength(2));
+    },
+  );
 
   test('creates a PDF that includes future-at-storage evidence', () async {
     final temp = await Directory.systemTemp.createTemp('future_evidence_test_');
