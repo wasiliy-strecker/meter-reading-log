@@ -286,7 +286,7 @@ class _PdfPurposeCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.fact_check_outlined, color: colors.primary),
+                Icon(Icons.description_outlined, color: colors.primary),
                 const SizedBox(width: 10),
                 const Expanded(
                   child: Text(
@@ -426,33 +426,6 @@ class _CorrectionHistoryCard extends StatelessWidget {
               ),
               data: (items) =>
                   _RevisionList(revisions: items, reading: reading),
-            ),
-            const SizedBox(height: 4),
-            Theme(
-              data: Theme.of(
-                context,
-              ).copyWith(dividerColor: Colors.transparent),
-              child: ExpansionTile(
-                tilePadding: EdgeInsets.zero,
-                childrenPadding: const EdgeInsets.only(bottom: 4),
-                leading: const Icon(Icons.fingerprint),
-                title: const Text(technicalChecksTitle),
-                children: [
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: SelectableText(
-                      'Prüfwert des Fotos (SHA-256)\n${reading.photoSha256}',
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: SelectableText(
-                      'Prüfwert der Ablesung (SHA-256)\n${reading.manifestSha256}',
-                    ),
-                  ),
-                ],
-              ),
             ),
           ],
         ),

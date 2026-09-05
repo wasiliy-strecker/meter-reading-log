@@ -449,22 +449,15 @@ void main() {
     expect(tester.widget<FilledButton>(saveButton).onPressed, isNotNull);
   });
 
-  testWidgets('system back traverses nested settings screens', (tester) async {
+  testWidgets('system back returns from settings', (tester) async {
     await tester.pumpWidget(_testApp());
     await tester.pumpAndSettle();
 
     await tester.tap(find.byTooltip('Einstellungen'));
     await tester.pumpAndSettle();
     expect(find.text('Einstellungen'), findsOneWidget);
-
-    await tester.tap(find.text('PDF auf Änderungen prüfen'));
-    await tester.pumpAndSettle();
-    expect(find.text('PDF auswählen'), findsOneWidget);
-
-    expect(await tester.binding.handlePopRoute(), isTrue);
-    await tester.pumpAndSettle();
-    expect(find.text('Einstellungen'), findsOneWidget);
-    expect(find.text('PDF auswählen'), findsNothing);
+    expect(find.text('PDF auf Änderungen prüfen'), findsNothing);
+    expect(find.text('Nachweise'), findsNothing);
 
     expect(await tester.binding.handlePopRoute(), isTrue);
     await tester.pumpAndSettle();

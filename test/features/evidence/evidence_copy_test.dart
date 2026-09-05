@@ -3,32 +3,25 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:meter_reading_log/core/integrity/integrity_copy.dart';
 import 'package:meter_reading_log/features/backup/presentation/settings_screen.dart';
-import 'package:meter_reading_log/features/evidence/presentation/evidence_verify_screen.dart';
 
 void main() {
-  testWidgets('settings describes PDF verification without technical jargon', (
-    tester,
-  ) async {
+  testWidgets('settings no longer exposes PDF verification', (tester) async {
     await tester.pumpWidget(
       const ProviderScope(child: MaterialApp(home: SettingsScreen())),
     );
 
-    expect(find.text(pdfVerificationTitle), findsOneWidget);
-    expect(
-      find.textContaining('ob eine von dieser App erstellte PDF verändert'),
-      findsOneWidget,
-    );
+    expect(find.text('Nachweise'), findsNothing);
+    expect(find.text('PDF auf Änderungen prüfen'), findsNothing);
+    expect(find.textContaining('verändert wurde'), findsNothing);
   });
 
-  testWidgets('verification screen explains comparison and its limitation', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      const ProviderScope(child: MaterialApp(home: EvidenceVerifyScreen())),
-    );
-
-    expect(find.text(pdfVerificationTitle), findsNWidgets(2));
-    expect(find.text(pdfVerificationText), findsOneWidget);
-    expect(find.text(privateDocumentationText), findsOneWidget);
+  test('PDF purpose copy stays user-facing and non-technical', () {
+    expect(pdfPurposeText, contains('Speichern, Drucken oder Teilen'));
+    expect(historyPdfPurposeText, contains('alle Ablesungen'));
+    for (final copy in [pdfPurposeText, historyPdfPurposeText]) {
+      expect(copy, isNot(contains('Prüfwert')));
+      expect(copy, isNot(contains('SHA-256')));
+      expect(copy, isNot(contains('verändert')));
+    }
   });
 }
