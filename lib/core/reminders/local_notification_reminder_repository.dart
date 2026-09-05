@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import '../../features/meters/domain/meter.dart';
+import '../../features/meters/domain/meter_reading.dart';
 
 enum ReminderPermissionStatus { granted, denied, unknown, unsupported }
 
@@ -34,7 +35,7 @@ abstract interface class MeterReminderRepository {
 
   Future<bool> requestExactAlarmPermission();
 
-  Future<void> schedule(Meter meter);
+  Future<void> schedule(Meter meter, {MeterReading? latestReading});
 
   Future<void> cancel(String meterId);
 
@@ -145,7 +146,7 @@ class LocalNotificationReminderRepository implements MeterReminderRepository {
   }
 
   @override
-  Future<void> schedule(Meter meter) async {
+  Future<void> schedule(Meter meter, {MeterReading? latestReading}) async {
     await initialize();
     final schedule = meter.reminder;
     if (schedule == null) {
@@ -162,6 +163,9 @@ class LocalNotificationReminderRepository implements MeterReminderRepository {
       await _channel.invokeMethod<void>('schedule', {
         'meterId': meter.id,
         'label': meter.label,
+        'meterTypeLabel': meter.type.label,
+        'latestValue': latestReading?.value.displayText,
+        'latestUnit': latestReading?.meter.unit,
         'interval': schedule.interval.name,
         'day': schedule.day,
         'month': schedule.month,

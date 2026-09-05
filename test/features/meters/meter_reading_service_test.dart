@@ -13,13 +13,30 @@ void main() {
     'photo correction archives original and records integrity change',
     () async {
       final repository = MemoryReadingRepository();
+      final meters = MemoryMeterRepository();
       final photos = _TrackingPhotoRepository();
+      final reminders = NoopMeterReminderRepository();
       final service = MeterReadingService(
+        meters: meters,
         readings: repository,
         photos: photos,
-        reminders: NoopMeterReminderRepository(),
+        reminders: reminders,
       );
       final existing = _reading();
+      meters.items[existing.meterId] = Meter(
+        id: existing.meter.id,
+        label: existing.meter.label,
+        type: existing.meter.type,
+        unit: existing.meter.unit,
+        createdAt: DateTime.utc(2026, 8, 1),
+        updatedAt: DateTime.utc(2026, 8, 1),
+        reminder: const ReadingReminderSchedule(
+          interval: ReminderInterval.daily,
+          day: 1,
+          hour: 9,
+          minute: 0,
+        ),
+      );
       await repository.save(existing);
       final capturedAt = existing.capturedAt.toLocal();
 
@@ -51,6 +68,7 @@ void main() {
       expect(updated.photoHistory.single.sha256, 'a' * 64);
       expect(updated.manifestSha256, hasLength(64));
       expect(photos.deleted, isEmpty);
+      expect(reminders.scheduledLatestReadings.last?.id, updated.id);
 
       final revisions = await repository.loadRevisions(existing.id);
       expect(revisions, hasLength(1));
@@ -65,6 +83,7 @@ void main() {
         photos.deleted,
         containsAll(['/tmp/original.jpg', '/tmp/new.jpg']),
       );
+      expect(reminders.scheduledLatestReadings.last, isNull);
     },
   );
 }

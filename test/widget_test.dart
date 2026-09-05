@@ -559,6 +559,24 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Erinnern: täglich um 06:00 Uhr'), findsOneWidget);
+    final nextReminder = find.byKey(
+      const ValueKey('next-reminder-active_reminder'),
+    );
+    expect(nextReminder, findsOneWidget);
+    expect(
+      find.descendant(
+        of: nextReminder,
+        matching: find.text('Nächste Erinnerung'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: nextReminder,
+        matching: find.textContaining('06:00 Uhr'),
+      ),
+      findsOneWidget,
+    );
     expect(
       find.text('Letzte Erinnerung: 05.09.2026, 06:01 Uhr'),
       findsOneWidget,

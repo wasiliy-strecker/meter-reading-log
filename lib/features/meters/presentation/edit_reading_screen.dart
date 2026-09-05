@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/app_providers.dart';
 import '../../../app/widgets/app_snack_bar.dart';
+import '../../../app/widgets/confirm_dialog.dart';
 import '../../../core/files/meter_photo_repository.dart';
 import '../../../core/ocr/meter_ocr_repository.dart';
 import '../domain/meter_reading.dart';
@@ -62,6 +63,8 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
   bool _processingPhoto = false;
   bool _saving = false;
   bool _saved = false;
+  bool _discardDialogOpen = false;
+  bool _allowPop = false;
 
   @override
   void initState() {
@@ -110,8 +113,11 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
         parsed != null &&
         previous != null &&
         parsed.compareTo(previous.value) < 0;
-    return Scaffold(
-      appBar: AppBar(title: const Text('Ablesung korrigieren')),
+    final scaffold = Scaffold(
+      appBar: AppBar(
+        leading: BackButton(onPressed: _handleBack),
+        title: const Text('Ablesung korrigieren'),
+      ),
       body: Form(
         key: _formKey,
         child: ListView(
@@ -171,6 +177,7 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
               controller: _note,
               decoration: const InputDecoration(labelText: 'Notiz'),
               maxLines: 3,
+              onChanged: (_) => setState(() {}),
               onTapOutside: (_) => FocusScope.of(context).unfocus(),
             ),
             const SizedBox(height: 12),
@@ -181,6 +188,7 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
                 hintText: 'z. B. Tippfehler beim Bestätigen',
               ),
               maxLines: 2,
+              onChanged: (_) => setState(() {}),
               onTapOutside: (_) => FocusScope.of(context).unfocus(),
               validator: (value) => value == null || value.trim().isEmpty
                   ? 'Bitte den Korrekturgrund angeben.'
@@ -201,6 +209,60 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
         ),
       ),
     );
+    return PopScope<void>(
+      canPop:
+          _allowPop || (!_hasUnsavedChanges && !_processingPhoto && !_saving),
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _handleBack();
+      },
+      child: scaffold,
+    );
+  }
+
+  bool get _hasUnsavedChanges =>
+      _value.text.trim() != widget.reading.value.displayText ||
+      _note.text.trim() != widget.reading.note ||
+      _reason.text.trim().isNotEmpty ||
+      _capturedAt != widget.reading.capturedAt.toLocal() ||
+      _lowerReason != widget.reading.lowerReadingReason ||
+      _replacementPhoto != null;
+
+  Future<void> _handleBack() async {
+    if (_saving || _processingPhoto || _discardDialogOpen) return;
+    FocusScope.of(context).unfocus();
+    if (!_hasUnsavedChanges) {
+      _leaveForm();
+      return;
+    }
+
+    _discardDialogOpen = true;
+    final discard = await confirmDiscardChanges(
+      context,
+      title: 'Korrektur verwerfen?',
+      message:
+          'Deine Änderungen an dieser Ablesung wurden noch nicht gespeichert.',
+      discardLabel: 'Korrektur verwerfen',
+    );
+    _discardDialogOpen = false;
+    if (!mounted || !discard) return;
+    await _leaveWithoutGuard();
+  }
+
+  Future<void> _leaveWithoutGuard() async {
+    setState(() => _allowPop = true);
+    await WidgetsBinding.instance.endOfFrame;
+    if (mounted) _leaveForm();
+  }
+
+  void _leaveForm() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.goNamed(
+        'readingDetail',
+        pathParameters: {'id': widget.reading.id},
+      );
+    }
   }
 
   Widget _buildPhotoCorrection(BuildContext context) {
@@ -455,7 +517,7 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
     if (!confirmed || !mounted) return;
     setState(() => _saving = true);
     try {
-      final updated = await ref
+      await ref
           .read(meterReadingServiceProvider)
           .update(
             existing: widget.reading,
@@ -472,11 +534,7 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
       ref.invalidate(revisionsForReadingProvider(widget.reading.id));
       _saved = true;
       if (mounted) {
-        if (context.canPop()) {
-          context.pop();
-        } else {
-          context.goNamed('readingDetail', pathParameters: {'id': updated.id});
-        }
+        await _leaveWithoutGuard();
       }
     } catch (error) {
       if (mounted) {

@@ -5,6 +5,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/reminders/local_notification_reminder_repository.dart';
+import '../features/meters/domain/meter_reading.dart';
 import 'app_router.dart';
 import 'app_providers.dart';
 import 'app_theme.dart';
@@ -46,8 +47,19 @@ class _MeterReadingLogAppState extends ConsumerState<MeterReadingLogApp> {
   Future<void> _synchronizeReminders(MeterReminderRepository reminders) async {
     final meters = await ref.read(meterRepositoryProvider).loadAll();
     for (final meter in meters) {
-      if (meter.reminder != null) await reminders.schedule(meter);
+      if (meter.reminder == null) continue;
+      final readings = await ref
+          .read(meterReadingRepositoryProvider)
+          .loadForMeter(meter.id);
+      await reminders.schedule(meter, latestReading: _latestReading(readings));
     }
+  }
+
+  MeterReading? _latestReading(List<MeterReading> readings) {
+    if (readings.isEmpty) return null;
+    return readings.reduce(
+      (left, right) => left.capturedAt.isAfter(right.capturedAt) ? left : right,
+    );
   }
 
   void _openMeter(String meterId) {

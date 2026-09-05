@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/app_providers.dart';
 import '../../../app/widgets/app_snack_bar.dart';
+import '../../../app/widgets/confirm_dialog.dart';
 import '../../../core/files/meter_photo_repository.dart';
 import '../../../core/ocr/meter_ocr_repository.dart';
 import '../domain/meter.dart';
@@ -34,14 +35,19 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
   MeterOcrResult? _ocr;
   String _selectedCandidate = '';
   String? _selectedUnit;
-  DateTime _capturedAt = DateTime.now();
+  late final DateTime _initialCapturedAt;
+  late DateTime _capturedAt;
   LowerReadingReason? _lowerReason;
   bool _working = false;
   bool _saved = false;
+  bool _discardDialogOpen = false;
+  bool _allowPop = false;
 
   @override
   void initState() {
     super.initState();
+    _initialCapturedAt = DateTime.now();
+    _capturedAt = _initialCapturedAt;
     _photos = ref.read(meterPhotoCaptureRepositoryProvider);
     WidgetsBinding.instance.addPostFrameCallback((_) => _recoverLostCapture());
   }
@@ -85,8 +91,11 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
         previous != null &&
         parsed.compareTo(previous.value) < 0;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Ablesen / Fotografieren')),
+    final scaffold = Scaffold(
+      appBar: AppBar(
+        leading: BackButton(onPressed: _handleBack),
+        title: const Text('Ablesen / Fotografieren'),
+      ),
       body: Form(
         key: _formKey,
         child: ListView(
@@ -247,6 +256,7 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
                   hintText: 'Optional, z. B. Wohnungsübergabe',
                 ),
                 maxLines: 3,
+                onChanged: (_) => setState(() {}),
                 onTapOutside: (_) => FocusScope.of(context).unfocus(),
               ),
               const SizedBox(height: 22),
@@ -265,6 +275,56 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
         ),
       ),
     );
+    return PopScope<void>(
+      canPop: _allowPop || (!_hasUnsavedChanges && !_working),
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _handleBack();
+      },
+      child: scaffold,
+    );
+  }
+
+  bool get _hasUnsavedChanges =>
+      _photo != null ||
+      _value.text.trim().isNotEmpty ||
+      _note.text.trim().isNotEmpty ||
+      _selectedUnit != null ||
+      _capturedAt != _initialCapturedAt ||
+      _lowerReason != null;
+
+  Future<void> _handleBack() async {
+    if (_working || _discardDialogOpen) return;
+    FocusScope.of(context).unfocus();
+    if (!_hasUnsavedChanges) {
+      _leaveForm();
+      return;
+    }
+
+    _discardDialogOpen = true;
+    final discard = await confirmDiscardChanges(
+      context,
+      title: 'Ablesung verwerfen?',
+      message:
+          'Deine Ablesung und das ausgewählte Foto wurden noch nicht gespeichert.',
+      discardLabel: 'Ablesung verwerfen',
+    );
+    _discardDialogOpen = false;
+    if (!mounted || !discard) return;
+    await _leaveWithoutGuard();
+  }
+
+  Future<void> _leaveWithoutGuard() async {
+    setState(() => _allowPop = true);
+    await WidgetsBinding.instance.endOfFrame;
+    if (mounted) _leaveForm();
+  }
+
+  void _leaveForm() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.goNamed('meterDetail', pathParameters: {'id': widget.meterId});
+    }
   }
 
   MeterReading? _previousFor(
@@ -413,6 +473,7 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
         ref.invalidate(meterByIdProvider(meter.id));
       }
       _saved = true;
+      _allowPop = true;
       if (!mounted) return;
       context.pushReplacementNamed(
         'readingDetail',
