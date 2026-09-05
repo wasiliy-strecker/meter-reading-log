@@ -346,17 +346,19 @@ void main() {
     await tester.tap(find.text('Bearbeiten'));
     await tester.pumpAndSettle();
 
+    final savedButton = find.widgetWithText(FilledButton, 'Alles gespeichert');
+    expect(savedButton, findsOneWidget);
+    expect(savedButton.hitTestable(), findsOneWidget);
+    expect(tester.widget<FilledButton>(savedButton).onPressed, isNull);
+
+    final labelField = find.widgetWithText(TextFormField, 'Bezeichnung *');
+    await tester.enterText(labelField, 'Strom Hauptzähler');
+    await tester.pump();
     final saveButton = find.widgetWithText(
       FilledButton,
       'Änderungen speichern',
     );
     expect(saveButton, findsOneWidget);
-    expect(saveButton.hitTestable(), findsOneWidget);
-    expect(tester.widget<FilledButton>(saveButton).onPressed, isNull);
-
-    final labelField = find.widgetWithText(TextFormField, 'Bezeichnung *');
-    await tester.enterText(labelField, 'Strom Hauptzähler');
-    await tester.pump();
     expect(tester.widget<FilledButton>(saveButton).onPressed, isNotNull);
 
     expect(await tester.binding.handlePopRoute(), isTrue);
@@ -384,6 +386,60 @@ void main() {
 
     expect(find.text('Zähler bearbeiten'), findsNothing);
     expect(meters.items[meter.id]!.label, 'Strom Keller');
+  });
+
+  testWidgets('selecting minutely enables saving for a changed reminder', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(430, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final meter =
+        _meter(
+          id: 'daily_meter',
+          label: 'Strom täglich',
+          type: MeterType.electricity,
+          location: 'Keller',
+          updatedAt: DateTime.utc(2026, 9, 4),
+        ).copyWith(
+          reminder: const ReadingReminderSchedule(
+            interval: ReminderInterval.daily,
+            day: 1,
+            hour: 6,
+            minute: 0,
+          ),
+        );
+    final meters = MemoryMeterRepository()..items[meter.id] = meter;
+
+    await tester.pumpWidget(_testApp(meters: meters));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Strom täglich'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Bearbeiten'));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.widgetWithText(FilledButton, 'Alles gespeichert'),
+          )
+          .onPressed,
+      isNull,
+    );
+
+    final intervalField = find.byType(
+      DropdownButtonFormField<ReminderInterval>,
+    );
+    await tester.tap(intervalField);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Minütlich (Dev)').last);
+    await tester.pumpAndSettle();
+
+    final saveButton = find.widgetWithText(
+      FilledButton,
+      'Änderungen speichern',
+    );
+    expect(saveButton, findsOneWidget);
+    expect(tester.widget<FilledButton>(saveButton).onPressed, isNotNull);
   });
 
   testWidgets('system back traverses nested settings screens', (tester) async {

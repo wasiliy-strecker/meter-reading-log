@@ -428,8 +428,20 @@ class _MeterFormState extends ConsumerState<_MeterForm> {
                     dimension: 18,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Icon(Icons.save_outlined),
-            label: Text(editing ? 'Änderungen speichern' : 'Zähler speichern'),
+                : Icon(
+                    editing && !hasUnsavedChanges
+                        ? Icons.check_circle_outline
+                        : Icons.save_outlined,
+                  ),
+            label: Text(
+              _saving
+                  ? 'Wird gespeichert …'
+                  : editing && !hasUnsavedChanges
+                  ? 'Alles gespeichert'
+                  : editing
+                  ? 'Änderungen speichern'
+                  : 'Zähler speichern',
+            ),
           ),
         ),
       ),
