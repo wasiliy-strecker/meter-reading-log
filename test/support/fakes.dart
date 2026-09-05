@@ -30,6 +30,14 @@ class NoopMeterReminderRepository implements MeterReminderRepository {
   @override
   Future<void> acknowledge(String meterId) async {
     acknowledgedMeterIds.add(meterId);
+    final status = statuses[meterId];
+    if (status != null) {
+      statuses[meterId] = ReminderStatus(
+        meterId: meterId,
+        isNotificationActive: false,
+        lastTriggeredAt: status.lastTriggeredAt,
+      );
+    }
   }
 
   @override

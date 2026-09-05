@@ -612,67 +612,82 @@ void main() {
     );
   });
 
-  testWidgets('dashboard shows active reminder badge and last trigger time', (
-    tester,
-  ) async {
-    await tester.binding.setSurfaceSize(const Size(430, 1000));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    final meter =
-        _meter(
-          id: 'active_reminder',
-          label: 'Gas Keller',
-          type: MeterType.gas,
-          location: 'Keller',
-          updatedAt: DateTime(2026, 9, 4),
-        ).copyWith(
-          reminder: const ReadingReminderSchedule(
-            interval: ReminderInterval.daily,
-            day: 1,
-            hour: 6,
-            minute: 0,
+  testWidgets(
+    'dashboard card acknowledges active reminder and keeps trigger time',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(430, 1000));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final meter =
+          _meter(
+            id: 'active_reminder',
+            label: 'Gas Keller',
+            type: MeterType.gas,
+            location: 'Keller',
+            updatedAt: DateTime(2026, 9, 4),
+          ).copyWith(
+            reminder: const ReadingReminderSchedule(
+              interval: ReminderInterval.daily,
+              day: 1,
+              hour: 6,
+              minute: 0,
+            ),
+          );
+      final meters = MemoryMeterRepository()..items[meter.id] = meter;
+      final reminders = NoopMeterReminderRepository(
+        statuses: {
+          meter.id: ReminderStatus(
+            meterId: meter.id,
+            isNotificationActive: true,
+            lastTriggeredAt: DateTime(2026, 9, 5, 6, 1),
           ),
-        );
-    final meters = MemoryMeterRepository()..items[meter.id] = meter;
-    final reminders = NoopMeterReminderRepository(
-      statuses: {
-        meter.id: ReminderStatus(
-          meterId: meter.id,
-          isNotificationActive: true,
-          lastTriggeredAt: DateTime(2026, 9, 5, 6, 1),
+        },
+      );
+
+      await tester.pumpWidget(_testApp(meters: meters, reminders: reminders));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Erinnern: täglich um 06:00 Uhr'), findsOneWidget);
+      final nextReminder = find.byKey(
+        const ValueKey('next-reminder-active_reminder'),
+      );
+      expect(nextReminder, findsOneWidget);
+      expect(
+        find.descendant(
+          of: nextReminder,
+          matching: find.text('Nächste Erinnerung'),
         ),
-      },
-    );
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: nextReminder,
+          matching: find.textContaining('06:00 Uhr'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Letzte Erinnerung: 05.09.2026, 06:01 Uhr'),
+        findsOneWidget,
+      );
+      final badge = tester.widget<Badge>(find.byType(Badge));
+      expect(badge.isLabelVisible, isTrue);
+      expect(find.text('1'), findsOneWidget);
 
-    await tester.pumpWidget(_testApp(meters: meters, reminders: reminders));
-    await tester.pumpAndSettle();
+      await tester.tap(find.text('Gas Keller'));
+      await tester.pumpAndSettle();
+      expect(reminders.acknowledgedMeterIds, [meter.id]);
 
-    expect(find.text('Erinnern: täglich um 06:00 Uhr'), findsOneWidget);
-    final nextReminder = find.byKey(
-      const ValueKey('next-reminder-active_reminder'),
-    );
-    expect(nextReminder, findsOneWidget);
-    expect(
-      find.descendant(
-        of: nextReminder,
-        matching: find.text('Nächste Erinnerung'),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(
-        of: nextReminder,
-        matching: find.textContaining('06:00 Uhr'),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.text('Letzte Erinnerung: 05.09.2026, 06:01 Uhr'),
-      findsOneWidget,
-    );
-    final badge = tester.widget<Badge>(find.byType(Badge));
-    expect(badge.isLabelVisible, isTrue);
-    expect(find.text('1'), findsOneWidget);
-  });
+      expect(await tester.binding.handlePopRoute(), isTrue);
+      await tester.pumpAndSettle();
+      expect(tester.widget<Badge>(find.byType(Badge)).isLabelVisible, isFalse);
+      expect(find.text('1'), findsNothing);
+      expect(
+        find.text('Letzte Erinnerung: 05.09.2026, 06:01 Uhr'),
+        findsOneWidget,
+      );
+      expect(nextReminder, findsOneWidget);
+    },
+  );
 }
 
 Widget _testApp({

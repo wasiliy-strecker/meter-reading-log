@@ -207,9 +207,29 @@ class _MeterListState extends ConsumerState<_MeterList> {
               meter: entry.meter,
               readings: entry.readings,
               reminderStatus: widget.reminderStatuses[entry.meter.id],
+              onTap: () => _openMeter(
+                entry.meter.id,
+                widget.reminderStatuses[entry.meter.id],
+              ),
             ),
       ],
     );
+  }
+
+  Future<void> _openMeter(
+    String meterId,
+    ReminderStatus? reminderStatus,
+  ) async {
+    if (reminderStatus?.isNotificationActive ?? false) {
+      try {
+        await ref.read(meterReminderRepositoryProvider).acknowledge(meterId);
+      } on Object {
+        // Opening the meter must not be blocked by a platform notification.
+      }
+      ref.invalidate(reminderStatusesProvider);
+    }
+    if (!mounted) return;
+    context.pushNamed('meterDetail', pathParameters: {'id': meterId});
   }
 }
 
@@ -250,12 +270,14 @@ class _MeterCard extends StatelessWidget {
   const _MeterCard({
     required this.meter,
     required this.readings,
+    required this.onTap,
     this.reminderStatus,
   });
 
   final Meter meter;
   final List<MeterReading> readings;
   final ReminderStatus? reminderStatus;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -270,8 +292,7 @@ class _MeterCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
-        onTap: () =>
-            context.pushNamed('meterDetail', pathParameters: {'id': meter.id}),
+        onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
