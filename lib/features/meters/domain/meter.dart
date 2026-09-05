@@ -216,10 +216,11 @@ MeterUnitOption? meterUnitOption(String unit) {
 String meterUnitDescription(String unit) =>
     meterUnitOption(unit)?.description ?? 'Eigene Einheit dieses Zählers';
 
-enum ReminderInterval { daily, weekly, monthly, yearly }
+enum ReminderInterval { minutely, daily, weekly, monthly, yearly }
 
 extension ReminderIntervalLabel on ReminderInterval {
   String get label => switch (this) {
+    ReminderInterval.minutely => 'Minütlich (Dev)',
     ReminderInterval.daily => 'Täglich',
     ReminderInterval.weekly => 'Wöchentlich',
     ReminderInterval.monthly => 'Monatlich',

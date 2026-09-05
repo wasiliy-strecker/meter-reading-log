@@ -381,6 +381,7 @@ String _reminderSummary(ReadingReminderSchedule reminder) {
   final time =
       '${reminder.hour.toString().padLeft(2, '0')}:${reminder.minute.toString().padLeft(2, '0')} Uhr';
   final schedule = switch (reminder.interval) {
+    ReminderInterval.minutely => 'minütlich (Dev)',
     ReminderInterval.daily => 'täglich um $time',
     ReminderInterval.weekly =>
       'wöchentlich am ${reminderWeekdayLabel(reminder.day)} um $time',

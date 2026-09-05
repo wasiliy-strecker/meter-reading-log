@@ -3,6 +3,20 @@ import 'package:meter_reading_log/core/reminders/local_notification_reminder_rep
 import 'package:meter_reading_log/features/meters/domain/meter.dart';
 
 void main() {
+  test('minutely dev reminder advances to the next full minute', () {
+    const schedule = ReadingReminderSchedule(
+      interval: ReminderInterval.minutely,
+      day: 1,
+      hour: 9,
+      minute: 30,
+    );
+
+    expect(
+      nextReminderDate(schedule, DateTime(2026, 9, 4, 8, 17, 42, 500)),
+      DateTime(2026, 9, 4, 8, 18),
+    );
+  });
+
   test('daily reminder uses today or advances to tomorrow', () {
     const schedule = ReadingReminderSchedule(
       interval: ReminderInterval.daily,
