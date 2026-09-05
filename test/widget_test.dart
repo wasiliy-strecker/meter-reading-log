@@ -19,6 +19,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Ersten Zähler anlegen'), findsOneWidget);
+    expect(
+      find.textContaining(
+        'Die gesamte Verarbeitung findet lokal auf deinem Gerät statt.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.textContaining('OCR-Daten'), findsNothing);
     await tester.tap(find.text('Zähler anlegen'));
     await tester.pumpAndSettle();
 
@@ -564,6 +571,13 @@ void main() {
     expect(find.text('Einstellungen'), findsOneWidget);
     expect(find.text('PDF auf Änderungen prüfen'), findsNothing);
     expect(find.text('Nachweise'), findsNothing);
+    expect(
+      find.text(
+        'Fotos auswerten, Zählerstände speichern und PDFs erstellen – alles passiert lokal auf deinem Gerät. Die App überträgt deine Zählerdaten nicht an einen Server.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.textContaining('OCR, Fotos'), findsNothing);
 
     expect(await tester.binding.handlePopRoute(), isTrue);
     await tester.pumpAndSettle();
