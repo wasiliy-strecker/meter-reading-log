@@ -55,7 +55,11 @@ void main() {
     expect(find.byType(TimePickerDialog), findsOneWidget);
   });
 
-  testWidgets('reminders support daily and weekly intervals', (tester) async {
+  testWidgets('reminders support dev, daily and weekly intervals', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(430, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     final meters = MemoryMeterRepository();
     await tester.pumpWidget(_testApp(meters: meters));
     await tester.pumpAndSettle();
@@ -74,9 +78,17 @@ void main() {
     await tester.ensureVisible(intervalField);
     await tester.tap(intervalField);
     await tester.pumpAndSettle();
+    expect(find.text('Minütlich (Dev)'), findsOneWidget);
     expect(find.text('Täglich'), findsOneWidget);
     expect(find.text('Wöchentlich'), findsOneWidget);
 
+    await tester.tap(find.text('Minütlich (Dev)'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Die nächste Erinnerung'), findsOneWidget);
+    expect(find.text('Uhrzeit ändern'), findsNothing);
+
+    await tester.tap(intervalField);
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Täglich'));
     await tester.pumpAndSettle();
     expect(find.text('Wochentag'), findsNothing);
@@ -310,6 +322,68 @@ void main() {
       tester.getTopLeft(delete).dy,
       lessThan(tester.getTopLeft(find.text('Verlauf')).dy),
     );
+  });
+
+  testWidgets('meter edit keeps save visible and protects unsaved changes', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(430, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final meters = MemoryMeterRepository();
+    final meter = _meter(
+      id: 'protected_meter',
+      label: 'Strom Keller',
+      type: MeterType.electricity,
+      location: 'Keller',
+      updatedAt: DateTime.utc(2026, 9, 4),
+    );
+    meters.items[meter.id] = meter;
+
+    await tester.pumpWidget(_testApp(meters: meters));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Strom Keller'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Bearbeiten'));
+    await tester.pumpAndSettle();
+
+    final saveButton = find.widgetWithText(
+      FilledButton,
+      'Änderungen speichern',
+    );
+    expect(saveButton, findsOneWidget);
+    expect(saveButton.hitTestable(), findsOneWidget);
+    expect(tester.widget<FilledButton>(saveButton).onPressed, isNull);
+
+    final labelField = find.widgetWithText(TextFormField, 'Bezeichnung *');
+    await tester.enterText(labelField, 'Strom Hauptzähler');
+    await tester.pump();
+    expect(tester.widget<FilledButton>(saveButton).onPressed, isNotNull);
+
+    expect(await tester.binding.handlePopRoute(), isTrue);
+    await tester.pumpAndSettle();
+    expect(find.text('Änderungen verwerfen?'), findsOneWidget);
+    expect(
+      find.text(
+        'Deine Änderungen an diesem Zähler wurden noch nicht gespeichert.',
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Weiter bearbeiten'));
+    await tester.pumpAndSettle();
+    expect(find.text('Zähler bearbeiten'), findsOneWidget);
+    expect(
+      tester.widget<TextFormField>(labelField).controller?.text,
+      'Strom Hauptzähler',
+    );
+
+    expect(await tester.binding.handlePopRoute(), isTrue);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Änderungen verwerfen'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Zähler bearbeiten'), findsNothing);
+    expect(meters.items[meter.id]!.label, 'Strom Keller');
   });
 
   testWidgets('system back traverses nested settings screens', (tester) async {

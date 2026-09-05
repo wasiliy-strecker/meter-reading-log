@@ -272,6 +272,16 @@ class LocalNotificationReminderRepository implements MeterReminderRepository {
 }
 
 DateTime nextReminderDate(ReadingReminderSchedule schedule, DateTime now) {
+  if (schedule.interval == ReminderInterval.minutely) {
+    return DateTime(
+      now.year,
+      now.month,
+      now.day,
+      now.hour,
+      now.minute,
+    ).add(const Duration(minutes: 1));
+  }
+
   if (schedule.interval == ReminderInterval.daily) {
     var candidate = DateTime(
       now.year,

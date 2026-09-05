@@ -45,6 +45,11 @@ internal data class StoredReminder(
         val now = Instant.ofEpochMilli(nowMillis).atZone(zoneId)
         val time = LocalTime.of(hour.coerceIn(0, 23), minute.coerceIn(0, 59))
         val candidate = when (interval) {
+            "minutely" -> if (BuildConfig.DEBUG) {
+                nextMinutely(now)
+            } else {
+                nextDaily(now, time, zoneId)
+            }
             "daily" -> nextDaily(now, time, zoneId)
             "weekly" -> nextWeekly(now, time, zoneId)
             "yearly" -> nextYearly(now, time, zoneId)
@@ -52,6 +57,9 @@ internal data class StoredReminder(
         }
         return candidate.toInstant().toEpochMilli()
     }
+
+    private fun nextMinutely(now: ZonedDateTime): ZonedDateTime =
+        now.withSecond(0).withNano(0).plusMinutes(1)
 
     private fun nextDaily(
         now: ZonedDateTime,

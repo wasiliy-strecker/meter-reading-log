@@ -46,4 +46,45 @@ void main() {
     await tester.pumpAndSettle();
     expect(result, isFalse);
   });
+
+  testWidgets(
+    'discard confirmation keeps editing unless explicitly discarded',
+    (tester) async {
+      bool? result;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => FilledButton(
+                onPressed: () async {
+                  result = await confirmDiscardChanges(
+                    context,
+                    title: 'Änderungen verwerfen?',
+                    message: 'Die Änderungen wurden noch nicht gespeichert.',
+                  );
+                },
+                child: const Text('Dialog öffnen'),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Dialog öffnen'));
+      await tester.pumpAndSettle();
+
+      final discard = find.widgetWithText(FilledButton, 'Änderungen verwerfen');
+      final keepEditing = find.widgetWithText(
+        OutlinedButton,
+        'Weiter bearbeiten',
+      );
+      expect(discard, findsOneWidget);
+      expect(keepEditing, findsOneWidget);
+      expect(tester.getSize(discard).width, tester.getSize(keepEditing).width);
+
+      await tester.tap(find.text('Weiter bearbeiten'));
+      await tester.pumpAndSettle();
+      expect(result, isFalse);
+    },
+  );
 }
