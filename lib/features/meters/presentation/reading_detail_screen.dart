@@ -174,6 +174,7 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
                   : checkingCurrentEvidence
                   ? 'Vorhandene Nachweise werden geprüft'
                   : 'Einzelnachweis als PDF erstellen',
+              textAlign: TextAlign.center,
             ),
           ),
           if (hasCurrentEvidence) ...[
