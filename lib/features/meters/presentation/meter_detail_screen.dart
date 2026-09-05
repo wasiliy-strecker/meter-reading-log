@@ -135,7 +135,15 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
   }
 
   Future<void> _exportHistory(List<MeterReading> readings) async {
+    if (_exporting) return;
     setState(() => _exporting = true);
+    final progressDialog = showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const _PdfExportProgressDialog(),
+    );
+    GeneratedEvidenceReport? report;
+    Object? failure;
     try {
       await WidgetsBinding.instance.endOfFrame;
       final repository = ref.read(meterReadingRepositoryProvider);
@@ -143,20 +151,26 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
       for (final reading in readings) {
         revisions[reading.id] = await repository.loadRevisions(reading.id);
       }
-      final report = await ref
+      report = await ref
           .read(evidenceReportServiceProvider)
           .createHistory(readings: readings, revisions: revisions);
-      if (!mounted) return;
-      await context.pushNamed('evidencePreview', extra: report);
     } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          AppSnackBar(message: 'PDF konnte nicht erstellt werden: $error'),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _exporting = false);
+      failure = error;
     }
+    if (!mounted) return;
+
+    Navigator.of(context, rootNavigator: true).pop();
+    await progressDialog;
+    if (!mounted) return;
+    setState(() => _exporting = false);
+
+    if (failure != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        AppSnackBar(message: 'PDF konnte nicht erstellt werden: $failure'),
+      );
+      return;
+    }
+    await context.pushNamed('evidencePreview', extra: report!);
   }
 
   Future<void> _openExport(EvidenceExportRecord record) async {
@@ -262,24 +276,68 @@ class _HistoryPdfAction extends StatelessWidget {
                 ),
               ],
             ),
-            if (exporting) ...[
-              const SizedBox(height: 14),
-              const LinearProgressIndicator(),
-            ],
             const SizedBox(height: 14),
-            FilledButton.icon(
-              onPressed: exporting ? null : onPressed,
-              icon: exporting
-                  ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.picture_as_pdf_outlined),
-              label: Text(
-                exporting ? 'PDF wird erstellt …' : 'Verlauf als PDF erstellen',
+            IgnorePointer(
+              ignoring: exporting,
+              child: FilledButton.icon(
+                onPressed: onPressed,
+                icon: const Icon(Icons.picture_as_pdf_outlined),
+                label: const Text('Verlauf als PDF erstellen'),
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PdfExportProgressDialog extends StatelessWidget {
+  const _PdfExportProgressDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return PopScope<void>(
+      canPop: false,
+      child: AlertDialog(
+        icon: Icon(
+          Icons.picture_as_pdf_outlined,
+          size: 36,
+          color: colors.primary,
+        ),
+        title: const Text(
+          'PDF-Nachweis wird erstellt',
+          textAlign: TextAlign.center,
+        ),
+        content: Semantics(
+          liveRegion: true,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Ablesungen, Fotos und Korrekturen werden für die PDF zusammengestellt.',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              LinearProgressIndicator(
+                key: const ValueKey('history-pdf-progress'),
+                minHeight: 8,
+                borderRadius: BorderRadius.circular(999),
+                backgroundColor: colors.primary.withValues(alpha: 0.18),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Bitte kurz warten …',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: colors.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -391,29 +449,94 @@ class _ReadingTile extends StatelessWidget {
         ? null
         : reading.value.difference(previous!.value).germanFormatted;
     return Card(
+      key: ValueKey('reading-card-${reading.id}'),
       margin: const EdgeInsets.only(bottom: 10),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: CircleAvatar(
-          child: Icon(
-            reading.source == ReadingSource.camera
-                ? Icons.photo_camera_outlined
-                : Icons.photo_library_outlined,
-          ),
-        ),
-        title: Text(
-          '${reading.value.displayText} ${reading.meter.unit}',
-          style: const TextStyle(fontWeight: FontWeight.w800),
-        ),
-        subtitle: Text(
-          '${formatDateTime(reading.capturedAt)}'
-          '${previous != null && !sameUnit ? ' · Einheit gewechselt' : ''}'
-          '${delta == null ? '' : ' · Δ $delta ${reading.meter.unit}'}',
-        ),
-        trailing: const Icon(Icons.chevron_right),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
         onTap: () => context.pushNamed(
           'readingDetail',
           pathParameters: {'id': reading.id},
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              _ReadingPhotoThumbnail(reading: reading),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Zählerstand',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${reading.value.displayText} ${reading.meter.unit}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Abgelesen am',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(formatDateTime(reading.capturedAt)),
+                    if (previous != null && !sameUnit)
+                      const Text('Einheit seit dieser Ablesung gewechselt')
+                    else if (delta != null)
+                      Text('Δ $delta ${reading.meter.unit}'),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.chevron_right,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ReadingPhotoThumbnail extends StatelessWidget {
+  const _ReadingPhotoThumbnail({required this.reading});
+
+  final MeterReading reading;
+
+  @override
+  Widget build(BuildContext context) {
+    final fallbackColor = Theme.of(context).colorScheme.primaryContainer;
+    return Semantics(
+      label: 'Foto zur Ablesung ${reading.value.displayText}',
+      image: true,
+      child: ClipRRect(
+        key: ValueKey('reading-thumbnail-${reading.id}'),
+        borderRadius: BorderRadius.circular(14),
+        child: SizedBox.square(
+          dimension: 92,
+          child: Image.file(
+            File(reading.photoPath),
+            fit: BoxFit.cover,
+            cacheWidth: 240,
+            errorBuilder: (_, _, _) => ColoredBox(
+              color: fallbackColor,
+              child: const Icon(Icons.broken_image_outlined, size: 30),
+            ),
+          ),
         ),
       ),
     );
