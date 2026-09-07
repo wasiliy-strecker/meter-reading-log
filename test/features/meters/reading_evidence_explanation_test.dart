@@ -439,6 +439,32 @@ void main() {
     );
     expect(
       find.textContaining('Nach einer Korrektur kannst du beide Varianten'),
+      findsNothing,
+    );
+    expect(
+      find.textContaining('Die andere kannst du weiterhin erstellen'),
+      findsNothing,
+    );
+    final currentStatus = find.byKey(const ValueKey('current-evidence-status'));
+    expect(currentStatus, findsOneWidget);
+    expect(
+      find.descendant(
+        of: currentStatus,
+        matching: find.byIcon(Icons.check_circle_rounded),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Aktuelle PDF-Nachweise'), findsOneWidget);
+    expect(
+      find.text(
+        'Kompakt ohne Fotos · Erstellt am ${formatDateTime(DateTime.utc(2026, 9, 5, 10))} Uhr',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        'Mit aktuellem Foto · Erstellt am ${formatDateTime(DateTime.utc(2026, 9, 5, 10, 1))} Uhr',
+      ),
       findsOneWidget,
     );
 
@@ -472,6 +498,17 @@ void main() {
       find.widgetWithText(FilledButton, 'Einzelnachweis als PDF erstellen'),
     );
     expect(enabledButton.onPressed, isNotNull);
+    expect(find.text('Aktueller PDF-Nachweis'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('current-evidence-currentPhotos')),
+      findsNothing,
+    );
+    expect(
+      find.text(
+        'Kompakt ohne Fotos · Erstellt am ${formatDateTime(DateTime.utc(2026, 9, 5, 10))} Uhr',
+      ),
+      findsOneWidget,
+    );
     expect(find.text('PDF-Nachweis gelöscht.'), findsOneWidget);
   });
 
@@ -592,6 +629,7 @@ void main() {
     );
     expect(createButton.onPressed, isNotNull);
     expect(find.text('Datei fehlt'), findsOneWidget);
+    expect(find.byKey(const ValueKey('current-evidence-status')), findsNothing);
   });
 
   testWidgets('a correction enables a new single evidence PDF', (tester) async {
@@ -664,6 +702,7 @@ void main() {
       find.byKey(const ValueKey('evidence-export-single_before_correction')),
       findsOneWidget,
     );
+    expect(find.byKey(const ValueKey('current-evidence-status')), findsNothing);
   });
 }
 

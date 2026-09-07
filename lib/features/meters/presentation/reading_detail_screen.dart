@@ -77,15 +77,24 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
     final checkingCurrentEvidence =
         exportsAsync.isLoading || manifestAsync.isLoading;
     final evidenceCheckFailed = exportsAsync.hasError || manifestAsync.hasError;
-    final currentEvidenceModes = matchingExports
-        .where((export) => availableFiles[export.id] == true)
-        .map((export) => export.photoMode)
-        .where(
-          (mode) =>
-              mode == EvidencePhotoMode.withoutPhotos ||
-              mode == EvidencePhotoMode.currentPhotos,
-        )
-        .toSet();
+    final currentEvidenceByMode = <EvidencePhotoMode, EvidenceExportRecord>{};
+    for (final export in matchingExports) {
+      final mode = export.photoMode;
+      final isCurrentMode =
+          mode == EvidencePhotoMode.withoutPhotos ||
+          mode == EvidencePhotoMode.currentPhotos;
+      if (availableFiles[export.id] == true && isCurrentMode) {
+        currentEvidenceByMode.putIfAbsent(mode, () => export);
+      }
+    }
+    final currentEvidenceExports = [
+      for (final mode in const [
+        EvidencePhotoMode.withoutPhotos,
+        EvidencePhotoMode.currentPhotos,
+      ])
+        ?currentEvidenceByMode[mode],
+    ];
+    final currentEvidenceModes = currentEvidenceByMode.keys.toSet();
     final hasAnyCurrentEvidence = currentEvidenceModes.isNotEmpty;
     final hasBothCurrentEvidence =
         currentEvidenceModes.contains(EvidencePhotoMode.withoutPhotos) &&
@@ -195,15 +204,7 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
           ),
           if (hasAnyCurrentEvidence) ...[
             const SizedBox(height: 8),
-            Text(
-              hasBothCurrentEvidence
-                  ? 'Seit diesen Nachweisen wurde die Ablesung nicht geändert. Nach einer Korrektur kannst du beide Varianten neu erstellen.'
-                  : 'Eine aktuelle Variante ist bereits gespeichert. Die andere kannst du weiterhin erstellen.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
+            _CurrentEvidenceStatus(exports: currentEvidenceExports),
           ],
           if (evidenceCheckFailed) ...[
             const SizedBox(height: 8),
@@ -333,6 +334,58 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
         context.goNamed('meterDetail', pathParameters: {'id': reading.meterId});
       }
     }
+  }
+}
+
+class _CurrentEvidenceStatus extends StatelessWidget {
+  const _CurrentEvidenceStatus({required this.exports});
+
+  final List<EvidenceExportRecord> exports;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Card(
+      key: const ValueKey('current-evidence-status'),
+      margin: EdgeInsets.zero,
+      color: colors.primaryContainer.withValues(alpha: 0.58),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.check_circle_rounded, color: colors.primary),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    exports.length == 1
+                        ? 'Aktueller PDF-Nachweis'
+                        : 'Aktuelle PDF-Nachweise',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: colors.onPrimaryContainer,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  for (final export in exports) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      '${export.photoMode.labelFor(export.kind)} · Erstellt am ${formatDateTime(export.createdAt)} Uhr',
+                      key: ValueKey(
+                        'current-evidence-${export.photoMode.name}',
+                      ),
+                      style: TextStyle(color: colors.onPrimaryContainer),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
