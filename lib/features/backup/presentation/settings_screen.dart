@@ -16,6 +16,7 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _working = false;
+  String _workingMessage = '';
 
   @override
   Widget build(BuildContext context) {
@@ -88,7 +89,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           if (_working) ...[
             const SizedBox(height: 24),
-            const Center(child: CircularProgressIndicator()),
+            Center(
+              child: Column(
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 12),
+                  Text(_workingMessage),
+                ],
+              ),
+            ),
           ],
         ],
       ),
@@ -98,7 +107,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _createBackup() async {
     final password = await _askPassword(confirm: true);
     if (password == null) return;
-    setState(() => _working = true);
+    setState(() {
+      _working = true;
+      _workingMessage = 'Backup wird verschlüsselt …';
+    });
     try {
       final backup = await ref
           .read(encryptedBackupServiceProvider)
@@ -123,7 +135,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     } catch (error) {
       _showMessage('Backup konnte nicht erstellt werden: $error');
     } finally {
-      if (mounted) setState(() => _working = false);
+      if (mounted) {
+        setState(() {
+          _working = false;
+          _workingMessage = '';
+        });
+      }
     }
   }
 
@@ -137,7 +154,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (path == null || !mounted) return;
     final password = await _askPassword(confirm: false);
     if (password == null) return;
-    setState(() => _working = true);
+    setState(() {
+      _working = true;
+      _workingMessage = 'Backup wird geprüft …';
+    });
     try {
       final service = ref.read(encryptedBackupServiceProvider);
       final preview = await service.inspect(path, password);
@@ -164,6 +184,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ) ??
           false;
       if (!confirmed) return;
+      setState(() => _workingMessage = 'Backup wird wiederhergestellt …');
       final result = await service.restore(path, password);
       ref.invalidate(metersProvider);
       ref.invalidate(meterDashboardItemsProvider);
@@ -177,7 +198,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     } catch (error) {
       _showMessage('Backup konnte nicht wiederhergestellt werden: $error');
     } finally {
-      if (mounted) setState(() => _working = false);
+      if (mounted) {
+        setState(() {
+          _working = false;
+          _workingMessage = '';
+        });
+      }
     }
   }
 
@@ -191,7 +217,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void _showBackupError(BackupException error) {
     final message = switch (error.failure) {
       BackupFailure.passwordTooShort =>
-        'Das Passwort muss mindestens 10 Zeichen lang sein.',
+        'Das Passwort muss mindestens 6 Zeichen lang sein.',
       BackupFailure.invalidPassword =>
         'Das Passwort ist falsch oder das Backup wurde verändert.',
       BackupFailure.missingFile =>
@@ -247,7 +273,7 @@ class _BackupPasswordDialogState extends State<_BackupPasswordDialog> {
             autofocus: true,
             decoration: const InputDecoration(
               labelText: 'Passwort',
-              helperText: 'Mindestens 10 Zeichen',
+              helperText: 'Mindestens 6 Zeichen',
             ),
           ),
           if (widget.confirm) ...[
@@ -269,7 +295,7 @@ class _BackupPasswordDialogState extends State<_BackupPasswordDialog> {
         ),
         FilledButton(
           onPressed: () {
-            if (_first.text.length < 10) return;
+            if (_first.text.length < 6) return;
             if (widget.confirm && _first.text != _second.text) return;
             Navigator.pop(context, _first.text);
           },

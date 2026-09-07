@@ -1,10 +1,11 @@
 import 'dart:convert';
-import 'package:universal_io/io.dart';
 import 'dart:math';
 
 import 'package:cryptography/cryptography.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:universal_io/io.dart';
 
 import '../../../core/integrity/integrity_service.dart';
 import '../../../core/reminders/local_notification_reminder_repository.dart';
@@ -89,7 +90,7 @@ class EncryptedBackupService {
   static const extension = 'zslbackup';
   static const _format = 'meter_reading_log_backup';
   static const _version = 2;
-  static const _minimumPasswordLength = 10;
+  static const _minimumPasswordLength = 6;
 
   final MeterRepository meters;
   final MeterReadingRepository readings;
@@ -99,7 +100,6 @@ class EncryptedBackupService {
   final int kdfIterations;
   final BackupDirectoryProvider _temporaryDirectoryProvider;
   final BackupDirectoryProvider _documentsDirectoryProvider;
-  final AesGcm _cipher = AesGcm.with256bits();
 
   Future<CreatedBackup> create(String password) async {
     _validatePassword(password);
@@ -165,7 +165,7 @@ class EncryptedBackupService {
       'exports': allExports.map((item) => item.toJson()).toList(),
       'files': files,
     };
-    final envelope = await _encrypt(payload, password);
+    final encodedEnvelope = await _encrypt(payload, password);
     final directory = Directory(
       p.join(
         (await _temporaryDirectoryProvider()).path,
@@ -177,7 +177,7 @@ class EncryptedBackupService {
     final file = File(
       p.join(directory.path, 'zaehlerstandlog_$stamp.$extension'),
     );
-    await file.writeAsString(jsonEncode(envelope), flush: true);
+    await file.writeAsString(encodedEnvelope, flush: true);
     return CreatedBackup(
       path: file.path,
       preview: BackupPreview(
@@ -367,74 +367,83 @@ class EncryptedBackupService {
     return file.path;
   }
 
-  Future<Map<String, dynamic>> _encrypt(
-    Map<String, dynamic> payload,
-    String password,
-  ) async {
-    final salt = _randomBytes(16);
-    final nonce = _randomBytes(12);
-    final key = await _deriveKey(password, salt, kdfIterations);
-    final box = await _cipher.encrypt(
-      utf8.encode(jsonEncode(payload)),
+  Future<String> _encrypt(Map<String, dynamic> payload, String password) async {
+    final salt = _secureRandomBytes(16);
+    final nonce = _secureRandomBytes(12);
+    final clearTextFuture = compute(
+      _encodeBackupPayload,
+      payload,
+      debugLabel: 'ZSL backup JSON encoding',
+    );
+    final key = await _deriveBackupKey(password, salt, kdfIterations);
+    final clearText = await clearTextFuture;
+    final box = await AesGcm.with256bits().encrypt(
+      clearText,
       secretKey: key,
       nonce: nonce,
     );
-    return {
+    return compute(_encodeBackupEnvelope, <String, dynamic>{
       'format': _format,
       'schemaVersion': _version,
-      'crypto': {
-        'algorithm': 'aes-256-gcm',
-        'kdf': 'pbkdf2-hmac-sha256',
-        'iterations': kdfIterations,
-        'salt': base64Encode(salt),
-        'nonce': base64Encode(nonce),
-      },
-      'cipherText': base64Encode(box.cipherText),
-      'mac': base64Encode(box.mac.bytes),
-    };
+      'iterations': kdfIterations,
+      'salt': salt,
+      'nonce': nonce,
+      'cipherText': box.cipherText,
+      'mac': box.mac.bytes,
+    }, debugLabel: 'ZSL backup envelope encoding');
   }
 
   Future<Map<String, dynamic>> _decrypt(String path, String password) async {
     _validatePassword(password);
-    late final Map<String, dynamic> envelope;
+    late final String encodedEnvelope;
     try {
-      envelope =
-          jsonDecode(await File(path).readAsString()) as Map<String, dynamic>;
+      encodedEnvelope = await File(path).readAsString();
     } on Object {
       throw const BackupException(BackupFailure.invalidFormat);
     }
-    final schemaVersion = (envelope['schemaVersion'] as num?)?.toInt();
-    if (envelope['format'] != _format ||
-        schemaVersion == null ||
-        schemaVersion < 1 ||
-        schemaVersion > _version) {
-      throw const BackupException(BackupFailure.unsupportedVersion);
+    final envelope = await compute(_decodeBackupEnvelope, <String, dynamic>{
+      'encodedEnvelope': encodedEnvelope,
+      'format': _format,
+      'maximumSchemaVersion': _version,
+    }, debugLabel: 'ZSL backup envelope decoding');
+    final failure = envelope['failure'] as String?;
+    if (failure != null) {
+      throw BackupException(switch (failure) {
+        'unsupportedVersion' => BackupFailure.unsupportedVersion,
+        _ => BackupFailure.invalidFormat,
+      });
     }
+    late final List<int> clearText;
     try {
-      final crypto = Map<String, dynamic>.from(envelope['crypto'] as Map);
-      final key = await _deriveKey(
+      final key = await _deriveBackupKey(
         password,
-        base64Decode(crypto['salt'] as String),
-        (crypto['iterations'] as num).toInt(),
+        envelope['salt'] as List<int>,
+        envelope['iterations'] as int,
       );
-      final clear = await _cipher.decrypt(
+      clearText = await AesGcm.with256bits().decrypt(
         SecretBox(
-          base64Decode(envelope['cipherText'] as String),
-          nonce: base64Decode(crypto['nonce'] as String),
-          mac: Mac(base64Decode(envelope['mac'] as String)),
+          envelope['cipherText'] as List<int>,
+          nonce: envelope['nonce'] as List<int>,
+          mac: Mac(envelope['mac'] as List<int>),
         ),
         secretKey: key,
       );
-      final payload = jsonDecode(utf8.decode(clear)) as Map<String, dynamic>;
-      _validatePayload(payload);
-      return payload;
     } on SecretBoxAuthenticationError {
       throw const BackupException(BackupFailure.invalidPassword);
-    } on BackupException {
-      rethrow;
     } on Object {
       throw const BackupException(BackupFailure.invalidFormat);
     }
+    final decoded = await compute(
+      _decodeBackupPayload,
+      clearText,
+      debugLabel: 'ZSL backup JSON decoding',
+    );
+    if (decoded['failure'] != null) {
+      throw const BackupException(BackupFailure.invalidFormat);
+    }
+    final payload = Map<String, dynamic>.from(decoded['payload'] as Map);
+    _validatePayload(payload);
+    return payload;
   }
 
   void _validatePayload(Map<String, dynamic> payload) {
@@ -460,26 +469,85 @@ class EncryptedBackupService {
     );
   }
 
-  Future<SecretKey> _deriveKey(
-    String password,
-    List<int> salt,
-    int iterations,
-  ) {
-    return Pbkdf2(
-      macAlgorithm: Hmac.sha256(),
-      iterations: iterations,
-      bits: 256,
-    ).deriveKey(secretKey: SecretKey(utf8.encode(password)), nonce: salt);
-  }
-
-  List<int> _randomBytes(int length) {
-    final random = Random.secure();
-    return List<int>.generate(length, (_) => random.nextInt(256));
-  }
-
   void _validatePassword(String password) {
     if (password.length < _minimumPasswordLength) {
       throw const BackupException(BackupFailure.passwordTooShort);
     }
   }
+}
+
+Uint8List _encodeBackupPayload(Map<String, dynamic> payload) {
+  return Uint8List.fromList(utf8.encode(jsonEncode(payload)));
+}
+
+String _encodeBackupEnvelope(Map<String, dynamic> input) {
+  return jsonEncode({
+    'format': input['format'] as String,
+    'schemaVersion': input['schemaVersion'] as int,
+    'crypto': {
+      'algorithm': 'aes-256-gcm',
+      'kdf': 'pbkdf2-hmac-sha256',
+      'iterations': input['iterations'] as int,
+      'salt': base64Encode(input['salt'] as List<int>),
+      'nonce': base64Encode(input['nonce'] as List<int>),
+    },
+    'cipherText': base64Encode(input['cipherText'] as List<int>),
+    'mac': base64Encode(input['mac'] as List<int>),
+  });
+}
+
+Map<String, dynamic> _decodeBackupEnvelope(Map<String, dynamic> input) {
+  late final Map<String, dynamic> envelope;
+  try {
+    envelope =
+        jsonDecode(input['encodedEnvelope'] as String) as Map<String, dynamic>;
+  } on Object {
+    return const {'failure': 'invalidFormat'};
+  }
+  final schemaVersion = (envelope['schemaVersion'] as num?)?.toInt();
+  if (envelope['format'] != input['format'] ||
+      schemaVersion == null ||
+      schemaVersion < 1 ||
+      schemaVersion > (input['maximumSchemaVersion'] as int)) {
+    return const {'failure': 'unsupportedVersion'};
+  }
+  try {
+    final crypto = Map<String, dynamic>.from(envelope['crypto'] as Map);
+    return {
+      'iterations': (crypto['iterations'] as num).toInt(),
+      'salt': base64Decode(crypto['salt'] as String),
+      'nonce': base64Decode(crypto['nonce'] as String),
+      'cipherText': base64Decode(envelope['cipherText'] as String),
+      'mac': base64Decode(envelope['mac'] as String),
+    };
+  } on Object {
+    return const {'failure': 'invalidFormat'};
+  }
+}
+
+Map<String, dynamic> _decodeBackupPayload(List<int> clearText) {
+  try {
+    return {
+      'payload': jsonDecode(utf8.decode(clearText)) as Map<String, dynamic>,
+    };
+  } on Object {
+    return const {'failure': 'invalidFormat'};
+  }
+}
+
+Future<SecretKey> _deriveBackupKey(
+  String password,
+  List<int> salt,
+  int iterations,
+) {
+  return Pbkdf2(
+    macAlgorithm: Hmac.sha256(),
+    iterations: iterations,
+    bits: 256,
+  ).deriveKeyFromPassword(password: password, nonce: salt);
+}
+
+List<int> _secureRandomBytes(int length) {
+  final random = Random.secure();
+  return List<int>.generate(length, (_) => random.nextInt(256));
 }

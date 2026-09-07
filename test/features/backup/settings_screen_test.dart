@@ -19,6 +19,7 @@ void main() {
       find.widgetWithText(TextField, 'Passwort wiederholen'),
       findsOneWidget,
     );
+    expect(find.text('Mindestens 6 Zeichen'), findsOneWidget);
 
     await tester.tap(find.widgetWithText(TextButton, 'Abbrechen'));
     await tester.pumpAndSettle();

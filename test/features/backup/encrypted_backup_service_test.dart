@@ -15,6 +15,34 @@ import '../../support/fakes.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test('accepts six-character passwords and rejects shorter ones', () async {
+    final temp = await Directory.systemTemp.createTemp('backup_password_test_');
+    addTearDown(() => temp.delete(recursive: true));
+    final service = EncryptedBackupService(
+      meters: MemoryMeterRepository(),
+      readings: MemoryReadingRepository(),
+      exports: MemoryEvidenceExportRepository(),
+      reminders: LocalNotificationReminderRepository.instance,
+      kdfIterations: 1000,
+      temporaryDirectoryProvider: () async => temp,
+      documentsDirectoryProvider: () async => temp,
+    );
+
+    await expectLater(
+      service.create('12345'),
+      throwsA(
+        isA<BackupException>().having(
+          (error) => error.failure,
+          'failure',
+          BackupFailure.passwordTooShort,
+        ),
+      ),
+    );
+
+    final backup = await service.create('123456');
+    expect(await File(backup.path).exists(), isTrue);
+  });
+
   test('encrypted backup round-trips domain data, photos and PDFs', () async {
     final temp = await Directory.systemTemp.createTemp('backup_test_');
     addTearDown(() => temp.delete(recursive: true));
