@@ -39,8 +39,17 @@ void main() {
       ),
     );
 
-    final backup = await service.create('123456');
-    expect(await File(backup.path).exists(), isTrue);
+    final firstBackup = await service.create('123456');
+    final latestBackup = await service.create('123456');
+    expect(await File(firstBackup.path).exists(), isFalse);
+    expect(await File(latestBackup.path).exists(), isTrue);
+    expect(
+      await File(latestBackup.path).parent
+          .list()
+          .where((entity) => entity.path.endsWith('.zslbackup'))
+          .length,
+      1,
+    );
   });
 
   test('encrypted backup round-trips domain data, photos and PDFs', () async {

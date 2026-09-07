@@ -2,6 +2,7 @@ package com.appfactory.meter_reading_log
 
 import android.Manifest
 import android.content.BroadcastReceiver
+import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -9,10 +10,12 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import java.io.File
 
 class MainActivity : FlutterActivity() {
     private var reminderChannel: MethodChannel? = null
@@ -33,6 +36,10 @@ class MainActivity : FlutterActivity() {
         ).also { channel ->
             channel.setMethodCallHandler(::handleReminderMethod)
         }
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            backupShareChannelName,
+        ).setMethodCallHandler(::handleBackupShareMethod)
     }
 
     override fun onStart() {
@@ -103,6 +110,65 @@ class MainActivity : FlutterActivity() {
             "showReminderTest" -> showReminderTest(call, result)
             "consumeInitialMeterId" -> result.success(consumeMeterId(intent))
             else -> result.notImplemented()
+        }
+    }
+
+    private fun handleBackupShareMethod(call: MethodCall, result: MethodChannel.Result) {
+        if (call.method != "shareBackup") {
+            result.notImplemented()
+            return
+        }
+        val arguments = call.arguments as? Map<*, *>
+        val path = arguments?.get("path") as? String
+        val title = arguments?.get("title") as? String ?: "ZählerstandLog Backup"
+        val text = arguments?.get("text") as? String
+        if (path.isNullOrBlank()) {
+            result.error("missing_path", "Der Backup-Pfad fehlt.", null)
+            return
+        }
+        try {
+            val backupRoot = File(cacheDir, "meter_reading_backups").canonicalFile
+            val backup = File(path).canonicalFile
+            val isInsideBackupRoot = backup.path.startsWith(
+                backupRoot.path + File.separator,
+            )
+            if (!isInsideBackupRoot || !backup.isFile) {
+                result.error("invalid_path", "Die Backup-Datei ist ungültig.", null)
+                return
+            }
+            clearLegacyShareCache()
+            val uri = FileProvider.getUriForFile(
+                this,
+                "$packageName.backup_provider",
+                backup,
+            )
+            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "application/octet-stream"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                if (!text.isNullOrBlank()) putExtra(Intent.EXTRA_TEXT, text)
+                clipData = ClipData.newRawUri(backup.name, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            packageManager.queryIntentActivities(
+                shareIntent,
+                PackageManager.MATCH_DEFAULT_ONLY,
+            ).forEach { target ->
+                grantUriPermission(
+                    target.activityInfo.packageName,
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                )
+            }
+            startActivity(Intent.createChooser(shareIntent, title))
+            result.success(null)
+        } catch (error: Exception) {
+            result.error("share_failed", error.message, null)
+        }
+    }
+
+    private fun clearLegacyShareCache() {
+        File(cacheDir, "share_plus").listFiles()?.forEach { file ->
+            file.deleteRecursively()
         }
     }
 
@@ -277,5 +343,7 @@ class MainActivity : FlutterActivity() {
 
     companion object {
         private const val notificationPermissionRequestCode = 4107
+        private const val backupShareChannelName =
+            "com.appfactory.meter_reading_log/backup_share"
     }
 }

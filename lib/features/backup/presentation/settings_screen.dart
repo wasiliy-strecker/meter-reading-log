@@ -1,6 +1,8 @@
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../app/app_providers.dart';
@@ -15,6 +17,10 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  static const _backupShareChannel = MethodChannel(
+    'com.appfactory.meter_reading_log/backup_share',
+  );
+
   bool _working = false;
   String _workingMessage = '';
 
@@ -116,20 +122,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           .read(encryptedBackupServiceProvider)
           .create(password);
       if (!mounted) return;
-      await SharePlus.instance.share(
-        ShareParams(
-          title: 'ZählerstandLog Backup',
-          text:
-              '${backup.preview.meterCount} Zähler, ${backup.preview.readingCount} Ablesungen',
-          files: [
-            XFile(
-              backup.path,
-              mimeType: 'application/octet-stream',
-              name: backup.path.split('/').last,
-            ),
-          ],
-        ),
-      );
+      await _shareBackup(backup);
     } on BackupException catch (error) {
       _showBackupError(error);
     } catch (error) {
@@ -142,6 +135,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         });
       }
     }
+  }
+
+  Future<void> _shareBackup(CreatedBackup backup) {
+    final title = 'ZählerstandLog Backup';
+    final text =
+        '${backup.preview.meterCount} Zähler, ${backup.preview.readingCount} Ablesungen';
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      return _backupShareChannel.invokeMethod<void>('shareBackup', {
+        'path': backup.path,
+        'title': title,
+        'text': text,
+      });
+    }
+    return SharePlus.instance
+        .share(
+          ShareParams(
+            title: title,
+            text: text,
+            files: [
+              XFile(
+                backup.path,
+                mimeType: 'application/octet-stream',
+                name: backup.path.split('/').last,
+              ),
+            ],
+          ),
+        )
+        .then((_) {});
   }
 
   Future<void> _restoreBackup() async {

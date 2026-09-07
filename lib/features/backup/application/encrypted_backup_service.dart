@@ -165,14 +165,14 @@ class EncryptedBackupService {
       'exports': allExports.map((item) => item.toJson()).toList(),
       'files': files,
     };
-    final encodedEnvelope = await _encrypt(payload, password);
     final directory = Directory(
       p.join(
         (await _temporaryDirectoryProvider()).path,
         'meter_reading_backups',
       ),
     );
-    await directory.create(recursive: true);
+    await _prepareBackupDirectory(directory);
+    final encodedEnvelope = await _encrypt(payload, password);
     final stamp = createdAt.toIso8601String().replaceAll(RegExp(r'[:.]'), '-');
     final file = File(
       p.join(directory.path, 'zaehlerstandlog_$stamp.$extension'),
@@ -341,6 +341,19 @@ class EncryptedBackupService {
       'sha256': await integrity.sha256Bytes(bytes),
       'bytesBase64': base64Encode(bytes),
     };
+  }
+
+  Future<void> _prepareBackupDirectory(Directory directory) async {
+    await directory.create(recursive: true);
+    await for (final entity in directory.list()) {
+      if (entity is File && entity.path.endsWith('.$extension')) {
+        try {
+          await entity.delete();
+        } on FileSystemException {
+          // A stale temporary backup must not prevent a new backup.
+        }
+      }
+    }
   }
 
   Future<String> _restoreFile(
