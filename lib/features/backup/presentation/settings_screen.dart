@@ -181,56 +181,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
-  Future<String?> _askPassword({required bool confirm}) async {
-    final first = TextEditingController();
-    final second = TextEditingController();
-    final result = await showDialog<String>(
+  Future<String?> _askPassword({required bool confirm}) {
+    return showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(confirm ? 'Backup-Passwort festlegen' : 'Backup-Passwort'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: first,
-              obscureText: true,
-              autofocus: true,
-              decoration: const InputDecoration(
-                labelText: 'Passwort',
-                helperText: 'Mindestens 10 Zeichen',
-              ),
-            ),
-            if (confirm) ...[
-              const SizedBox(height: 12),
-              TextField(
-                controller: second,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Passwort wiederholen',
-                ),
-              ),
-            ],
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Abbrechen'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (first.text.length < 10) return;
-              if (confirm && first.text != second.text) return;
-              Navigator.pop(context, first.text);
-            },
-            child: const Text('Weiter'),
-          ),
-        ],
-      ),
+      builder: (_) => _BackupPasswordDialog(confirm: confirm),
     );
-    first.dispose();
-    second.dispose();
-    return result;
   }
 
   void _showBackupError(BackupException error) {
@@ -254,5 +209,73 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void _showMessage(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(AppSnackBar(message: message));
+  }
+}
+
+class _BackupPasswordDialog extends StatefulWidget {
+  const _BackupPasswordDialog({required this.confirm});
+
+  final bool confirm;
+
+  @override
+  State<_BackupPasswordDialog> createState() => _BackupPasswordDialogState();
+}
+
+class _BackupPasswordDialogState extends State<_BackupPasswordDialog> {
+  final TextEditingController _first = TextEditingController();
+  final TextEditingController _second = TextEditingController();
+
+  @override
+  void dispose() {
+    _first.dispose();
+    _second.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(
+        widget.confirm ? 'Backup-Passwort festlegen' : 'Backup-Passwort',
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _first,
+            obscureText: true,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'Passwort',
+              helperText: 'Mindestens 10 Zeichen',
+            ),
+          ),
+          if (widget.confirm) ...[
+            const SizedBox(height: 12),
+            TextField(
+              controller: _second,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Passwort wiederholen',
+              ),
+            ),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Abbrechen'),
+        ),
+        FilledButton(
+          onPressed: () {
+            if (_first.text.length < 10) return;
+            if (widget.confirm && _first.text != _second.text) return;
+            Navigator.pop(context, _first.text);
+          },
+          child: const Text('Weiter'),
+        ),
+      ],
+    );
   }
 }
