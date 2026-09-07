@@ -324,8 +324,12 @@ void main() {
     ))!;
     addTearDown(() => temp.delete(recursive: true));
     final pdf = File('${temp.path}/single.pdf');
+    final photoPdf = File('${temp.path}/single-photo.pdf');
     await tester.runAsync(
-      () => pdf.writeAsBytes(const [0x25, 0x50, 0x44, 0x46]),
+      () => Future.wait([
+        pdf.writeAsBytes(const [0x25, 0x50, 0x44, 0x46]),
+        photoPdf.writeAsBytes(const [0x25, 0x50, 0x44, 0x46]),
+      ]),
     );
     final reading = _reading();
     final readings = MemoryReadingRepository()..items[reading.id] = reading;
@@ -349,7 +353,7 @@ void main() {
       readingIds: [reading.id],
       createdAt: DateTime.utc(2026, 9, 5, 10, 1),
       fileName: 'single-photo.pdf',
-      filePath: pdf.path,
+      filePath: photoPdf.path,
       pdfSha256: 'f' * 64,
       manifestSha256: unchangedReadingManifest,
       photoMode: EvidencePhotoMode.currentPhotos,
@@ -371,6 +375,9 @@ void main() {
         overrides: [
           meterReadingRepositoryProvider.overrideWithValue(readings),
           evidenceExportRepositoryProvider.overrideWithValue(exports),
+          evidenceReportServiceProvider.overrideWithValue(
+            _SynchronousDeleteEvidenceReportService(exports),
+          ),
           singleReadingEvidenceManifestProvider(
             reading.id,
           ).overrideWith((ref) => unchangedReadingManifest),
@@ -432,6 +439,105 @@ void main() {
     );
     expect(
       find.textContaining('Nach einer Korrektur kannst du beide Varianten'),
+      findsOneWidget,
+    );
+
+    final deletePhotoEvidence = find.byKey(
+      const ValueKey('delete-evidence-single_current_photo'),
+    );
+    expect(deletePhotoEvidence, findsOneWidget);
+    await tester.tap(deletePhotoEvidence);
+    await tester.pumpAndSettle();
+    expect(find.text('Einzelnachweis löschen?'), findsOneWidget);
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Abbrechen'));
+    await tester.pumpAndSettle();
+    expect(exports.items, contains('single_current_photo'));
+    expect(photoPdf.existsSync(), isTrue);
+
+    await tester.tap(deletePhotoEvidence);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Löschen'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(exports.items, isNot(contains('single_current_photo')));
+    expect(
+      find.byKey(const ValueKey('evidence-export-single_current_photo')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('evidence-export-single_current')),
+      findsOneWidget,
+    );
+    final enabledButton = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, 'Einzelnachweis als PDF erstellen'),
+    );
+    expect(enabledButton.onPressed, isNotNull);
+    expect(find.text('PDF-Nachweis gelöscht.'), findsOneWidget);
+  });
+
+  testWidgets('keeps a single PDF visible when deletion fails', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(430, 1800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final reading = _reading();
+    final readings = MemoryReadingRepository()..items[reading.id] = reading;
+    final exports = MemoryEvidenceExportRepository();
+    exports.items['single_failed'] = EvidenceExportRecord(
+      id: 'single_failed',
+      meterId: reading.meterId,
+      kind: EvidenceExportKind.singleReading,
+      readingIds: [reading.id],
+      createdAt: DateTime.utc(2026, 9, 7),
+      fileName: 'single-failed.pdf',
+      filePath: '/tmp/single-failed.pdf',
+      pdfSha256: 'c' * 64,
+      manifestSha256: unchangedReadingManifest,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          meterReadingRepositoryProvider.overrideWithValue(readings),
+          evidenceExportRepositoryProvider.overrideWithValue(exports),
+          evidenceReportServiceProvider.overrideWithValue(
+            _FailingDeleteEvidenceReportService(),
+          ),
+          singleReadingEvidenceManifestProvider(
+            reading.id,
+          ).overrideWith((ref) => unchangedReadingManifest),
+        ],
+        child: MaterialApp(home: ReadingDetailScreen(readingId: reading.id)),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final scrollable = find
+        .descendant(
+          of: find.byType(ListView),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('delete-evidence-single_failed')),
+      250,
+      scrollable: scrollable,
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey('delete-evidence-single_failed')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Löschen'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(exports.items, contains('single_failed'));
+    expect(
+      find.byKey(const ValueKey('evidence-export-single_failed')),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        'PDF-Nachweis konnte nicht gelöscht werden. Bitte versuche es erneut.',
+      ),
       findsOneWidget,
     );
   });
@@ -574,6 +680,27 @@ class _PendingEvidenceReportService extends EvidenceReportService {
     EvidencePhotoMode photoMode = EvidencePhotoMode.allPhotos,
   }) {
     return pending.future;
+  }
+}
+
+class _FailingDeleteEvidenceReportService extends EvidenceReportService {
+  _FailingDeleteEvidenceReportService()
+    : super(exports: MemoryEvidenceExportRepository());
+
+  @override
+  Future<void> delete(EvidenceExportRecord record) {
+    throw StateError('Löschen fehlgeschlagen');
+  }
+}
+
+class _SynchronousDeleteEvidenceReportService extends EvidenceReportService {
+  _SynchronousDeleteEvidenceReportService(
+    MemoryEvidenceExportRepository repository,
+  ) : super(exports: repository);
+
+  @override
+  Future<void> delete(EvidenceExportRecord record) async {
+    await exports.delete(record.id);
   }
 }
 

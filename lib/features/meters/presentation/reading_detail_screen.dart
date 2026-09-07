@@ -31,6 +31,7 @@ class ReadingDetailScreen extends ConsumerStatefulWidget {
 
 class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
   bool _exporting = false;
+  final Set<String> _deletingExportIds = {};
 
   @override
   Widget build(BuildContext context) {
@@ -167,6 +168,8 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
                 onTap: availableFiles[export.id] != true
                     ? null
                     : () => _openExport(export),
+                deleting: _deletingExportIds.contains(export.id),
+                onDelete: () => _deleteExport(export),
               ),
             const SizedBox(height: 10),
           ],
@@ -278,6 +281,40 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
       bytes: await file.readAsBytes(),
     );
     if (mounted) await context.pushNamed('evidencePreview', extra: report);
+  }
+
+  Future<void> _deleteExport(EvidenceExportRecord record) async {
+    if (_deletingExportIds.contains(record.id)) return;
+    final confirmed = await confirmDestructiveAction(
+      context,
+      title: 'Einzelnachweis löschen?',
+      message:
+          'Die PDF wird dauerhaft aus ZählerstandLog gelöscht. Bereits geteilte oder außerhalb der App gespeicherte Kopien bleiben erhalten.',
+    );
+    if (!confirmed || !mounted) return;
+    setState(() => _deletingExportIds.add(record.id));
+    try {
+      await ref.read(evidenceReportServiceProvider).delete(record);
+      ref.invalidate(evidenceForMeterProvider(record.meterId));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(AppSnackBar(message: 'PDF-Nachweis gelöscht.'));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          AppSnackBar(
+            message:
+                'PDF-Nachweis konnte nicht gelöscht werden. Bitte versuche es erneut.',
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _deletingExportIds.remove(record.id));
+      }
+    }
   }
 
   Future<void> _delete(MeterReading reading) async {

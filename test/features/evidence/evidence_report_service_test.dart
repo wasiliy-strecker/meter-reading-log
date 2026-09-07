@@ -30,6 +30,36 @@ void main() {
     expect(record.photoMode, EvidencePhotoMode.allPhotos);
   });
 
+  test('deletes the PDF file and its stored export record', () async {
+    final temp = await Directory.systemTemp.createTemp('delete_evidence_test_');
+    addTearDown(() => temp.delete(recursive: true));
+    final file = File('${temp.path}/single.pdf');
+    await file.writeAsBytes(const [0x25, 0x50, 0x44, 0x46]);
+    final repository = MemoryEvidenceExportRepository();
+    final record = _export(file.path);
+    await repository.save(record);
+    final service = EvidenceReportService(exports: repository);
+
+    await service.delete(record);
+
+    expect(await file.exists(), isFalse);
+    expect(repository.items, isNot(contains(record.id)));
+  });
+
+  test(
+    'deletes the stored record when the PDF file is already missing',
+    () async {
+      final repository = MemoryEvidenceExportRepository();
+      final record = _export('/tmp/missing-evidence-report.pdf');
+      await repository.save(record);
+      final service = EvidenceReportService(exports: repository);
+
+      await service.delete(record);
+
+      expect(repository.items, isNot(contains(record.id)));
+    },
+  );
+
   test(
     'creates a persistent single-reading PDF with internal hashes',
     () async {
@@ -415,6 +445,18 @@ class _RecordingPhotoAssets implements EvidencePhotoAssetRepository {
   @override
   Future<void> delete(String sha256) async {}
 }
+
+EvidenceExportRecord _export(String filePath) => EvidenceExportRecord(
+  id: 'evidence_1',
+  meterId: 'meter_1',
+  kind: EvidenceExportKind.singleReading,
+  readingIds: const ['reading_1'],
+  createdAt: DateTime.utc(2026, 9, 7),
+  fileName: 'single.pdf',
+  filePath: filePath,
+  pdfSha256: 'c' * 64,
+  manifestSha256: 'd' * 64,
+);
 
 MeterReading _reading(
   String photoPath, {

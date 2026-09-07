@@ -47,6 +47,14 @@ class EvidenceReportService {
   final DocumentsDirectoryProvider _documentsDirectoryProvider;
   final EvidencePhotoAssetRepository photoAssets;
 
+  Future<void> delete(EvidenceExportRecord record) async {
+    final file = File(record.filePath);
+    if (await file.exists()) {
+      await file.delete();
+    }
+    await exports.delete(record.id);
+  }
+
   Future<GeneratedEvidenceReport> createSingle({
     required MeterReading reading,
     required List<ReadingRevision> revisions,

@@ -10,14 +10,18 @@ class EvidenceExportCard extends StatelessWidget {
     required this.title,
     required this.detail,
     required this.onTap,
+    required this.onDelete,
     this.fileAvailable = true,
+    this.deleting = false,
   });
 
   final EvidenceExportRecord export;
   final String title;
   final String detail;
   final VoidCallback? onTap;
+  final VoidCallback? onDelete;
   final bool fileAvailable;
+  final bool deleting;
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +33,7 @@ class EvidenceExportCard extends StatelessWidget {
       color: colors.secondaryContainer.withValues(alpha: 0.38),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: onTap,
+        onTap: deleting ? null : onTap,
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Row(
@@ -53,7 +57,7 @@ class EvidenceExportCard extends StatelessWidget {
                       : colors.onErrorContainer,
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -96,15 +100,19 @@ class EvidenceExportCard extends StatelessWidget {
                               color: accent,
                             ),
                             const SizedBox(width: 5),
-                            Text(
-                              fileAvailable
-                                  ? 'Lokal gespeichert'
-                                  : 'Datei fehlt',
-                              style: Theme.of(context).textTheme.labelMedium
-                                  ?.copyWith(
-                                    color: accent,
-                                    fontWeight: FontWeight.w800,
-                                  ),
+                            Flexible(
+                              child: Text(
+                                fileAvailable
+                                    ? 'Lokal gespeichert'
+                                    : 'Datei fehlt',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.labelMedium
+                                    ?.copyWith(
+                                      color: accent,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                              ),
                             ),
                           ],
                         ),
@@ -113,15 +121,29 @@ class EvidenceExportCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              Padding(
-                padding: const EdgeInsets.only(top: 14),
-                child: Icon(
-                  fileAvailable
-                      ? Icons.chevron_right
-                      : Icons.warning_amber_rounded,
-                  color: accent,
-                ),
+              const SizedBox(width: 4),
+              SizedBox(
+                width: 48,
+                height: 48,
+                child: deleting
+                    ? Center(
+                        child: SizedBox.square(
+                          key: ValueKey(
+                            'delete-evidence-progress-${export.id}',
+                          ),
+                          dimension: 22,
+                          child: const CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                          ),
+                        ),
+                      )
+                    : IconButton(
+                        key: ValueKey('delete-evidence-${export.id}'),
+                        tooltip: 'PDF-Nachweis löschen',
+                        onPressed: onDelete,
+                        color: colors.error,
+                        icon: const Icon(Icons.delete_outline),
+                      ),
               ),
             ],
           ),

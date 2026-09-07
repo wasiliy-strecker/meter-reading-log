@@ -7,6 +7,7 @@ import 'package:meter_reading_log/app/app.dart';
 import 'package:meter_reading_log/app/app_providers.dart';
 import 'package:meter_reading_log/core/files/meter_photo_repository.dart';
 import 'package:meter_reading_log/core/ocr/meter_ocr_repository.dart';
+import 'package:meter_reading_log/features/evidence/application/evidence_report_service.dart';
 import 'package:meter_reading_log/features/evidence/domain/evidence_export.dart';
 import 'package:meter_reading_log/features/meters/domain/meter.dart';
 import 'package:meter_reading_log/features/meters/domain/meter_reading.dart';
@@ -274,6 +275,9 @@ void main() {
           meterRepositoryProvider.overrideWithValue(meters),
           meterReadingRepositoryProvider.overrideWithValue(readings),
           evidenceExportRepositoryProvider.overrideWithValue(exports),
+          evidenceReportServiceProvider.overrideWithValue(
+            _SynchronousDeleteEvidenceReportService(exports),
+          ),
           meterPhotoCaptureRepositoryProvider.overrideWithValue(
             _FixedPhotoRepository(),
           ),
@@ -389,6 +393,36 @@ void main() {
       tester.getTopLeft(historyActionTitle).dy,
       lessThan(tester.getTopLeft(historyExportCard).dy),
     );
+    final deleteHistory = find.byKey(
+      const ValueKey('delete-evidence-history_export'),
+    );
+    expect(deleteHistory, findsOneWidget);
+    expect(
+      tester.widget<IconButton>(deleteHistory).tooltip,
+      'PDF-Nachweis löschen',
+    );
+    await tester.tap(deleteHistory);
+    await tester.pumpAndSettle();
+    expect(find.text('Zählerverlaufsnachweis löschen?'), findsOneWidget);
+    expect(
+      find.textContaining('außerhalb der App gespeicherte Kopien'),
+      findsOneWidget,
+    );
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Abbrechen'));
+    await tester.pumpAndSettle();
+    expect(exports.items, contains('history_export'));
+
+    await tester.tap(deleteHistory);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Löschen'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(exports.items, isNot(contains('history_export')));
+    expect(
+      find.byKey(const ValueKey('evidence-export-history_export')),
+      findsNothing,
+    );
+    expect(find.text('PDF-Nachweis gelöscht.'), findsOneWidget);
     await tester.scrollUntilVisible(
       find.text('Zählerverlauf als PDF erstellen'),
       -250,
@@ -421,6 +455,17 @@ class _PendingRevisionRepository extends MemoryReadingRepository {
   @override
   Future<List<ReadingRevision>> loadRevisions(String readingId) {
     return _pending.future;
+  }
+}
+
+class _SynchronousDeleteEvidenceReportService extends EvidenceReportService {
+  _SynchronousDeleteEvidenceReportService(
+    MemoryEvidenceExportRepository repository,
+  ) : super(exports: repository);
+
+  @override
+  Future<void> delete(EvidenceExportRecord record) async {
+    await exports.delete(record.id);
   }
 }
 
