@@ -210,7 +210,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             title: const Text('Backup gespeichert'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text('$fileName wurde im gewählten Speicherort abgelegt.'),
                 const SizedBox(height: 12),
@@ -224,19 +224,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
+                const SizedBox(height: 20),
+                FilledButton.icon(
+                  onPressed: () => Navigator.pop(context, false),
+                  icon: const Icon(Icons.check_rounded),
+                  label: const Text('Fertig', textAlign: TextAlign.center),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: () => Navigator.pop(context, true),
+                  icon: const Icon(Icons.ios_share_outlined),
+                  label: const Text('Teilen', textAlign: TextAlign.center),
+                ),
               ],
             ),
-            actions: [
-              TextButton.icon(
-                onPressed: () => Navigator.pop(context, true),
-                icon: const Icon(Icons.ios_share_outlined),
-                label: const Text('Teilen'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Fertig'),
-              ),
-            ],
           ),
         ) ??
         false;

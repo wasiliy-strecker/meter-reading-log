@@ -86,6 +86,18 @@ void main() {
         find.textContaining('gesichertes-backup.zslbackup'),
         findsOneWidget,
       );
+      final doneButton = find.widgetWithText(FilledButton, 'Fertig');
+      final shareButton = find.widgetWithText(OutlinedButton, 'Teilen');
+      expect(doneButton, findsOneWidget);
+      expect(shareButton, findsOneWidget);
+      expect(
+        tester.getSize(doneButton).width,
+        tester.getSize(shareButton).width,
+      );
+      expect(
+        tester.getTopLeft(doneButton).dy,
+        lessThan(tester.getTopLeft(shareButton).dy),
+      );
 
       await tester.tap(find.text('Teilen'));
       await tester.pumpAndSettle();
