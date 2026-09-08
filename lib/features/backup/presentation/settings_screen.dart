@@ -23,89 +23,97 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   bool _working = false;
   String _workingMessage = '';
+  BackupProgress? _backupProgress;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Einstellungen')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-        children: [
-          Text(
-            'Datensicherung',
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 8),
-          Card(
-            child: Column(
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.lock_outline),
-                  title: const Text('Verschlüsseltes Backup erstellen'),
-                  subtitle: const Text(
-                    'Zähler, Fotos, PDFs und Korrekturverläufe',
-                  ),
-                  trailing: const Icon(Icons.chevron_right),
-                  enabled: !_working,
-                  onTap: _createBackup,
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.settings_backup_restore_outlined),
-                  title: const Text('Backup wiederherstellen'),
-                  subtitle: const Text(
-                    'Vorhandene neuere Einträge bleiben erhalten',
-                  ),
-                  trailing: const Icon(Icons.chevron_right),
-                  enabled: !_working,
-                  onTap: _restoreBackup,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 18),
-          Text(
-            'Datenschutz und Lizenz',
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 8),
-          const Card(
-            child: Padding(
-              padding: EdgeInsets.all(18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+    return PopScope(
+      canPop: !_working,
+      child: Scaffold(
+        appBar: AppBar(title: const Text('Einstellungen')),
+        body: Stack(
+          children: [
+            AbsorbPointer(
+              absorbing: _working,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
                 children: [
                   Text(
-                    'ZählerstandLog 0.1.0',
-                    style: TextStyle(fontWeight: FontWeight.w800),
+                    'Datensicherung',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
+                  Card(
+                    child: Column(
+                      children: [
+                        ListTile(
+                          leading: const Icon(Icons.lock_outline),
+                          title: const Text('Verschlüsseltes Backup erstellen'),
+                          subtitle: const Text(
+                            'Zähler, Fotos, PDFs und Korrekturverläufe',
+                          ),
+                          trailing: const Icon(Icons.chevron_right),
+                          enabled: !_working,
+                          onTap: _createBackup,
+                        ),
+                        const Divider(height: 1),
+                        ListTile(
+                          leading: const Icon(
+                            Icons.settings_backup_restore_outlined,
+                          ),
+                          title: const Text('Backup wiederherstellen'),
+                          subtitle: const Text(
+                            'Vorhandene neuere Einträge bleiben erhalten',
+                          ),
+                          trailing: const Icon(Icons.chevron_right),
+                          enabled: !_working,
+                          onTap: _restoreBackup,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 18),
                   Text(
-                    'Fotos auswerten, Zählerstände speichern und PDFs erstellen – alles passiert lokal auf deinem Gerät. Die App überträgt deine Zählerdaten nicht an einen Server.',
+                    'Datenschutz und Lizenz',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
-                  SizedBox(height: 10),
-                  Text('Quellcode-Lizenz: Mozilla Public License 2.0'),
+                  const SizedBox(height: 8),
+                  const Card(
+                    child: Padding(
+                      padding: EdgeInsets.all(18),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'ZählerstandLog 0.1.0',
+                            style: TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'Fotos auswerten, Zählerstände speichern und PDFs erstellen – alles passiert lokal auf deinem Gerät. Die App überträgt deine Zählerdaten nicht an einen Server.',
+                          ),
+                          SizedBox(height: 10),
+                          Text('Quellcode-Lizenz: Mozilla Public License 2.0'),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
-          ),
-          if (_working) ...[
-            const SizedBox(height: 24),
-            Center(
-              child: Column(
-                children: [
-                  const CircularProgressIndicator(),
-                  const SizedBox(height: 12),
-                  Text(_workingMessage),
-                ],
+            if (_working)
+              Positioned.fill(
+                child: _BackupWorkOverlay(
+                  progress: _backupProgress,
+                  fallbackMessage: _workingMessage,
+                ),
               ),
-            ),
           ],
-        ],
+        ),
       ),
     );
   }
@@ -115,12 +123,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (password == null) return;
     setState(() {
       _working = true;
-      _workingMessage = 'Backup wird verschlüsselt …';
+      _workingMessage = 'Dateien werden vorbereitet …';
+      _backupProgress = const BackupProgress.preparing();
     });
     try {
       final backup = await ref
           .read(encryptedBackupServiceProvider)
-          .create(password);
+          .create(
+            password,
+            onProgress: (progress) {
+              if (mounted) setState(() => _backupProgress = progress);
+            },
+          );
       if (!mounted) return;
       await _shareBackup(backup);
     } on BackupException catch (error) {
@@ -132,6 +146,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         setState(() {
           _working = false;
           _workingMessage = '';
+          _backupProgress = null;
         });
       }
     }
@@ -139,8 +154,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _shareBackup(CreatedBackup backup) {
     final title = 'ZählerstandLog Backup';
+    final sizeInMb = backup.sizeBytes / (1024 * 1024);
     final text =
-        '${backup.preview.meterCount} Zähler, ${backup.preview.readingCount} Ablesungen';
+        '${backup.preview.meterCount} Zähler, ${backup.preview.readingCount} Ablesungen · ${sizeInMb.toStringAsFixed(1)} MB';
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
       return _backupShareChannel.invokeMethod<void>('shareBackup', {
         'path': backup.path,
@@ -178,6 +194,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     setState(() {
       _working = true;
       _workingMessage = 'Backup wird geprüft …';
+      _backupProgress = null;
     });
     try {
       final service = ref.read(encryptedBackupServiceProvider);
@@ -223,6 +240,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         setState(() {
           _working = false;
           _workingMessage = '';
+          _backupProgress = null;
         });
       }
     }
@@ -256,6 +274,116 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void _showMessage(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(AppSnackBar(message: message));
+  }
+}
+
+class _BackupWorkOverlay extends StatelessWidget {
+  const _BackupWorkOverlay({
+    required this.progress,
+    required this.fallbackMessage,
+  });
+
+  final BackupProgress? progress;
+  final String fallbackMessage;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final value = progress?.fraction;
+    final title = progress == null
+        ? fallbackMessage
+        : switch (progress!.phase) {
+            BackupProgressPhase.preparing => 'Dateien werden vorbereitet',
+            BackupProgressPhase.encrypting => 'Backup wird verschlüsselt',
+            BackupProgressPhase.packaging => 'Backup wird abgeschlossen',
+            BackupProgressPhase.complete => 'Backup ist bereit',
+          };
+    final detail = progress == null
+        ? 'Bitte einen Moment warten.'
+        : progress!.totalItems <= 0
+        ? 'Fotos und PDF-Nachweise werden zusammengestellt.'
+        : '${progress!.completedItems} von ${progress!.totalItems} Dateien';
+
+    return ColoredBox(
+      color: colors.surface.withValues(alpha: 0.94),
+      child: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Card(
+              key: const ValueKey('backup-progress-overlay'),
+              elevation: 2,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: colors.primaryContainer,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Icon(
+                            progress?.phase == BackupProgressPhase.complete
+                                ? Icons.check_rounded
+                                : Icons.shield_outlined,
+                            size: 30,
+                            color: colors.onPrimaryContainer,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 220),
+                        child: Text(
+                          title,
+                          key: ValueKey(title),
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        detail,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(99),
+                        child: LinearProgressIndicator(
+                          key: const ValueKey('backup-linear-progress'),
+                          value: value,
+                          minHeight: 8,
+                        ),
+                      ),
+                      if (value != null) ...[
+                        const SizedBox(height: 10),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            '${(value * 100).round()} %',
+                            style: Theme.of(context).textTheme.labelLarge
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

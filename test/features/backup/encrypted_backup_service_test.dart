@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:archive/archive.dart';
+import 'package:cryptography/cryptography.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:meter_reading_log/core/integrity/integrity_service.dart';
 import 'package:meter_reading_log/core/reminders/local_notification_reminder_repository.dart';
@@ -52,6 +54,65 @@ void main() {
     );
   });
 
+  test('failed encryption removes its partial backup file', () async {
+    final temp = await Directory.systemTemp.createTemp('failed_backup_test_');
+    addTearDown(() => temp.delete(recursive: true));
+    final photo = File('${temp.path}/photo.jpg')..writeAsStringSync('photo');
+    final corruptedDuplicate = File('${temp.path}/corrupted.jpg')
+      ..writeAsStringSync('corrupted');
+    final photoHash = await const IntegrityService().sha256Bytes(
+      await photo.readAsBytes(),
+    );
+    final meter = _meter();
+    final meters = MemoryMeterRepository();
+    final readings = MemoryReadingRepository();
+    await meters.save(meter);
+    await readings.save(
+      _reading(meter, photo.path, photoHash).copyWith(
+        photoHistory: [
+          ReadingPhotoVersion(
+            id: 'corrupted_duplicate',
+            path: corruptedDuplicate.path,
+            sha256: photoHash,
+            source: ReadingSource.gallery,
+            addedAt: DateTime.utc(2026, 9, 8),
+            ocrRawText: '',
+            ocrCandidate: '',
+            ocrConfidence: 0,
+          ),
+        ],
+      ),
+    );
+    final service = EncryptedBackupService(
+      meters: meters,
+      readings: readings,
+      exports: MemoryEvidenceExportRepository(),
+      reminders: LocalNotificationReminderRepository.instance,
+      kdfIterations: 1000,
+      temporaryDirectoryProvider: () async => temp,
+      documentsDirectoryProvider: () async => temp,
+    );
+
+    await expectLater(
+      service.create('123456'),
+      throwsA(
+        isA<BackupException>().having(
+          (error) => error.failure,
+          'failure',
+          BackupFailure.integrityMismatch,
+        ),
+      ),
+    );
+    final backupDirectory = Directory('${temp.path}/meter_reading_backups');
+    expect(
+      await backupDirectory
+          .list()
+          .where((entity) => entity.path.endsWith('.zslbackup'))
+          .isEmpty,
+      isTrue,
+    );
+  });
+
   test('encrypted backup round-trips domain data, photos and PDFs', () async {
     final temp = await Directory.systemTemp.createTemp('backup_test_');
     addTearDown(() => temp.delete(recursive: true));
@@ -82,33 +143,41 @@ void main() {
           ocrCandidate: '41,9',
           ocrConfidence: 0.8,
         ),
+        ReadingPhotoVersion(
+          id: 'photo_version_duplicate',
+          path: photo.path,
+          sha256: photoHash,
+          source: ReadingSource.camera,
+          addedAt: DateTime.utc(2026, 8, 30, 11),
+          ocrRawText: '42,5',
+          ocrCandidate: '42,5',
+          ocrConfidence: 0.9,
+        ),
       ],
     );
     await sourceMeters.save(meter);
     await sourceReadings.save(reading);
-    await sourceReadings.saveRevision(
-      ReadingRevision(
-        id: 'revision_1',
-        readingId: reading.id,
-        changedAt: DateTime.utc(2026, 8, 31, 11),
-        reason: 'Kontrolle',
-        changes: const {'Notiz': ReadingChange(before: '', after: 'Geprüft')},
-      ),
+    final revision = ReadingRevision(
+      id: 'revision_1',
+      readingId: reading.id,
+      changedAt: DateTime.utc(2026, 8, 31, 11),
+      reason: 'Kontrolle',
+      changes: const {'Notiz': ReadingChange(before: '', after: 'Geprüft')},
     );
-    await sourceExports.save(
-      EvidenceExportRecord(
-        id: 'export_1',
-        meterId: meter.id,
-        kind: EvidenceExportKind.singleReading,
-        readingIds: [reading.id],
-        createdAt: DateTime.utc(2026, 8, 31, 12),
-        fileName: 'proof.pdf',
-        filePath: pdf.path,
-        pdfSha256: pdfHash,
-        manifestSha256: 'manifest',
-        photoMode: EvidencePhotoMode.currentPhotos,
-      ),
+    await sourceReadings.saveRevision(revision);
+    final export = EvidenceExportRecord(
+      id: 'export_1',
+      meterId: meter.id,
+      kind: EvidenceExportKind.singleReading,
+      readingIds: [reading.id],
+      createdAt: DateTime.utc(2026, 8, 31, 12),
+      fileName: 'proof.pdf',
+      filePath: pdf.path,
+      pdfSha256: pdfHash,
+      manifestSha256: 'manifest',
+      photoMode: EvidencePhotoMode.currentPhotos,
     );
+    await sourceExports.save(export);
 
     final source = EncryptedBackupService(
       meters: sourceMeters,
@@ -119,15 +188,69 @@ void main() {
       temporaryDirectoryProvider: () async => temp,
       documentsDirectoryProvider: () async => temp,
     );
-    final backup = await source.create('sicheres-passwort');
+    final progress = <BackupProgress>[];
+    final backup = await source.create(
+      'sicheres-passwort',
+      onProgress: progress.add,
+    );
     expect(await File(backup.path).exists(), isTrue);
+    expect(backup.sizeBytes, await File(backup.path).length());
     expect(backup.preview.readingCount, 1);
-    final legacyEnvelope = Map<String, dynamic>.from(
-      jsonDecode(await File(backup.path).readAsString()) as Map,
-    )..['schemaVersion'] = 1;
-    final legacyPath =
-        '${temp.path}/legacy.${EncryptedBackupService.extension}';
-    await File(legacyPath).writeAsString(jsonEncode(legacyEnvelope));
+    expect(
+      progress.map((item) => item.phase),
+      containsAllInOrder([
+        BackupProgressPhase.preparing,
+        BackupProgressPhase.encrypting,
+        BackupProgressPhase.packaging,
+        BackupProgressPhase.complete,
+      ]),
+    );
+    final archiveInput = InputFileStream(backup.path);
+    final archive = ZipDecoder().decodeStream(archiveInput);
+    expect(
+      archive.where((entry) => entry.name.startsWith('assets/')),
+      hasLength(3),
+    );
+    archive.clearSync();
+    archiveInput.closeSync();
+
+    final legacyPayload = <String, dynamic>{
+      'manifest': {
+        'format': 'meter_reading_log_backup',
+        'schemaVersion': 2,
+        'createdAt': DateTime.utc(2026, 8, 31, 12).toIso8601String(),
+        'meterCount': 1,
+        'readingCount': 1,
+        'exportCount': 1,
+      },
+      'meters': [meter.toJson()],
+      'readings': [reading.toJson()],
+      'revisions': {
+        reading.id: [revision.toJson()],
+      },
+      'exports': [export.toJson()],
+      'files': [
+        _legacyFile('photo', reading.id, photo, photoHash),
+        _legacyFile(
+          'photoVersion',
+          'photo_version_1',
+          olderPhoto,
+          olderPhotoHash,
+        ),
+        _legacyFile(
+          'photoVersion',
+          'photo_version_duplicate',
+          photo,
+          photoHash,
+        ),
+        _legacyFile('evidence', export.id, pdf, pdfHash),
+      ],
+    };
+    final legacyPath = await _writeLegacyBackup(
+      temp,
+      'sicheres-passwort',
+      legacyPayload,
+    );
     expect(
       (await source.inspect(legacyPath, 'sicheres-passwort')).readingCount,
       1,
@@ -159,12 +282,12 @@ void main() {
       isTrue,
     );
     final restoredReading = (await targetReadings.findById(reading.id))!;
-    expect(restoredReading.photoHistory, hasLength(1));
+    expect(restoredReading.photoHistory, hasLength(2));
     expect(
-      await File(restoredReading.photoHistory.single.path).exists(),
+      await File(restoredReading.photoHistory.first.path).exists(),
       isTrue,
     );
-    expect(restoredReading.photoHistory.single.sha256, olderPhotoHash);
+    expect(restoredReading.photoHistory.first.sha256, olderPhotoHash);
     expect(
       (await targetExports.loadAll()).single.photoMode,
       EvidencePhotoMode.currentPhotos,
@@ -180,7 +303,82 @@ void main() {
         ),
       ),
     );
+
+    final legacyTargetRoot = Directory('${temp.path}/legacy-restored')
+      ..createSync();
+    final legacyReadings = MemoryReadingRepository();
+    final legacyTarget = EncryptedBackupService(
+      meters: MemoryMeterRepository(),
+      readings: legacyReadings,
+      exports: MemoryEvidenceExportRepository(),
+      reminders: LocalNotificationReminderRepository.instance,
+      kdfIterations: 1000,
+      temporaryDirectoryProvider: () async => legacyTargetRoot,
+      documentsDirectoryProvider: () async => legacyTargetRoot,
+    );
+    final legacyResult = await legacyTarget.restore(
+      legacyPath,
+      'sicheres-passwort',
+    );
+    expect(legacyResult.meters, 1);
+    expect(legacyResult.readings, 1);
+    expect(legacyResult.exports, 1);
+    expect(
+      (await legacyReadings.findById(reading.id))!.photoHistory,
+      hasLength(2),
+    );
   });
+}
+
+Map<String, dynamic> _legacyFile(
+  String kind,
+  String ownerId,
+  File file,
+  String sha256,
+) {
+  return {
+    'kind': kind,
+    'ownerId': ownerId,
+    'fileName': file.uri.pathSegments.last,
+    'sha256': sha256,
+    'bytesBase64': base64Encode(file.readAsBytesSync()),
+  };
+}
+
+Future<String> _writeLegacyBackup(
+  Directory directory,
+  String password,
+  Map<String, dynamic> payload,
+) async {
+  const iterations = 1000;
+  final salt = List<int>.generate(16, (index) => index + 1);
+  final nonce = List<int>.generate(12, (index) => index + 20);
+  final key = await Pbkdf2(
+    macAlgorithm: Hmac.sha256(),
+    iterations: iterations,
+    bits: 256,
+  ).deriveKeyFromPassword(password: password, nonce: salt);
+  final box = await AesGcm.with256bits().encrypt(
+    utf8.encode(jsonEncode(payload)),
+    secretKey: key,
+    nonce: nonce,
+  );
+  final envelope = {
+    'format': 'meter_reading_log_backup',
+    'schemaVersion': 2,
+    'crypto': {
+      'algorithm': 'aes-256-gcm',
+      'kdf': 'pbkdf2-hmac-sha256',
+      'iterations': iterations,
+      'salt': base64Encode(salt),
+      'nonce': base64Encode(nonce),
+    },
+    'cipherText': base64Encode(box.cipherText),
+    'mac': base64Encode(box.mac.bytes),
+  };
+  final path = '${directory.path}/legacy.${EncryptedBackupService.extension}';
+  await File(path).writeAsString(jsonEncode(envelope));
+  return path;
 }
 
 Meter _meter() => Meter(

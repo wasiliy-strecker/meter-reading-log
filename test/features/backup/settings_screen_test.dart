@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -51,13 +53,10 @@ void main() {
           .setMockMethodCallHandler(channel, null),
     );
 
+    final service = _ControlledBackupService();
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [
-          encryptedBackupServiceProvider.overrideWithValue(
-            _ImmediateBackupService(),
-          ),
-        ],
+        overrides: [encryptedBackupServiceProvider.overrideWithValue(service)],
         child: const MaterialApp(home: SettingsScreen()),
       ),
     );
@@ -67,6 +66,22 @@ void main() {
     await tester.enterText(find.byType(TextField).at(0), '123456');
     await tester.enterText(find.byType(TextField).at(1), '123456');
     await tester.tap(find.widgetWithText(FilledButton, 'Weiter'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(
+      find.byKey(const ValueKey('backup-progress-overlay')),
+      findsOneWidget,
+    );
+    expect(find.text('Backup wird verschlüsselt'), findsOneWidget);
+    expect(find.text('1 von 2 Dateien'), findsOneWidget);
+    expect(find.text('50 %'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('backup-linear-progress')),
+      findsOneWidget,
+    );
+
+    service.complete();
     await tester.pumpAndSettle();
 
     expect(sharedCall?.method, 'shareBackup');
@@ -74,13 +89,13 @@ void main() {
       (sharedCall?.arguments as Map<Object?, Object?>)['path'],
       '/tmp/test.zslbackup',
     );
-    expect(find.text('Backup wird verschlüsselt …'), findsNothing);
+    expect(find.byKey(const ValueKey('backup-progress-overlay')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }
 
-class _ImmediateBackupService extends EncryptedBackupService {
-  _ImmediateBackupService()
+class _ControlledBackupService extends EncryptedBackupService {
+  _ControlledBackupService()
     : super(
         meters: MemoryMeterRepository(),
         readings: MemoryReadingRepository(),
@@ -88,15 +103,36 @@ class _ImmediateBackupService extends EncryptedBackupService {
         reminders: LocalNotificationReminderRepository.instance,
       );
 
+  final _completer = Completer<CreatedBackup>();
+
   @override
-  Future<CreatedBackup> create(String password) async {
-    return CreatedBackup(
-      path: '/tmp/test.zslbackup',
-      preview: BackupPreview(
-        createdAt: DateTime.utc(2026, 9, 7),
-        meterCount: 2,
-        readingCount: 4,
-        exportCount: 2,
+  Future<CreatedBackup> create(
+    String password, {
+    void Function(BackupProgress progress)? onProgress,
+  }) {
+    onProgress?.call(
+      const BackupProgress(
+        phase: BackupProgressPhase.encrypting,
+        processedBytes: 50,
+        totalBytes: 100,
+        completedItems: 1,
+        totalItems: 2,
+      ),
+    );
+    return _completer.future;
+  }
+
+  void complete() {
+    _completer.complete(
+      CreatedBackup(
+        path: '/tmp/test.zslbackup',
+        sizeBytes: 8 * 1024 * 1024,
+        preview: BackupPreview(
+          createdAt: DateTime.utc(2026, 9, 7),
+          meterCount: 2,
+          readingCount: 4,
+          exportCount: 2,
+        ),
       ),
     );
   }

@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:math';
 
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter/foundation.dart';
@@ -13,6 +12,8 @@ import '../../evidence/domain/evidence_export.dart';
 import '../../meters/domain/meter.dart';
 import '../../meters/domain/meter_reading.dart';
 import '../../meters/domain/meter_repositories.dart';
+import 'binary_backup_codec.dart';
+import 'binary_backup_worker_runner.dart';
 
 enum BackupFailure {
   passwordTooShort,
@@ -49,11 +50,65 @@ class BackupPreview {
   final int exportCount;
 }
 
+enum BackupProgressPhase { preparing, encrypting, packaging, complete }
+
+class BackupProgress {
+  const BackupProgress({
+    required this.phase,
+    required this.processedBytes,
+    required this.totalBytes,
+    required this.completedItems,
+    required this.totalItems,
+  });
+
+  const BackupProgress.preparing()
+    : phase = BackupProgressPhase.preparing,
+      processedBytes = 0,
+      totalBytes = 0,
+      completedItems = 0,
+      totalItems = 0;
+
+  final BackupProgressPhase phase;
+  final int processedBytes;
+  final int totalBytes;
+  final int completedItems;
+  final int totalItems;
+
+  double? get fraction {
+    if (phase == BackupProgressPhase.complete) return 1;
+    if (phase == BackupProgressPhase.packaging) return 0.97;
+    if (phase == BackupProgressPhase.preparing || totalBytes <= 0) return null;
+    final byteFraction = (processedBytes / totalBytes).clamp(0.0, 1.0);
+    return 0.04 + (byteFraction * 0.91);
+  }
+
+  factory BackupProgress.fromWorker(Map<String, dynamic> value) {
+    final phase = switch (value['phase']) {
+      'encrypting' => BackupProgressPhase.encrypting,
+      'packaging' => BackupProgressPhase.packaging,
+      'complete' => BackupProgressPhase.complete,
+      _ => BackupProgressPhase.preparing,
+    };
+    return BackupProgress(
+      phase: phase,
+      processedBytes: (value['processedBytes'] as num?)?.toInt() ?? 0,
+      totalBytes: (value['totalBytes'] as num?)?.toInt() ?? 0,
+      completedItems: (value['completedItems'] as num?)?.toInt() ?? 0,
+      totalItems: (value['totalItems'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
 class CreatedBackup {
-  const CreatedBackup({required this.path, required this.preview});
+  const CreatedBackup({
+    required this.path,
+    required this.preview,
+    required this.sizeBytes,
+  });
 
   final String path;
   final BackupPreview preview;
+  final int sizeBytes;
 }
 
 class BackupImportResult {
@@ -89,7 +144,8 @@ class EncryptedBackupService {
 
   static const extension = 'zslbackup';
   static const _format = 'meter_reading_log_backup';
-  static const _version = 2;
+  static const _version = binaryBackupVersion;
+  static const _maximumLegacyVersion = 2;
   static const _minimumPasswordLength = 6;
 
   final MeterRepository meters;
@@ -101,8 +157,12 @@ class EncryptedBackupService {
   final BackupDirectoryProvider _temporaryDirectoryProvider;
   final BackupDirectoryProvider _documentsDirectoryProvider;
 
-  Future<CreatedBackup> create(String password) async {
+  Future<CreatedBackup> create(
+    String password, {
+    void Function(BackupProgress progress)? onProgress,
+  }) async {
     _validatePassword(password);
+    onProgress?.call(const BackupProgress.preparing());
     final createdAt = DateTime.now();
     final allMeters = await meters.loadAll();
     final allReadings = await readings.loadAll();
@@ -114,41 +174,36 @@ class EncryptedBackupService {
       )).map((item) => item.toJson()).toList();
     }
     final files = <Map<String, dynamic>>[];
+    final assets = <Map<String, dynamic>>[];
     for (final reading in allReadings) {
-      final portable = await _portableFile(
+      final portable = await _portableFileReference(
         kind: 'photo',
         ownerId: reading.id,
         path: reading.photoPath,
+        expectedSha256: reading.photoSha256,
       );
-      if (portable['sha256'] != reading.photoSha256) {
-        throw BackupException(
-          BackupFailure.integrityMismatch,
-          reading.photoPath,
-        );
-      }
       files.add(portable);
+      assets.add({'sha256': reading.photoSha256, 'path': reading.photoPath});
       for (final version in reading.photoHistory) {
-        final archived = await _portableFile(
+        final archived = await _portableFileReference(
           kind: 'photoVersion',
           ownerId: version.id,
           path: version.path,
+          expectedSha256: version.sha256,
         );
-        if (archived['sha256'] != version.sha256) {
-          throw BackupException(BackupFailure.integrityMismatch, version.path);
-        }
         files.add(archived);
+        assets.add({'sha256': version.sha256, 'path': version.path});
       }
     }
     for (final export in allExports) {
-      final portable = await _portableFile(
+      final portable = await _portableFileReference(
         kind: 'evidence',
         ownerId: export.id,
         path: export.filePath,
+        expectedSha256: export.pdfSha256,
       );
-      if (portable['sha256'] != export.pdfSha256) {
-        throw BackupException(BackupFailure.integrityMismatch, export.filePath);
-      }
       files.add(portable);
+      assets.add({'sha256': export.pdfSha256, 'path': export.filePath});
     }
     final payload = <String, dynamic>{
       'manifest': {
@@ -172,14 +227,25 @@ class EncryptedBackupService {
       ),
     );
     await _prepareBackupDirectory(directory);
-    final encodedEnvelope = await _encrypt(payload, password);
     final stamp = createdAt.toIso8601String().replaceAll(RegExp(r'[:.]'), '-');
     final file = File(
       p.join(directory.path, 'zaehlerstandlog_$stamp.$extension'),
     );
-    await file.writeAsString(encodedEnvelope, flush: true);
+    late final Map<String, dynamic> workerResult;
+    try {
+      workerResult = await runBinaryBackupWorker({
+        'outputPath': file.path,
+        'password': password,
+        'iterations': kdfIterations,
+        'payload': payload,
+        'assets': assets,
+      }, (value) => onProgress?.call(BackupProgress.fromWorker(value)));
+    } on BinaryBackupCodecException catch (error) {
+      throw _translateBinaryError(error);
+    }
     return CreatedBackup(
       path: file.path,
+      sizeBytes: (workerResult['sizeBytes'] as num).toInt(),
       preview: BackupPreview(
         createdAt: createdAt,
         meterCount: allMeters.length,
@@ -190,12 +256,62 @@ class EncryptedBackupService {
   }
 
   Future<BackupPreview> inspect(String path, String password) async {
-    final payload = await _decrypt(path, password);
-    return _preview(payload);
+    _validatePassword(password);
+    if (!await isBinaryBackup(path)) {
+      return _preview(await _decryptLegacy(path, password));
+    }
+    BinaryBackupReader? reader;
+    try {
+      reader = await BinaryBackupReader.open(path, password);
+      _validatePayload(reader.payload, expectedVersion: _version);
+      return _preview(reader.payload);
+    } on BinaryBackupCodecException catch (error) {
+      throw _translateBinaryError(error);
+    } finally {
+      reader?.close();
+    }
   }
 
   Future<BackupImportResult> restore(String path, String password) async {
-    final payload = await _decrypt(path, password);
+    _validatePassword(password);
+    BinaryBackupReader? reader;
+    Directory? stagingDirectory;
+    late final Map<String, dynamic> payload;
+    try {
+      Map<String, String>? stagedAssets;
+      if (await isBinaryBackup(path)) {
+        reader = await BinaryBackupReader.open(path, password);
+        payload = reader.payload;
+        _validatePayload(payload, expectedVersion: _version);
+        stagingDirectory = Directory(
+          p.join(
+            (await _temporaryDirectoryProvider()).path,
+            'meter_backup_restore_${DateTime.now().microsecondsSinceEpoch}',
+          ),
+        );
+        stagedAssets = await _stageBinaryAssets(
+          reader,
+          payload,
+          stagingDirectory,
+        );
+      } else {
+        payload = await _decryptLegacy(path, password);
+      }
+      return await _restorePayload(payload, stagedAssets: stagedAssets);
+    } on BinaryBackupCodecException catch (error) {
+      throw _translateBinaryError(error);
+    } finally {
+      reader?.close();
+      if (stagingDirectory != null && await stagingDirectory.exists()) {
+        await stagingDirectory.delete(recursive: true);
+      }
+    }
+  }
+
+  Future<BackupImportResult> _restorePayload(
+    Map<String, dynamic> payload, {
+    Map<String, String>? stagedAssets,
+  }) async {
     final files = <String, Map<String, dynamic>>{
       for (final item in payload['files'] as List)
         '${(item as Map)['kind']}:${item['ownerId']}':
@@ -238,6 +354,7 @@ class EncryptedBackupService {
       final restoredPath = await _restoreFile(
         portable,
         Directory(p.join(documents.path, 'meter_photos')),
+        stagedAssets: stagedAssets,
       );
       final restoredHistory = <ReadingPhotoVersion>[];
       for (final version in reading.photoHistory) {
@@ -253,6 +370,7 @@ class EncryptedBackupService {
             path: await _restoreFile(
               archived,
               Directory(p.join(documents.path, 'meter_photos')),
+              stagedAssets: stagedAssets,
             ),
           ),
         );
@@ -287,6 +405,7 @@ class EncryptedBackupService {
       final restoredPath = await _restoreFile(
         portable,
         Directory(p.join(documents.path, 'evidence_reports')),
+        stagedAssets: stagedAssets,
       );
       await exports.save(
         EvidenceExportRecord(
@@ -324,22 +443,22 @@ class EncryptedBackupService {
     );
   }
 
-  Future<Map<String, dynamic>> _portableFile({
+  Future<Map<String, dynamic>> _portableFileReference({
     required String kind,
     required String ownerId,
     required String path,
+    required String expectedSha256,
   }) async {
     final file = File(path);
     if (!await file.exists()) {
       throw BackupException(BackupFailure.missingFile, path);
     }
-    final bytes = await file.readAsBytes();
     return {
       'kind': kind,
       'ownerId': ownerId,
       'fileName': p.basename(path),
-      'sha256': await integrity.sha256Bytes(bytes),
-      'bytesBase64': base64Encode(bytes),
+      'sha256': expectedSha256,
+      'assetSha256': expectedSha256,
     };
   }
 
@@ -358,10 +477,30 @@ class EncryptedBackupService {
 
   Future<String> _restoreFile(
     Map<String, dynamic> portable,
-    Directory directory,
-  ) async {
-    final bytes = base64Decode(portable['bytesBase64'] as String);
+    Directory directory, {
+    Map<String, String>? stagedAssets,
+  }) async {
     final expected = portable['sha256'] as String;
+    final List<int> bytes;
+    if (stagedAssets != null) {
+      final assetSha256 = portable['assetSha256'] as String?;
+      if (assetSha256 == null || assetSha256 != expected) {
+        throw BackupException(
+          BackupFailure.invalidFormat,
+          portable['fileName'] as String? ?? '',
+        );
+      }
+      final stagedPath = stagedAssets[assetSha256];
+      if (stagedPath == null) {
+        throw BackupException(
+          BackupFailure.invalidFormat,
+          portable['fileName'] as String? ?? '',
+        );
+      }
+      bytes = await File(stagedPath).readAsBytes();
+    } else {
+      bytes = base64Decode(portable['bytesBase64'] as String);
+    }
     if (await integrity.sha256Bytes(bytes) != expected) {
       throw BackupException(
         BackupFailure.integrityMismatch,
@@ -380,33 +519,38 @@ class EncryptedBackupService {
     return file.path;
   }
 
-  Future<String> _encrypt(Map<String, dynamic> payload, String password) async {
-    final salt = _secureRandomBytes(16);
-    final nonce = _secureRandomBytes(12);
-    final clearTextFuture = compute(
-      _encodeBackupPayload,
-      payload,
-      debugLabel: 'ZSL backup JSON encoding',
-    );
-    final key = await _deriveBackupKey(password, salt, kdfIterations);
-    final clearText = await clearTextFuture;
-    final box = await AesGcm.with256bits().encrypt(
-      clearText,
-      secretKey: key,
-      nonce: nonce,
-    );
-    return compute(_encodeBackupEnvelope, <String, dynamic>{
-      'format': _format,
-      'schemaVersion': _version,
-      'iterations': kdfIterations,
-      'salt': salt,
-      'nonce': nonce,
-      'cipherText': box.cipherText,
-      'mac': box.mac.bytes,
-    }, debugLabel: 'ZSL backup envelope encoding');
+  Future<Map<String, String>> _stageBinaryAssets(
+    BinaryBackupReader reader,
+    Map<String, dynamic> payload,
+    Directory directory,
+  ) async {
+    final assetIds = <String>{};
+    final rawFiles = payload['files'];
+    if (rawFiles is! List) {
+      throw const BackupException(BackupFailure.invalidFormat);
+    }
+    for (final rawFile in rawFiles) {
+      final file = Map<String, dynamic>.from(rawFile as Map);
+      final sha256 = file['assetSha256'] as String?;
+      if (sha256 == null || sha256 != file['sha256']) {
+        throw const BackupException(BackupFailure.invalidFormat);
+      }
+      assetIds.add(sha256);
+    }
+    await directory.create(recursive: true);
+    final staged = <String, String>{};
+    for (final sha256 in assetIds) {
+      final target = File(p.join(directory.path, '$sha256.bin'));
+      await target.writeAsBytes(await reader.readAsset(sha256), flush: true);
+      staged[sha256] = target.path;
+    }
+    return staged;
   }
 
-  Future<Map<String, dynamic>> _decrypt(String path, String password) async {
+  Future<Map<String, dynamic>> _decryptLegacy(
+    String path,
+    String password,
+  ) async {
     _validatePassword(password);
     late final String encodedEnvelope;
     try {
@@ -417,7 +561,7 @@ class EncryptedBackupService {
     final envelope = await compute(_decodeBackupEnvelope, <String, dynamic>{
       'encodedEnvelope': encodedEnvelope,
       'format': _format,
-      'maximumSchemaVersion': _version,
+      'maximumSchemaVersion': _maximumLegacyVersion,
     }, debugLabel: 'ZSL backup envelope decoding');
     final failure = envelope['failure'] as String?;
     if (failure != null) {
@@ -459,10 +603,18 @@ class EncryptedBackupService {
     return payload;
   }
 
-  void _validatePayload(Map<String, dynamic> payload) {
+  void _validatePayload(Map<String, dynamic> payload, {int? expectedVersion}) {
     final manifest = payload['manifest'];
+    final rawSchemaVersion = manifest is Map ? manifest['schemaVersion'] : null;
+    final schemaVersion = rawSchemaVersion is num
+        ? rawSchemaVersion.toInt()
+        : null;
     if (manifest is! Map ||
         manifest['format'] != _format ||
+        schemaVersion == null ||
+        schemaVersion < 1 ||
+        schemaVersion > _version ||
+        (expectedVersion != null && schemaVersion != expectedVersion) ||
         payload['meters'] is! List ||
         payload['readings'] is! List ||
         payload['revisions'] is! Map ||
@@ -487,26 +639,16 @@ class EncryptedBackupService {
       throw const BackupException(BackupFailure.passwordTooShort);
     }
   }
-}
 
-Uint8List _encodeBackupPayload(Map<String, dynamic> payload) {
-  return Uint8List.fromList(utf8.encode(jsonEncode(payload)));
-}
-
-String _encodeBackupEnvelope(Map<String, dynamic> input) {
-  return jsonEncode({
-    'format': input['format'] as String,
-    'schemaVersion': input['schemaVersion'] as int,
-    'crypto': {
-      'algorithm': 'aes-256-gcm',
-      'kdf': 'pbkdf2-hmac-sha256',
-      'iterations': input['iterations'] as int,
-      'salt': base64Encode(input['salt'] as List<int>),
-      'nonce': base64Encode(input['nonce'] as List<int>),
-    },
-    'cipherText': base64Encode(input['cipherText'] as List<int>),
-    'mac': base64Encode(input['mac'] as List<int>),
-  });
+  BackupException _translateBinaryError(BinaryBackupCodecException error) {
+    return BackupException(switch (error.code) {
+      'missingFile' => BackupFailure.missingFile,
+      'invalidPassword' => BackupFailure.invalidPassword,
+      'unsupportedVersion' => BackupFailure.unsupportedVersion,
+      'integrityMismatch' => BackupFailure.integrityMismatch,
+      _ => BackupFailure.invalidFormat,
+    }, error.detail);
+  }
 }
 
 Map<String, dynamic> _decodeBackupEnvelope(Map<String, dynamic> input) {
@@ -558,9 +700,4 @@ Future<SecretKey> _deriveBackupKey(
     iterations: iterations,
     bits: 256,
   ).deriveKeyFromPassword(password: password, nonce: salt);
-}
-
-List<int> _secureRandomBytes(int length) {
-  final random = Random.secure();
-  return List<int>.generate(length, (_) => random.nextInt(256));
 }

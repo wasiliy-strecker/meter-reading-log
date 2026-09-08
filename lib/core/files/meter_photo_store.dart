@@ -7,26 +7,42 @@ import 'package:path_provider/path_provider.dart';
 import '../integrity/integrity_service.dart';
 import '../utils/id_generator.dart';
 import '../../features/meters/domain/meter_reading.dart';
+import 'meter_photo_optimizer.dart';
 import 'meter_photo_repository.dart';
+
+typedef MeterPhotoDocumentsDirectoryProvider = Future<Directory> Function();
+typedef MeterPhotoPicker = Future<XFile?> Function(ReadingSource source);
 
 class DeviceMeterPhotoCaptureRepository implements MeterPhotoCaptureRepository {
   DeviceMeterPhotoCaptureRepository({
     ImagePicker? picker,
     IntegrityService integrity = const IntegrityService(),
+    MeterPhotoOptimizer optimizer = const MeterPhotoOptimizer(),
+    MeterPhotoDocumentsDirectoryProvider? documentsDirectoryProvider,
+    MeterPhotoPicker? photoPicker,
   }) : _picker = picker ?? ImagePicker(),
-       _integrity = integrity;
+       _integrity = integrity,
+       _optimizer = optimizer,
+       _photoPicker = photoPicker,
+       _documentsDirectoryProvider =
+           documentsDirectoryProvider ?? getApplicationDocumentsDirectory;
 
   final ImagePicker _picker;
   final IntegrityService _integrity;
+  final MeterPhotoOptimizer _optimizer;
+  final MeterPhotoDocumentsDirectoryProvider _documentsDirectoryProvider;
+  final MeterPhotoPicker? _photoPicker;
 
   @override
   Future<StoredMeterPhoto?> capture(ReadingSource source) async {
-    final picked = await _picker.pickImage(
-      source: source == ReadingSource.camera
-          ? ImageSource.camera
-          : ImageSource.gallery,
-      requestFullMetadata: true,
-    );
+    final picked = await (_photoPicker != null
+        ? _photoPicker(source)
+        : _picker.pickImage(
+            source: source == ReadingSource.camera
+                ? ImageSource.camera
+                : ImageSource.gallery,
+            requestFullMetadata: false,
+          ));
     if (picked == null) {
       return null;
     }
@@ -51,15 +67,26 @@ class DeviceMeterPhotoCaptureRepository implements MeterPhotoCaptureRepository {
     required ReadingSource source,
     required DateTime capturedAt,
   }) async {
-    final bytes = await picked.readAsBytes();
-    final documents = await getApplicationDocumentsDirectory();
+    final documents = await _documentsDirectoryProvider();
     final directory = Directory(p.join(documents.path, 'meter_photos'));
     await directory.create(recursive: true);
-    final extension = _safeExtension(p.extension(picked.name));
-    final file = File(
-      p.join(directory.path, '${newLocalId('photo')}$extension'),
+    final id = newLocalId('photo');
+    final optimizedFile = File(p.join(directory.path, '$id.jpg'));
+    final staging = File(p.join(directory.path, '$id.preparing.jpg'));
+    final optimized = await _optimizer.optimize(
+      sourcePath: picked.path,
+      targetPath: staging.path,
     );
-    await file.writeAsBytes(bytes, flush: true);
+    late final File file;
+    if (optimized) {
+      file = await staging.rename(optimizedFile.path);
+    } else {
+      if (await staging.exists()) await staging.delete();
+      final extension = _safeExtension(p.extension(picked.name));
+      file = File(p.join(directory.path, '$id$extension'));
+      await File(picked.path).copy(file.path);
+    }
+    final bytes = await file.readAsBytes();
     return StoredMeterPhoto(
       path: file.path,
       sha256: await _integrity.sha256Bytes(bytes),
