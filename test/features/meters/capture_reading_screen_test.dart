@@ -56,7 +56,12 @@ void main() {
 
     await tester.tap(find.text('Wärme Keller'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Ablesen / Fotografieren'));
+    final emptyHistoryAction = find.byKey(
+      const ValueKey('empty-readings-action'),
+    );
+    expect(emptyHistoryAction, findsOneWidget);
+    expect(find.text('Erste Ablesung erfassen'), findsOneWidget);
+    await tester.tap(emptyHistoryAction);
     await tester.pumpAndSettle();
     expect(find.text('Ablesen / Fotografieren'), findsWidgets);
 

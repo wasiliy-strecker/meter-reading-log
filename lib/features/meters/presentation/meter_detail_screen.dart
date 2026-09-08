@@ -84,6 +84,8 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
         .toList(growable: false);
     void openMeterEditor() =>
         context.pushNamed('meterEdit', pathParameters: {'id': meter.id});
+    void captureReading() =>
+        context.pushNamed('captureReading', pathParameters: {'id': meter.id});
     return Scaffold(
       appBar: _appBar(meter.label),
       body: readingsAsync.when(
@@ -119,7 +121,7 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
             ),
             const SizedBox(height: 8),
             if (readings.isEmpty)
-              const _EmptyReadings()
+              _EmptyReadings(onTap: captureReading)
             else
               for (var index = 0; index < readings.length; index++)
                 _ReadingTile(
@@ -159,10 +161,7 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.pushNamed(
-          'captureReading',
-          pathParameters: {'id': meter.id},
-        ),
+        onPressed: captureReading,
         icon: const Icon(Icons.add_a_photo_outlined),
         label: const Text('Ablesen / Fotografieren'),
       ),
@@ -617,26 +616,54 @@ class _ReadingPhotoThumbnail extends StatelessWidget {
 }
 
 class _EmptyReadings extends StatelessWidget {
-  const _EmptyReadings();
+  const _EmptyReadings({required this.onTap});
+
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            Icon(
-              Icons.add_a_photo_outlined,
-              size: 44,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              'Noch keine Ablesung. Fotografiere den Zähler und bestätige den lokal erkannten Wert.',
-              textAlign: TextAlign.center,
-            ),
-          ],
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        key: const ValueKey('empty-readings-action'),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            children: [
+              Icon(
+                Icons.add_a_photo_outlined,
+                size: 44,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Noch keine Ablesung. Fotografiere den Zähler und bestätige den lokal erkannten Wert.',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 14),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Flexible(
+                    child: Text(
+                      'Erste Ablesung erfassen',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.chevron_right,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
