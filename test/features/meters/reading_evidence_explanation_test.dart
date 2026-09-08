@@ -445,27 +445,56 @@ void main() {
       find.textContaining('Die andere kannst du weiterhin erstellen'),
       findsNothing,
     );
-    final currentStatus = find.byKey(const ValueKey('current-evidence-status'));
-    expect(currentStatus, findsOneWidget);
+    expect(find.byKey(const ValueKey('current-evidence-status')), findsNothing);
+    final compactCard = find.byKey(
+      const ValueKey('evidence-export-single_current'),
+    );
+    final compactBadge = find.byKey(
+      const ValueKey('current-evidence-badge-single_current'),
+    );
+    final photoCard = find.byKey(
+      const ValueKey('evidence-export-single_current_photo'),
+    );
+    final photoBadge = find.byKey(
+      const ValueKey('current-evidence-badge-single_current_photo'),
+    );
+    expect(compactBadge, findsOneWidget);
+    expect(photoBadge, findsOneWidget);
     expect(
       find.descendant(
-        of: currentStatus,
+        of: compactBadge,
         matching: find.byIcon(Icons.check_circle_rounded),
       ),
       findsOneWidget,
     );
-    expect(find.text('Aktuelle PDF-Nachweise'), findsOneWidget);
     expect(
-      find.text(
-        'Kompakt ohne Fotos · Erstellt am ${formatDateTime(DateTime.utc(2026, 9, 5, 10))} Uhr',
+      find.descendant(
+        of: compactCard,
+        matching: find.text('Aktueller PDF-Nachweis'),
       ),
       findsOneWidget,
     );
     expect(
-      find.text(
-        'Mit aktuellem Foto · Erstellt am ${formatDateTime(DateTime.utc(2026, 9, 5, 10, 1))} Uhr',
+      find.descendant(
+        of: photoCard,
+        matching: find.text('Aktueller PDF-Nachweis'),
       ),
       findsOneWidget,
+    );
+    expect(find.text('Aktueller PDF-Nachweis'), findsNWidgets(2));
+    expect(find.text('Aktuelle PDF-Nachweise'), findsNothing);
+    expect(
+      tester.getTopLeft(compactBadge).dy,
+      lessThan(
+        tester
+            .getTopLeft(
+              find.descendant(
+                of: compactCard,
+                matching: find.text('Einzelnachweis'),
+              ),
+            )
+            .dy,
+      ),
     );
 
     final deletePhotoEvidence = find.byKey(
@@ -500,12 +529,17 @@ void main() {
     expect(enabledButton.onPressed, isNotNull);
     expect(find.text('Aktueller PDF-Nachweis'), findsOneWidget);
     expect(
-      find.byKey(const ValueKey('current-evidence-currentPhotos')),
+      find.byKey(const ValueKey('current-evidence-badge-single_current_photo')),
       findsNothing,
     );
     expect(
-      find.text(
-        'Kompakt ohne Fotos · Erstellt am ${formatDateTime(DateTime.utc(2026, 9, 5, 10))} Uhr',
+      find.byKey(const ValueKey('current-evidence-badge-single_current')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('evidence-export-single_current')),
+        matching: find.textContaining('Kompakt ohne Fotos'),
       ),
       findsOneWidget,
     );

@@ -87,15 +87,7 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
         currentEvidenceByMode.putIfAbsent(mode, () => export);
       }
     }
-    final currentEvidenceExports = [
-      for (final mode in const [
-        EvidencePhotoMode.withoutPhotos,
-        EvidencePhotoMode.currentPhotos,
-      ])
-        ?currentEvidenceByMode[mode],
-    ];
     final currentEvidenceModes = currentEvidenceByMode.keys.toSet();
-    final hasAnyCurrentEvidence = currentEvidenceModes.isNotEmpty;
     final hasBothCurrentEvidence =
         currentEvidenceModes.contains(EvidencePhotoMode.withoutPhotos) &&
         currentEvidenceModes.contains(EvidencePhotoMode.currentPhotos);
@@ -173,6 +165,10 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
                 title: 'Einzelnachweis',
                 detail:
                     'Zählerstand: ${reading.value.displayText} ${reading.meter.unit}\n${export.photoMode.labelFor(export.kind)}',
+                currentLabel:
+                    currentEvidenceByMode[export.photoMode]?.id == export.id
+                    ? 'Aktueller PDF-Nachweis'
+                    : null,
                 fileAvailable: availableFiles[export.id] == true,
                 onTap: availableFiles[export.id] != true
                     ? null
@@ -202,10 +198,6 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
               textAlign: TextAlign.center,
             ),
           ),
-          if (hasAnyCurrentEvidence) ...[
-            const SizedBox(height: 8),
-            _CurrentEvidenceStatus(exports: currentEvidenceExports),
-          ],
           if (evidenceCheckFailed) ...[
             const SizedBox(height: 8),
             Text(
@@ -334,58 +326,6 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
         context.goNamed('meterDetail', pathParameters: {'id': reading.meterId});
       }
     }
-  }
-}
-
-class _CurrentEvidenceStatus extends StatelessWidget {
-  const _CurrentEvidenceStatus({required this.exports});
-
-  final List<EvidenceExportRecord> exports;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Card(
-      key: const ValueKey('current-evidence-status'),
-      margin: EdgeInsets.zero,
-      color: colors.primaryContainer.withValues(alpha: 0.58),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(Icons.check_circle_rounded, color: colors.primary),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    exports.length == 1
-                        ? 'Aktueller PDF-Nachweis'
-                        : 'Aktuelle PDF-Nachweise',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: colors.onPrimaryContainer,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  for (final export in exports) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      '${export.photoMode.labelFor(export.kind)} · Erstellt am ${formatDateTime(export.createdAt)} Uhr',
-                      key: ValueKey(
-                        'current-evidence-${export.photoMode.name}',
-                      ),
-                      style: TextStyle(color: colors.onPrimaryContainer),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
 
