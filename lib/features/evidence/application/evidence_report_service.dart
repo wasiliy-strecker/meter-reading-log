@@ -102,13 +102,42 @@ class EvidenceReportService {
     if (readings.isEmpty) {
       throw StateError('Für diesen Zähler gibt es noch keine Ablesungen.');
     }
+    final sortedReadings = [...readings]
+      ..sort((left, right) => left.capturedAt.compareTo(right.capturedAt));
+    final manifestSha = await _reportManifestHash(sortedReadings, revisions);
+    final existingExports = await exports.loadForMeter(
+      sortedReadings.first.meterId,
+    );
+    for (final export in existingExports) {
+      final matchesCurrentHistory =
+          export.kind == EvidenceExportKind.meterHistory &&
+          export.manifestSha256 == manifestSha &&
+          export.photoMode == photoMode;
+      if (matchesCurrentHistory && await File(export.filePath).exists()) {
+        throw StateError(
+          'Für den aktuellen Stand dieses Zählerverlaufs wurde diese PDF-Variante bereits erstellt.',
+        );
+      }
+    }
     return _create(
-      readings: [...readings]
-        ..sort((left, right) => left.capturedAt.compareTo(right.capturedAt)),
+      readings: sortedReadings,
       revisions: revisions,
       kind: EvidenceExportKind.meterHistory,
       photoMode: photoMode,
+      manifestSha256: manifestSha,
     );
+  }
+
+  Future<String> historyManifestSha256({
+    required List<MeterReading> readings,
+    required Map<String, List<ReadingRevision>> revisions,
+  }) {
+    if (readings.isEmpty) {
+      throw StateError('Für diesen Zähler gibt es noch keine Ablesungen.');
+    }
+    final sortedReadings = [...readings]
+      ..sort((left, right) => left.capturedAt.compareTo(right.capturedAt));
+    return _reportManifestHash(sortedReadings, revisions);
   }
 
   Future<GeneratedEvidenceReport> _create({

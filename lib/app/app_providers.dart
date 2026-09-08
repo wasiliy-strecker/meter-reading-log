@@ -173,6 +173,28 @@ final singleReadingEvidenceManifestProvider = FutureProvider.autoDispose
       );
     });
 
+final historyEvidenceManifestProvider = FutureProvider.autoDispose
+    .family<String?, String>((ref, meterId) async {
+      final readingsFuture = ref.watch(
+        readingsForMeterProvider(meterId).future,
+      );
+      final repository = ref.watch(meterReadingRepositoryProvider);
+      final service = ref.watch(evidenceReportServiceProvider);
+      final readings = await readingsFuture;
+      if (readings.isEmpty) return null;
+      final revisionLists = await Future.wait(
+        readings.map((reading) => repository.loadRevisions(reading.id)),
+      );
+      final revisions = <String, List<ReadingRevision>>{
+        for (var index = 0; index < readings.length; index++)
+          readings[index].id: revisionLists[index],
+      };
+      return service.historyManifestSha256(
+        readings: readings,
+        revisions: revisions,
+      );
+    });
+
 final evidenceForMeterProvider =
     StreamProvider.family<List<EvidenceExportRecord>, String>(
       (ref, id) =>

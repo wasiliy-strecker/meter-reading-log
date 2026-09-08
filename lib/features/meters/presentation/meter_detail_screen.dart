@@ -77,11 +77,45 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
 
   Widget _buildContent(Meter meter) {
     final readingsAsync = ref.watch(readingsForMeterProvider(meter.id));
-    final exports =
-        ref.watch(evidenceForMeterProvider(meter.id)).value ?? const [];
+    final exportsAsync = ref.watch(evidenceForMeterProvider(meter.id));
+    final exports = exportsAsync.value ?? const [];
     final historyExports = exports
         .where((export) => export.kind == EvidenceExportKind.meterHistory)
         .toList(growable: false);
+    final manifestAsync = historyExports.isEmpty
+        ? const AsyncValue<String?>.data(null)
+        : ref.watch(historyEvidenceManifestProvider(meter.id));
+    final availableFiles = <String, bool>{
+      for (final export in historyExports)
+        export.id: File(export.filePath).existsSync(),
+    };
+    final currentManifest = manifestAsync.value;
+    final matchingExports = currentManifest == null
+        ? const <EvidenceExportRecord>[]
+        : historyExports
+              .where((export) => export.manifestSha256 == currentManifest)
+              .toList(growable: false);
+    final checkingCurrentEvidence =
+        exportsAsync.isLoading || manifestAsync.isLoading;
+    final evidenceCheckFailed = exportsAsync.hasError || manifestAsync.hasError;
+    final currentEvidenceByMode = <EvidencePhotoMode, EvidenceExportRecord>{};
+    for (final export in matchingExports) {
+      final mode = export.photoMode;
+      final isCurrentMode =
+          mode == EvidencePhotoMode.withoutPhotos ||
+          mode == EvidencePhotoMode.currentPhotos;
+      if (availableFiles[export.id] == true && isCurrentMode) {
+        currentEvidenceByMode.putIfAbsent(mode, () => export);
+      }
+    }
+    final currentEvidenceModes = currentEvidenceByMode.keys.toSet();
+    final hasBothCurrentEvidence =
+        currentEvidenceModes.contains(EvidencePhotoMode.withoutPhotos) &&
+        currentEvidenceModes.contains(EvidencePhotoMode.currentPhotos);
+    final canCreateEvidence =
+        !checkingCurrentEvidence &&
+        !evidenceCheckFailed &&
+        !hasBothCurrentEvidence;
     void openMeterEditor() =>
         context.pushNamed('meterEdit', pathParameters: {'id': meter.id});
     void captureReading() =>
@@ -142,7 +176,12 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
               if (readings.isNotEmpty) ...[
                 _HistoryPdfAction(
                   exporting: _exporting,
-                  onPressed: () => _exportHistory(readings),
+                  checkingCurrentEvidence: checkingCurrentEvidence,
+                  evidenceCheckFailed: evidenceCheckFailed,
+                  hasBothCurrentEvidence: hasBothCurrentEvidence,
+                  onPressed: canCreateEvidence
+                      ? () => _exportHistory(readings, currentEvidenceModes)
+                      : null,
                 ),
                 if (historyExports.isNotEmpty) const SizedBox(height: 12),
               ],
@@ -152,7 +191,14 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
                   title: 'Zählerverlaufsnachweis',
                   detail:
                       '${_readingCountLabel(export.readingIds.length)}\n${export.photoMode.labelFor(export.kind)}',
-                  onTap: () => _openExport(export),
+                  currentLabel:
+                      currentEvidenceByMode[export.photoMode]?.id == export.id
+                      ? 'Aktueller Zählerverlaufsnachweis'
+                      : null,
+                  fileAvailable: availableFiles[export.id] == true,
+                  onTap: availableFiles[export.id] != true
+                      ? null
+                      : () => _openExport(export),
                   deleting: _deletingExportIds.contains(export.id),
                   onDelete: () => _deleteExport(export),
                 ),
@@ -168,11 +214,15 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
     );
   }
 
-  Future<void> _exportHistory(List<MeterReading> readings) async {
+  Future<void> _exportHistory(
+    List<MeterReading> readings,
+    Set<EvidencePhotoMode> unavailableModes,
+  ) async {
     if (_exporting) return;
     final photoMode = await showEvidencePhotoModeSheet(
       context,
       kind: EvidenceExportKind.meterHistory,
+      unavailableModes: unavailableModes,
     );
     if (photoMode == null || !mounted) return;
     setState(() => _exporting = true);
@@ -316,10 +366,19 @@ class _MeterActions extends StatelessWidget {
 }
 
 class _HistoryPdfAction extends StatelessWidget {
-  const _HistoryPdfAction({required this.exporting, required this.onPressed});
+  const _HistoryPdfAction({
+    required this.exporting,
+    required this.checkingCurrentEvidence,
+    required this.evidenceCheckFailed,
+    required this.hasBothCurrentEvidence,
+    required this.onPressed,
+  });
 
   final bool exporting;
-  final VoidCallback onPressed;
+  final bool checkingCurrentEvidence;
+  final bool evidenceCheckFailed;
+  final bool hasBothCurrentEvidence;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -352,14 +411,32 @@ class _HistoryPdfAction extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 14),
-            IgnorePointer(
-              ignoring: exporting,
-              child: FilledButton.icon(
-                onPressed: onPressed,
-                icon: const Icon(Icons.picture_as_pdf_outlined),
-                label: const Text('Zählerverlauf als PDF erstellen'),
+            FilledButton.icon(
+              onPressed: exporting ? null : onPressed,
+              icon: Icon(
+                hasBothCurrentEvidence
+                    ? Icons.check_circle_outline
+                    : checkingCurrentEvidence
+                    ? Icons.hourglass_top_rounded
+                    : Icons.picture_as_pdf_outlined,
+              ),
+              label: Text(
+                hasBothCurrentEvidence
+                    ? 'Beide aktuellen Varianten bereits erstellt'
+                    : checkingCurrentEvidence
+                    ? 'Vorhandene Nachweise werden geprüft'
+                    : 'Zählerverlauf als PDF erstellen',
+                textAlign: TextAlign.center,
               ),
             ),
+            if (evidenceCheckFailed) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Die gespeicherten Nachweise konnten gerade nicht geprüft werden.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: colors.error),
+              ),
+            ],
           ],
         ),
       ),

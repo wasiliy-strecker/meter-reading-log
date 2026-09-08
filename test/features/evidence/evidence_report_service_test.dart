@@ -175,6 +175,129 @@ void main() {
     expect(after, isNot(before));
   });
 
+  test('new readings and corrections change the history manifest', () async {
+    final first = _reading('/tmp/first.jpg');
+    final second = _reading(
+      '/tmp/second.jpg',
+      id: 'reading_2',
+      capturedAt: DateTime.utc(2026, 9, 1, 10),
+      storedAt: DateTime.utc(2026, 9, 1, 10),
+    );
+    final service = EvidenceReportService(
+      exports: MemoryEvidenceExportRepository(),
+    );
+    final initial = await service.historyManifestSha256(
+      readings: [first],
+      revisions: {first.id: const []},
+    );
+    final withReading = await service.historyManifestSha256(
+      readings: [second, first],
+      revisions: {first.id: const [], second.id: const []},
+    );
+    final withCorrection = await service.historyManifestSha256(
+      readings: [first],
+      revisions: {
+        first.id: [
+          ReadingRevision(
+            id: 'history_revision',
+            readingId: first.id,
+            changedAt: DateTime.utc(2026, 9, 5, 11),
+            reason: 'Zählerstand korrigiert',
+            changes: const {
+              'Zählerstand': ReadingChange(before: '00123,3', after: '00123,4'),
+            },
+          ),
+        ],
+      },
+    );
+
+    expect(withReading, isNot(initial));
+    expect(withCorrection, isNot(initial));
+  });
+
+  test('rejects a duplicate history PDF for the unchanged variant', () async {
+    final temp = await Directory.systemTemp.createTemp(
+      'duplicate_history_test_',
+    );
+    addTearDown(() => temp.delete(recursive: true));
+    final pdf = File('${temp.path}/history.pdf');
+    await pdf.writeAsBytes(const [0x25, 0x50, 0x44, 0x46]);
+    final repository = MemoryEvidenceExportRepository();
+    final service = EvidenceReportService(
+      exports: repository,
+      documentsDirectoryProvider: () async => temp,
+    );
+    final reading = _reading('/tmp/photo.jpg');
+    final manifest = await service.historyManifestSha256(
+      readings: [reading],
+      revisions: {reading.id: const []},
+    );
+    repository.items['current_history'] = EvidenceExportRecord(
+      id: 'current_history',
+      meterId: reading.meterId,
+      kind: EvidenceExportKind.meterHistory,
+      readingIds: [reading.id],
+      createdAt: DateTime.utc(2026, 9, 5, 10),
+      fileName: 'history.pdf',
+      filePath: pdf.path,
+      pdfSha256: 'c' * 64,
+      manifestSha256: manifest,
+      photoMode: EvidencePhotoMode.withoutPhotos,
+    );
+
+    await expectLater(
+      service.createHistory(
+        readings: [reading],
+        revisions: {reading.id: const []},
+        photoMode: EvidencePhotoMode.withoutPhotos,
+      ),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          contains('bereits erstellt'),
+        ),
+      ),
+    );
+    expect(repository.items, hasLength(1));
+  });
+
+  test('allows history recreation when the matching PDF is missing', () async {
+    final temp = await Directory.systemTemp.createTemp('missing_history_test_');
+    addTearDown(() => temp.delete(recursive: true));
+    final repository = MemoryEvidenceExportRepository();
+    final service = EvidenceReportService(
+      exports: repository,
+      documentsDirectoryProvider: () async => temp,
+    );
+    final reading = _reading('/tmp/photo.jpg');
+    final manifest = await service.historyManifestSha256(
+      readings: [reading],
+      revisions: {reading.id: const []},
+    );
+    repository.items['missing_history'] = EvidenceExportRecord(
+      id: 'missing_history',
+      meterId: reading.meterId,
+      kind: EvidenceExportKind.meterHistory,
+      readingIds: [reading.id],
+      createdAt: DateTime.utc(2026, 9, 5, 10),
+      fileName: 'missing.pdf',
+      filePath: '${temp.path}/missing.pdf',
+      pdfSha256: 'c' * 64,
+      manifestSha256: manifest,
+      photoMode: EvidencePhotoMode.withoutPhotos,
+    );
+
+    final report = await service.createHistory(
+      readings: [reading],
+      revisions: {reading.id: const []},
+      photoMode: EvidencePhotoMode.withoutPhotos,
+    );
+
+    expect(await File(report.record.filePath).exists(), isTrue);
+    expect(repository.items, hasLength(2));
+  });
+
   test(
     'allows recreation when a matching single-reading PDF is missing',
     () async {
@@ -460,6 +583,7 @@ EvidenceExportRecord _export(String filePath) => EvidenceExportRecord(
 
 MeterReading _reading(
   String photoPath, {
+  String id = 'reading_1',
   DateTime? capturedAt,
   DateTime? storedAt,
 }) {
@@ -473,7 +597,7 @@ MeterReading _reading(
     updatedAt: DateTime.utc(2026, 8, 1),
   );
   return MeterReading(
-    id: 'reading_1',
+    id: id,
     meterId: meter.id,
     meter: MeterSnapshot.fromMeter(meter),
     value: ReadingValue.tryParse('00123,4')!,

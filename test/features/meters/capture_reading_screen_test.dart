@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -221,9 +222,174 @@ void main() {
     expect(find.text('Dashboard'), findsOneWidget);
   });
 
+  testWidgets(
+    'current history PDFs are marked and unavailable until the history changes',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(430, 3000));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final temp = Directory.systemTemp.createTempSync(
+        'current_history_screen_test_',
+      );
+      addTearDown(() => temp.deleteSync(recursive: true));
+      final compactPdf = File('${temp.path}/compact.pdf');
+      final photoPdf = File('${temp.path}/photos.pdf');
+      compactPdf.writeAsBytesSync(const [0x25, 0x50, 0x44, 0x46]);
+      photoPdf.writeAsBytesSync(const [0x25, 0x50, 0x44, 0x46]);
+      final meter = Meter(
+        id: 'meter_current_history',
+        label: 'Gas Keller',
+        type: MeterType.gas,
+        unit: 'm³',
+        createdAt: DateTime.utc(2026, 9, 1),
+        updatedAt: DateTime.utc(2026, 9, 1),
+      );
+      final meters = MemoryMeterRepository()..items[meter.id] = meter;
+      final readings = MemoryReadingRepository();
+      final reading = MeterReading(
+        id: 'reading_current_history',
+        meterId: meter.id,
+        meter: MeterSnapshot.fromMeter(meter),
+        value: ReadingValue.tryParse('84,2')!,
+        capturedAt: DateTime.utc(2026, 9, 2, 10),
+        timezoneOffsetMinutes: 120,
+        storedAt: DateTime.utc(2026, 9, 2, 10),
+        updatedAt: DateTime.utc(2026, 9, 2, 10),
+        source: ReadingSource.camera,
+        photoPath: '/tmp/current-history-photo.jpg',
+        photoSha256: 'a' * 64,
+        ocrRawText: '84,2',
+        ocrCandidate: '84,2',
+        manifestSha256: 'b' * 64,
+      );
+      readings.items[reading.id] = reading;
+      const currentManifest = 'current-history-manifest';
+      final exports = MemoryEvidenceExportRepository();
+      exports.items['history_compact'] = EvidenceExportRecord(
+        id: 'history_compact',
+        meterId: meter.id,
+        kind: EvidenceExportKind.meterHistory,
+        readingIds: [reading.id],
+        createdAt: DateTime.utc(2026, 9, 5, 10),
+        fileName: 'compact.pdf',
+        filePath: compactPdf.path,
+        pdfSha256: 'c' * 64,
+        manifestSha256: currentManifest,
+        photoMode: EvidencePhotoMode.withoutPhotos,
+      );
+      exports.items['history_photos'] = EvidenceExportRecord(
+        id: 'history_photos',
+        meterId: meter.id,
+        kind: EvidenceExportKind.meterHistory,
+        readingIds: [reading.id],
+        createdAt: DateTime.utc(2026, 9, 5, 10, 1),
+        fileName: 'photos.pdf',
+        filePath: photoPdf.path,
+        pdfSha256: 'd' * 64,
+        manifestSha256: currentManifest,
+        photoMode: EvidencePhotoMode.currentPhotos,
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            meterRepositoryProvider.overrideWithValue(meters),
+            meterReadingRepositoryProvider.overrideWithValue(readings),
+            evidenceExportRepositoryProvider.overrideWithValue(exports),
+            evidenceReportServiceProvider.overrideWithValue(
+              _SynchronousDeleteEvidenceReportService(exports),
+            ),
+            historyEvidenceManifestProvider(
+              meter.id,
+            ).overrideWith((ref) => currentManifest),
+          ],
+          child: const MeterReadingLogApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Gas Keller'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Beide aktuellen Varianten bereits erstellt'),
+        250,
+        scrollable: find.byType(Scrollable).last,
+      );
+
+      final compactCard = find.byKey(
+        const ValueKey('evidence-export-history_compact'),
+      );
+      final photoCard = find.byKey(
+        const ValueKey('evidence-export-history_photos'),
+      );
+      expect(
+        find.descendant(
+          of: compactCard,
+          matching: find.text('Aktueller Zählerverlaufsnachweis'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: photoCard,
+          matching: find.text('Aktueller Zählerverlaufsnachweis'),
+        ),
+        findsOneWidget,
+      );
+      final blockedButton = tester.widget<FilledButton>(
+        find.widgetWithText(
+          FilledButton,
+          'Beide aktuellen Varianten bereits erstellt',
+        ),
+      );
+      expect(blockedButton.onPressed, isNull);
+
+      await tester.tap(
+        find.byKey(const ValueKey('delete-evidence-history_photos')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Löschen'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('evidence-export-history_photos')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('current-evidence-badge-history_compact')),
+        findsOneWidget,
+      );
+      final enabledButton = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, 'Zählerverlauf als PDF erstellen'),
+      );
+      expect(enabledButton.onPressed, isNotNull);
+
+      await tester.tap(find.text('Zählerverlauf als PDF erstellen'));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<ListTile>(
+              find.byKey(const ValueKey('evidence-photo-mode-withoutPhotos')),
+            )
+            .enabled,
+        isFalse,
+      );
+      expect(
+        tester
+            .widget<ListTile>(
+              find.byKey(const ValueKey('evidence-photo-mode-currentPhotos')),
+            )
+            .enabled,
+        isTrue,
+      );
+    },
+  );
+
   testWidgets('history PDFs follow readings and show progress', (tester) async {
     await tester.binding.setSurfaceSize(const Size(430, 3000));
     addTearDown(() => tester.binding.setSurfaceSize(null));
+    final temp = Directory.systemTemp.createTempSync('history_screen_test_');
+    addTearDown(() => temp.deleteSync(recursive: true));
+    final historyPdf = File('${temp.path}/history.pdf');
+    historyPdf.writeAsBytesSync(const [0x25, 0x50, 0x44, 0x46]);
     final meter = Meter(
       id: 'meter_pdf',
       label: 'Wasser Bad',
@@ -258,9 +424,10 @@ void main() {
       readingIds: const ['reading_pdf'],
       createdAt: DateTime.utc(2026, 9, 5, 8, 30),
       fileName: 'zaehlerverlauf_wasser_bad_20260905_083000.pdf',
-      filePath: '/tmp/history.pdf',
+      filePath: historyPdf.path,
       pdfSha256: 'c' * 64,
       manifestSha256: 'd' * 64,
+      photoMode: EvidencePhotoMode.withoutPhotos,
     );
     exports.items['single_export'] = EvidenceExportRecord(
       id: 'single_export',
@@ -283,6 +450,9 @@ void main() {
           evidenceReportServiceProvider.overrideWithValue(
             _SynchronousDeleteEvidenceReportService(exports),
           ),
+          historyEvidenceManifestProvider(
+            meter.id,
+          ).overrideWith((ref) => 'current-history-manifest'),
           meterPhotoCaptureRepositoryProvider.overrideWithValue(
             _FixedPhotoRepository(),
           ),
@@ -366,6 +536,10 @@ void main() {
     expect(
       find.byKey(const ValueKey('evidence-export-history_export')),
       findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('current-evidence-badge-history_export')),
+      findsNothing,
     );
     expect(
       find.byKey(const ValueKey('evidence-export-single_export')),
