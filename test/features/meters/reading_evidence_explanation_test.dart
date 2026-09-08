@@ -78,7 +78,7 @@ void main() {
         scrollable: scrollable,
       );
       expect(find.text(pdfPurposeText), findsOneWidget);
-      expect(find.text(privateDocumentationText), findsOneWidget);
+      expect(find.text(privateDocumentationText), findsNothing);
       expect(find.byIcon(Icons.description_outlined), findsOneWidget);
     },
   );

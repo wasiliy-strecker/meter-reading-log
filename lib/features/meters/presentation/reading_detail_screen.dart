@@ -357,11 +357,6 @@ class _PdfPurposeCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             const Text(pdfPurposeText),
-            const SizedBox(height: 8),
-            Text(
-              privateDocumentationText,
-              style: TextStyle(color: colors.onSurfaceVariant),
-            ),
           ],
         ),
       ),
