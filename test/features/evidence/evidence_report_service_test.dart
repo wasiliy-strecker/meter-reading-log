@@ -117,7 +117,7 @@ void main() {
   );
 
   test(
-    'rejects a duplicate single-reading PDF for unchanged evidence',
+    'allows repeated single-reading PDFs without overwriting files',
     () async {
       final temp = await Directory.systemTemp.createTemp(
         'duplicate_evidence_test_',
@@ -132,32 +132,37 @@ void main() {
       );
       final reading = _reading(photo.path);
 
-      await service.createSingle(reading: reading, revisions: const []);
-
-      await expectLater(
-        service.createSingle(reading: reading, revisions: const []),
-        throwsA(
-          isA<StateError>().having(
-            (error) => error.message,
-            'message',
-            contains('bereits ein Einzelnachweis erstellt'),
-          ),
-        ),
+      final first = await service.createSingle(
+        reading: reading,
+        revisions: const [],
       );
-      expect(repository.items, hasLength(1));
+      final second = await service.createSingle(
+        reading: reading,
+        revisions: const [],
+      );
+
+      expect(repository.items, hasLength(2));
+      expect(second.record.id, isNot(first.record.id));
+      expect(second.record.filePath, isNot(first.record.filePath));
+      expect(await File(first.record.filePath).exists(), isTrue);
+      expect(await File(second.record.filePath).exists(), isTrue);
     },
   );
 
   test('a correction changes the single-reading evidence manifest', () async {
-    final reading = _reading('/tmp/photo.jpg');
+    final temp = await Directory.systemTemp.createTemp('manifest_test_');
+    addTearDown(() => temp.delete(recursive: true));
+    final reading = _reading('${temp.path}/not-needed.jpg');
     final service = EvidenceReportService(
       exports: MemoryEvidenceExportRepository(),
+      documentsDirectoryProvider: () async => temp,
     );
-    final before = await service.singleReadingManifestSha256(
+    final before = await service.createSingle(
       reading: reading,
       revisions: const [],
+      photoMode: EvidencePhotoMode.withoutPhotos,
     );
-    final after = await service.singleReadingManifestSha256(
+    final after = await service.createSingle(
       reading: reading,
       revisions: [
         ReadingRevision(
@@ -170,31 +175,40 @@ void main() {
           },
         ),
       ],
+      photoMode: EvidencePhotoMode.withoutPhotos,
     );
 
-    expect(after, isNot(before));
+    expect(after.record.manifestSha256, isNot(before.record.manifestSha256));
   });
 
   test('new readings and corrections change the history manifest', () async {
-    final first = _reading('/tmp/first.jpg');
+    final temp = await Directory.systemTemp.createTemp('history_hash_test_');
+    addTearDown(() => temp.delete(recursive: true));
+    final first = _reading('${temp.path}/first-not-needed.jpg');
     final second = _reading(
-      '/tmp/second.jpg',
+      '${temp.path}/second-not-needed.jpg',
       id: 'reading_2',
       capturedAt: DateTime.utc(2026, 9, 1, 10),
       storedAt: DateTime.utc(2026, 9, 1, 10),
     );
     final service = EvidenceReportService(
       exports: MemoryEvidenceExportRepository(),
+      documentsDirectoryProvider: () async => temp,
     );
-    final initial = await service.historyManifestSha256(
+    final initial = await service.createHistory(
+      meter: _meter(),
       readings: [first],
       revisions: {first.id: const []},
+      photoMode: EvidencePhotoMode.withoutPhotos,
     );
-    final withReading = await service.historyManifestSha256(
+    final withReading = await service.createHistory(
+      meter: _meter(),
       readings: [second, first],
       revisions: {first.id: const [], second.id: const []},
+      photoMode: EvidencePhotoMode.withoutPhotos,
     );
-    final withCorrection = await service.historyManifestSha256(
+    final withCorrection = await service.createHistory(
+      meter: _meter(),
       readings: [first],
       revisions: {
         first.id: [
@@ -209,57 +223,47 @@ void main() {
           ),
         ],
       },
+      photoMode: EvidencePhotoMode.withoutPhotos,
     );
 
-    expect(withReading, isNot(initial));
-    expect(withCorrection, isNot(initial));
+    expect(
+      withReading.record.manifestSha256,
+      isNot(initial.record.manifestSha256),
+    );
+    expect(
+      withCorrection.record.manifestSha256,
+      isNot(initial.record.manifestSha256),
+    );
   });
 
-  test('rejects a duplicate history PDF for the unchanged variant', () async {
+  test('allows repeated history PDFs and uses current meter data', () async {
     final temp = await Directory.systemTemp.createTemp(
       'duplicate_history_test_',
     );
     addTearDown(() => temp.delete(recursive: true));
-    final pdf = File('${temp.path}/history.pdf');
-    await pdf.writeAsBytes(const [0x25, 0x50, 0x44, 0x46]);
     final repository = MemoryEvidenceExportRepository();
     final service = EvidenceReportService(
       exports: repository,
       documentsDirectoryProvider: () async => temp,
     );
-    final reading = _reading('/tmp/photo.jpg');
-    final manifest = await service.historyManifestSha256(
+    final reading = _reading('${temp.path}/not-needed.jpg');
+    final first = await service.createHistory(
+      meter: _meter(location: 'Alter Standort'),
       readings: [reading],
       revisions: {reading.id: const []},
+      photoMode: EvidencePhotoMode.withoutPhotos,
     );
-    repository.items['current_history'] = EvidenceExportRecord(
-      id: 'current_history',
-      meterId: reading.meterId,
-      kind: EvidenceExportKind.meterHistory,
-      readingIds: [reading.id],
-      createdAt: DateTime.utc(2026, 9, 5, 10),
-      fileName: 'history.pdf',
-      filePath: pdf.path,
-      pdfSha256: 'c' * 64,
-      manifestSha256: manifest,
+    final second = await service.createHistory(
+      meter: _meter(label: 'Strom Neu', location: 'Neuer Standort'),
+      readings: [reading],
+      revisions: {reading.id: const []},
       photoMode: EvidencePhotoMode.withoutPhotos,
     );
 
-    await expectLater(
-      service.createHistory(
-        readings: [reading],
-        revisions: {reading.id: const []},
-        photoMode: EvidencePhotoMode.withoutPhotos,
-      ),
-      throwsA(
-        isA<StateError>().having(
-          (error) => error.message,
-          'message',
-          contains('bereits erstellt'),
-        ),
-      ),
-    );
-    expect(repository.items, hasLength(1));
+    expect(repository.items, hasLength(2));
+    expect(second.record.filePath, isNot(first.record.filePath));
+    expect(second.record.fileName, contains('strom_neu'));
+    expect(second.record.manifestSha256, isNot(first.record.manifestSha256));
   });
 
   test('allows history recreation when the matching PDF is missing', () async {
@@ -271,10 +275,6 @@ void main() {
       documentsDirectoryProvider: () async => temp,
     );
     final reading = _reading('/tmp/photo.jpg');
-    final manifest = await service.historyManifestSha256(
-      readings: [reading],
-      revisions: {reading.id: const []},
-    );
     repository.items['missing_history'] = EvidenceExportRecord(
       id: 'missing_history',
       meterId: reading.meterId,
@@ -284,11 +284,12 @@ void main() {
       fileName: 'missing.pdf',
       filePath: '${temp.path}/missing.pdf',
       pdfSha256: 'c' * 64,
-      manifestSha256: manifest,
+      manifestSha256: 'd' * 64,
       photoMode: EvidencePhotoMode.withoutPhotos,
     );
 
     final report = await service.createHistory(
+      meter: _meter(),
       readings: [reading],
       revisions: {reading.id: const []},
       photoMode: EvidencePhotoMode.withoutPhotos,
@@ -313,10 +314,6 @@ void main() {
         documentsDirectoryProvider: () async => temp,
       );
       final reading = _reading(photo.path);
-      final manifest = await service.singleReadingManifestSha256(
-        reading: reading,
-        revisions: const [],
-      );
       repository.items['missing'] = EvidenceExportRecord(
         id: 'missing',
         meterId: reading.meterId,
@@ -326,7 +323,7 @@ void main() {
         fileName: 'missing.pdf',
         filePath: '${temp.path}/missing.pdf',
         pdfSha256: 'c' * 64,
-        manifestSha256: manifest,
+        manifestSha256: 'd' * 64,
       );
 
       final report = await service.createSingle(
@@ -509,7 +506,7 @@ void main() {
     expect(report.record.fileName, contains('_mit_fotos_'));
   });
 
-  test('duplicate detection is separate for compact and photo PDFs', () async {
+  test('all PDF variants can be created repeatedly', () async {
     final temp = await Directory.systemTemp.createTemp('variant_pdf_test_');
     addTearDown(() => temp.delete(recursive: true));
     final photo = File('${temp.path}/photo.jpg');
@@ -522,34 +519,30 @@ void main() {
     );
     final reading = _reading(photo.path);
 
-    await service.createSingle(
+    final compactFirst = await service.createSingle(
       reading: reading,
       revisions: const [],
       photoMode: EvidencePhotoMode.withoutPhotos,
     );
-    await service.createSingle(
+    final photoFirst = await service.createSingle(
+      reading: reading,
+      revisions: const [],
+      photoMode: EvidencePhotoMode.currentPhotos,
+    );
+    final compactSecond = await service.createSingle(
+      reading: reading,
+      revisions: const [],
+      photoMode: EvidencePhotoMode.withoutPhotos,
+    );
+    final photoSecond = await service.createSingle(
       reading: reading,
       revisions: const [],
       photoMode: EvidencePhotoMode.currentPhotos,
     );
 
-    expect(repository.items, hasLength(2));
-    await expectLater(
-      service.createSingle(
-        reading: reading,
-        revisions: const [],
-        photoMode: EvidencePhotoMode.withoutPhotos,
-      ),
-      throwsStateError,
-    );
-    await expectLater(
-      service.createSingle(
-        reading: reading,
-        revisions: const [],
-        photoMode: EvidencePhotoMode.currentPhotos,
-      ),
-      throwsStateError,
-    );
+    expect(repository.items, hasLength(4));
+    expect(compactSecond.record.filePath, isNot(compactFirst.record.filePath));
+    expect(photoSecond.record.filePath, isNot(photoFirst.record.filePath));
   });
 }
 
@@ -588,14 +581,7 @@ MeterReading _reading(
   DateTime? storedAt,
 }) {
   final persistedAt = storedAt ?? DateTime.utc(2026, 8, 31, 10);
-  final meter = Meter(
-    id: 'meter_1',
-    label: 'Strom Keller',
-    type: MeterType.electricity,
-    unit: 'kWh',
-    createdAt: DateTime.utc(2026, 8, 1),
-    updatedAt: DateTime.utc(2026, 8, 1),
-  );
+  final meter = _meter();
   return MeterReading(
     id: id,
     meterId: meter.id,
@@ -614,3 +600,14 @@ MeterReading _reading(
     manifestSha256: 'b' * 64,
   );
 }
+
+Meter _meter({String label = 'Strom Keller', String location = ''}) => Meter(
+  id: 'meter_1',
+  label: label,
+  type: MeterType.electricity,
+  unit: 'kWh',
+  meterNumber: 'EL-42',
+  location: location,
+  createdAt: DateTime.utc(2026, 8, 1),
+  updatedAt: DateTime.utc(2026, 9, 8),
+);

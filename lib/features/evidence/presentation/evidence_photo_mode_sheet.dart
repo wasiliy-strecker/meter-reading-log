@@ -5,7 +5,6 @@ import '../domain/evidence_export.dart';
 Future<EvidencePhotoMode?> showEvidencePhotoModeSheet(
   BuildContext context, {
   required EvidenceExportKind kind,
-  Set<EvidencePhotoMode> unavailableModes = const {},
 }) {
   return showModalBottomSheet<EvidencePhotoMode>(
     context: context,
@@ -38,9 +37,6 @@ Future<EvidencePhotoMode?> showEvidencePhotoModeSheet(
               icon: Icons.speed_outlined,
               description:
                   'Schnell und klein. Alle Angaben und Korrekturen bleiben enthalten.',
-              unavailable: unavailableModes.contains(
-                EvidencePhotoMode.withoutPhotos,
-              ),
             ),
             const SizedBox(height: 8),
             _PhotoModeTile(
@@ -50,9 +46,6 @@ Future<EvidencePhotoMode?> showEvidencePhotoModeSheet(
               description: kind == EvidenceExportKind.singleReading
                   ? 'Enthält das aktuell zugeordnete Nachweisfoto.'
                   : 'Enthält pro Ablesung das aktuell zugeordnete Nachweisfoto.',
-              unavailable: unavailableModes.contains(
-                EvidencePhotoMode.currentPhotos,
-              ),
             ),
           ],
         ),
@@ -67,14 +60,12 @@ class _PhotoModeTile extends StatelessWidget {
     required this.kind,
     required this.icon,
     required this.description,
-    required this.unavailable,
   });
 
   final EvidencePhotoMode mode;
   final EvidenceExportKind kind;
   final IconData icon;
   final String description;
-  final bool unavailable;
 
   @override
   Widget build(BuildContext context) {
@@ -84,19 +75,14 @@ class _PhotoModeTile extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: ListTile(
         key: ValueKey('evidence-photo-mode-${mode.name}'),
-        enabled: !unavailable,
-        leading: Icon(icon, color: unavailable ? null : colors.primary),
+        leading: Icon(icon, color: colors.primary),
         title: Text(
           mode.labelFor(kind),
           style: const TextStyle(fontWeight: FontWeight.w700),
         ),
-        subtitle: Text(
-          unavailable ? '$description Bereits erstellt.' : description,
-        ),
-        trailing: unavailable
-            ? const Icon(Icons.check_circle_outline)
-            : const Icon(Icons.chevron_right),
-        onTap: unavailable ? null : () => Navigator.pop(context, mode),
+        subtitle: Text(description),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => Navigator.pop(context, mode),
       ),
     );
   }

@@ -60,41 +60,24 @@ class EvidenceReportService {
     required List<ReadingRevision> revisions,
     EvidencePhotoMode photoMode = EvidencePhotoMode.allPhotos,
   }) async {
-    final manifestSha = await singleReadingManifestSha256(
-      reading: reading,
-      revisions: revisions,
+    final reportMeter = reading.meter;
+    final manifestSha = await _reportManifestHash(
+      [reading],
+      {reading.id: revisions},
+      reportMeter,
     );
-    final existingExports = await exports.loadForMeter(reading.meterId);
-    for (final export in existingExports) {
-      final matchesCurrentReading =
-          export.kind == EvidenceExportKind.singleReading &&
-          export.readingIds.length == 1 &&
-          export.readingIds.single == reading.id &&
-          export.manifestSha256 == manifestSha &&
-          export.photoMode == photoMode;
-      if (matchesCurrentReading && await File(export.filePath).exists()) {
-        throw StateError(
-          'Für den aktuellen Stand dieser Ablesung wurde bereits ein Einzelnachweis erstellt.',
-        );
-      }
-    }
     return _create(
       readings: [reading],
       revisions: {reading.id: revisions},
       kind: EvidenceExportKind.singleReading,
       photoMode: photoMode,
       manifestSha256: manifestSha,
+      reportMeter: reportMeter,
     );
   }
 
-  Future<String> singleReadingManifestSha256({
-    required MeterReading reading,
-    required List<ReadingRevision> revisions,
-  }) {
-    return _reportManifestHash([reading], {reading.id: revisions});
-  }
-
   Future<GeneratedEvidenceReport> createHistory({
+    required Meter meter,
     required List<MeterReading> readings,
     required Map<String, List<ReadingRevision>> revisions,
     EvidencePhotoMode photoMode = EvidencePhotoMode.allPhotos,
@@ -104,40 +87,23 @@ class EvidenceReportService {
     }
     final sortedReadings = [...readings]
       ..sort((left, right) => left.capturedAt.compareTo(right.capturedAt));
-    final manifestSha = await _reportManifestHash(sortedReadings, revisions);
-    final existingExports = await exports.loadForMeter(
-      sortedReadings.first.meterId,
-    );
-    for (final export in existingExports) {
-      final matchesCurrentHistory =
-          export.kind == EvidenceExportKind.meterHistory &&
-          export.manifestSha256 == manifestSha &&
-          export.photoMode == photoMode;
-      if (matchesCurrentHistory && await File(export.filePath).exists()) {
-        throw StateError(
-          'Für den aktuellen Stand dieses Zählerverlaufs wurde diese PDF-Variante bereits erstellt.',
-        );
-      }
+    if (sortedReadings.any((reading) => reading.meterId != meter.id)) {
+      throw StateError('Die Ablesungen gehören nicht zu diesem Zähler.');
     }
+    final reportMeter = MeterSnapshot.fromMeter(meter);
+    final manifestSha = await _reportManifestHash(
+      sortedReadings,
+      revisions,
+      reportMeter,
+    );
     return _create(
       readings: sortedReadings,
       revisions: revisions,
       kind: EvidenceExportKind.meterHistory,
       photoMode: photoMode,
       manifestSha256: manifestSha,
+      reportMeter: reportMeter,
     );
-  }
-
-  Future<String> historyManifestSha256({
-    required List<MeterReading> readings,
-    required Map<String, List<ReadingRevision>> revisions,
-  }) {
-    if (readings.isEmpty) {
-      throw StateError('Für diesen Zähler gibt es noch keine Ablesungen.');
-    }
-    final sortedReadings = [...readings]
-      ..sort((left, right) => left.capturedAt.compareTo(right.capturedAt));
-    return _reportManifestHash(sortedReadings, revisions);
   }
 
   Future<GeneratedEvidenceReport> _create({
@@ -145,7 +111,8 @@ class EvidenceReportService {
     required Map<String, List<ReadingRevision>> revisions,
     required EvidenceExportKind kind,
     required EvidencePhotoMode photoMode,
-    String? manifestSha256,
+    required String manifestSha256,
+    required MeterSnapshot reportMeter,
   }) async {
     final createdAt = DateTime.now();
     final fonts = await _loadFontBytes();
@@ -164,24 +131,25 @@ class EvidenceReportService {
       'preparedPhotoPaths': preparedPhotoPaths,
       'createdAtMicroseconds': createdAt.microsecondsSinceEpoch,
       'manifestSha256': manifestSha256,
+      'reportMeter': reportMeter.toJson(),
       'regularFontBytes': fonts.regular,
       'boldFontBytes': fonts.bold,
     }, debugLabel: 'evidence-pdf-builder');
     final bytes = buildResult['bytes']! as Uint8List;
     final manifestSha = buildResult['manifestSha256']! as String;
     final pdfSha = buildResult['pdfSha256']! as String;
-    final meter = readings.first.meter;
-    final id = newLocalId('evidence');
-    final safeLabel = _safeFilePart(meter.label);
+    final id = newLocalId('evidence', now: createdAt);
+    final safeLabel = _safeFilePart(reportMeter.label);
     final stamp = DateFormat('yyyyMMdd_HHmmss').format(createdAt);
+    final uniqueSuffix = id.substring(id.length - 6);
     final variant = switch (photoMode) {
       EvidencePhotoMode.withoutPhotos => 'kompakt',
       EvidencePhotoMode.currentPhotos => 'mit_fotos',
       EvidencePhotoMode.allPhotos => 'alle_fotos',
     };
     final fileName = kind == EvidenceExportKind.singleReading
-        ? 'zaehlerstand_${safeLabel}_${variant}_$stamp.pdf'
-        : 'zaehlerverlauf_${safeLabel}_${variant}_$stamp.pdf';
+        ? 'zaehlerstand_${safeLabel}_${variant}_${stamp}_$uniqueSuffix.pdf'
+        : 'zaehlerverlauf_${safeLabel}_${variant}_${stamp}_$uniqueSuffix.pdf';
     final directory = Directory(
       p.join((await _documentsDirectoryProvider()).path, 'evidence_reports'),
     );
@@ -275,6 +243,9 @@ class EvidenceReportService {
     final photoAssets = _PdfPhotoAssets(
       Map<String, String>.from(message['preparedPhotoPaths']! as Map),
     );
+    final reportMeter = MeterSnapshot.fromJson(
+      Map<String, dynamic>.from(message['reportMeter']! as Map),
+    );
     final createdAt = DateTime.fromMicrosecondsSinceEpoch(
       message['createdAtMicroseconds']! as int,
     );
@@ -284,9 +255,7 @@ class EvidenceReportService {
       regular: pw.Font.ttf(ByteData.sublistView(regularFontBytes)),
       bold: pw.Font.ttf(ByteData.sublistView(boldFontBytes)),
     );
-    final manifestSha =
-        message['manifestSha256'] as String? ??
-        await _reportManifestHash(readings, revisions);
+    final manifestSha = message['manifestSha256']! as String;
     final document = pw.Document(
       title: kind == EvidenceExportKind.singleReading
           ? 'Zählerstand-Nachweis'
@@ -295,7 +264,6 @@ class EvidenceReportService {
       subject: 'Private Dokumentation eines Zählerstands',
     );
     final date = DateFormat('dd.MM.yyyy, HH:mm');
-    final meter = readings.first.meter;
 
     document.addPage(
       pw.MultiPage(
@@ -336,11 +304,11 @@ class EvidenceReportService {
           ),
           pw.SizedBox(height: 6),
           pw.Text(
-            '${meter.type.label} · ${meter.label}',
+            '${reportMeter.type.label} · ${reportMeter.label}',
             style: const pw.TextStyle(fontSize: 14, color: PdfColors.grey800),
           ),
           pw.SizedBox(height: 18),
-          _meterTable(readings.first),
+          _meterTable(reportMeter),
           pw.SizedBox(height: 12),
           _photoModeBox(photoMode),
           pw.SizedBox(height: 14),
@@ -399,6 +367,7 @@ class EvidenceReportService {
   static Future<String> _reportManifestHash(
     List<MeterReading> readings,
     Map<String, List<ReadingRevision>> revisions,
+    MeterSnapshot reportMeter,
   ) async {
     const integrity = IntegrityService();
     final normalizedReadings = readings.map((reading) {
@@ -412,15 +381,15 @@ class EvidenceReportService {
     };
     return integrity.sha256Text(
       integrity.canonicalJson({
-        'schema': 'meter_reading_evidence_v2',
+        'schema': 'meter_reading_evidence_v3',
+        'reportMeter': reportMeter.toJson(),
         'readings': normalizedReadings,
         'revisions': normalizedRevisions,
       }),
     );
   }
 
-  static pw.Widget _meterTable(MeterReading reading) {
-    final meter = reading.meter;
+  static pw.Widget _meterTable(MeterSnapshot meter) {
     return pw.TableHelper.fromTextArray(
       headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
       headerDecoration: const pw.BoxDecoration(color: PdfColors.grey200),

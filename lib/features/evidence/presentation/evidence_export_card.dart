@@ -13,7 +13,6 @@ class EvidenceExportCard extends StatelessWidget {
     required this.onDelete,
     this.fileAvailable = true,
     this.deleting = false,
-    this.currentLabel,
   });
 
   final EvidenceExportRecord export;
@@ -23,7 +22,6 @@ class EvidenceExportCard extends StatelessWidget {
   final VoidCallback? onDelete;
   final bool fileAvailable;
   final bool deleting;
-  final String? currentLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -39,34 +37,6 @@ class EvidenceExportCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (currentLabel case final label?)
-              Ink(
-                key: ValueKey('current-evidence-badge-${export.id}'),
-                color: colors.primaryContainer.withValues(alpha: 0.72),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 9,
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.check_circle_rounded,
-                      size: 19,
-                      color: colors.primary,
-                    ),
-                    const SizedBox(width: 7),
-                    Expanded(
-                      child: Text(
-                        label,
-                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                          color: colors.onPrimaryContainer,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             Padding(
               padding: const EdgeInsets.all(14),
               child: Row(

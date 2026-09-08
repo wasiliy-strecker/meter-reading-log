@@ -61,40 +61,10 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
             export.readingIds.contains(reading.id),
       ),
     ]..sort((left, right) => right.createdAt.compareTo(left.createdAt));
-    final manifestAsync = singleExports.isEmpty
-        ? const AsyncValue<String?>.data(null)
-        : ref.watch(singleReadingEvidenceManifestProvider(reading.id));
     final availableFiles = <String, bool>{
       for (final export in singleExports)
         export.id: File(export.filePath).existsSync(),
     };
-    final currentManifest = manifestAsync.value;
-    final matchingExports = currentManifest == null
-        ? const <EvidenceExportRecord>[]
-        : singleExports
-              .where((export) => export.manifestSha256 == currentManifest)
-              .toList(growable: false);
-    final checkingCurrentEvidence =
-        exportsAsync.isLoading || manifestAsync.isLoading;
-    final evidenceCheckFailed = exportsAsync.hasError || manifestAsync.hasError;
-    final currentEvidenceByMode = <EvidencePhotoMode, EvidenceExportRecord>{};
-    for (final export in matchingExports) {
-      final mode = export.photoMode;
-      final isCurrentMode =
-          mode == EvidencePhotoMode.withoutPhotos ||
-          mode == EvidencePhotoMode.currentPhotos;
-      if (availableFiles[export.id] == true && isCurrentMode) {
-        currentEvidenceByMode.putIfAbsent(mode, () => export);
-      }
-    }
-    final currentEvidenceModes = currentEvidenceByMode.keys.toSet();
-    final hasBothCurrentEvidence =
-        currentEvidenceModes.contains(EvidencePhotoMode.withoutPhotos) &&
-        currentEvidenceModes.contains(EvidencePhotoMode.currentPhotos);
-    final canCreateEvidence =
-        !checkingCurrentEvidence &&
-        !evidenceCheckFailed &&
-        !hasBothCurrentEvidence;
     return Scaffold(
       appBar: AppBar(title: const Text('Ablesung')),
       body: ListView(
@@ -165,10 +135,6 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
                 title: 'Einzelnachweis',
                 detail:
                     'Zählerstand: ${reading.value.displayText} ${reading.meter.unit}\n${export.photoMode.labelFor(export.kind)}',
-                currentLabel:
-                    currentEvidenceByMode[export.photoMode]?.id == export.id
-                    ? 'Aktueller PDF-Nachweis'
-                    : null,
                 fileAvailable: availableFiles[export.id] == true,
                 onTap: availableFiles[export.id] != true
                     ? null
@@ -179,33 +145,13 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
             const SizedBox(height: 10),
           ],
           FilledButton.icon(
-            onPressed: canCreateEvidence && !_exporting
-                ? () => _export(reading, currentEvidenceModes)
-                : null,
-            icon: Icon(
-              hasBothCurrentEvidence
-                  ? Icons.check_circle_outline
-                  : checkingCurrentEvidence
-                  ? Icons.hourglass_top_rounded
-                  : Icons.picture_as_pdf_outlined,
-            ),
-            label: Text(
-              hasBothCurrentEvidence
-                  ? 'Beide aktuellen Varianten bereits erstellt'
-                  : checkingCurrentEvidence
-                  ? 'Vorhandene Nachweise werden geprüft'
-                  : 'Einzelnachweis als PDF erstellen',
+            onPressed: _exporting ? null : () => _export(reading),
+            icon: const Icon(Icons.picture_as_pdf_outlined),
+            label: const Text(
+              'Einzelnachweis als PDF erstellen',
               textAlign: TextAlign.center,
             ),
           ),
-          if (evidenceCheckFailed) ...[
-            const SizedBox(height: 8),
-            Text(
-              'Die gespeicherten Nachweise konnten gerade nicht geprüft werden.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            ),
-          ],
           const SizedBox(height: 10),
           const _PdfPurposeCard(),
         ],
@@ -213,15 +159,11 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
     );
   }
 
-  Future<void> _export(
-    MeterReading reading,
-    Set<EvidencePhotoMode> unavailableModes,
-  ) async {
+  Future<void> _export(MeterReading reading) async {
     if (_exporting) return;
     final photoMode = await showEvidencePhotoModeSheet(
       context,
       kind: EvidenceExportKind.singleReading,
-      unavailableModes: unavailableModes,
     );
     if (photoMode == null || !mounted) return;
     setState(() => _exporting = true);

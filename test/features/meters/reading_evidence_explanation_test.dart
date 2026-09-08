@@ -17,13 +17,7 @@ import 'package:meter_reading_log/features/meters/presentation/reading_detail_sc
 import '../../support/fakes.dart';
 
 void main() {
-  late String unchangedReadingManifest;
-
-  setUpAll(() async {
-    unchangedReadingManifest = await EvidenceReportService(
-      exports: MemoryEvidenceExportRepository(),
-    ).singleReadingManifestSha256(reading: _reading(), revisions: const []);
-  });
+  const unchangedReadingManifest = 'unchanged-reading-manifest';
 
   testWidgets(
     'hides OCR and hash diagnostics and explains empty correction history',
@@ -314,7 +308,7 @@ void main() {
     expect(find.text('Einzelnachweis als PDF erstellen'), findsOneWidget);
   });
 
-  testWidgets('shows saved single evidence and blocks an unchanged duplicate', (
+  testWidgets('shows saved single evidence and keeps creation available', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(430, 1800));
@@ -378,9 +372,6 @@ void main() {
           evidenceReportServiceProvider.overrideWithValue(
             _SynchronousDeleteEvidenceReportService(exports),
           ),
-          singleReadingEvidenceManifestProvider(
-            reading.id,
-          ).overrideWith((ref) => unchangedReadingManifest),
         ],
         child: MaterialApp(home: ReadingDetailScreen(readingId: reading.id)),
       ),
@@ -407,19 +398,10 @@ void main() {
       findsOneWidget,
     );
     expect(find.byKey(const ValueKey('evidence-export-history')), findsNothing);
-    final blockedButton = tester.widget<FilledButton>(
-      find.widgetWithText(
-        FilledButton,
-        'Beide aktuellen Varianten bereits erstellt',
-      ),
+    final createButton = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, 'Einzelnachweis als PDF erstellen'),
     );
-    expect(blockedButton.onPressed, isNull);
-    expect(
-      tester
-          .widget<Text>(find.text('Beide aktuellen Varianten bereits erstellt'))
-          .textAlign,
-      TextAlign.center,
-    );
+    expect(createButton.onPressed, isNotNull);
     expect(
       tester
           .getTopLeft(
@@ -431,71 +413,39 @@ void main() {
             .getTopLeft(
               find.widgetWithText(
                 FilledButton,
-                'Beide aktuellen Varianten bereits erstellt',
+                'Einzelnachweis als PDF erstellen',
               ),
             )
             .dy,
       ),
     );
     expect(
-      find.textContaining('Nach einer Korrektur kannst du beide Varianten'),
+      find.text('Beide aktuellen Varianten bereits erstellt'),
       findsNothing,
     );
-    expect(
-      find.textContaining('Die andere kannst du weiterhin erstellen'),
-      findsNothing,
-    );
+    expect(find.text('Aktueller PDF-Nachweis'), findsNothing);
     expect(find.byKey(const ValueKey('current-evidence-status')), findsNothing);
-    final compactCard = find.byKey(
-      const ValueKey('evidence-export-single_current'),
-    );
-    final compactBadge = find.byKey(
-      const ValueKey('current-evidence-badge-single_current'),
-    );
-    final photoCard = find.byKey(
-      const ValueKey('evidence-export-single_current_photo'),
-    );
-    final photoBadge = find.byKey(
-      const ValueKey('current-evidence-badge-single_current_photo'),
-    );
-    expect(compactBadge, findsOneWidget);
-    expect(photoBadge, findsOneWidget);
+
+    await tester.tap(find.text('Einzelnachweis als PDF erstellen'));
+    await tester.pumpAndSettle();
     expect(
-      find.descendant(
-        of: compactBadge,
-        matching: find.byIcon(Icons.check_circle_rounded),
-      ),
-      findsOneWidget,
+      tester
+          .widget<ListTile>(
+            find.byKey(const ValueKey('evidence-photo-mode-withoutPhotos')),
+          )
+          .enabled,
+      isTrue,
     );
     expect(
-      find.descendant(
-        of: compactCard,
-        matching: find.text('Aktueller PDF-Nachweis'),
-      ),
-      findsOneWidget,
+      tester
+          .widget<ListTile>(
+            find.byKey(const ValueKey('evidence-photo-mode-currentPhotos')),
+          )
+          .enabled,
+      isTrue,
     );
-    expect(
-      find.descendant(
-        of: photoCard,
-        matching: find.text('Aktueller PDF-Nachweis'),
-      ),
-      findsOneWidget,
-    );
-    expect(find.text('Aktueller PDF-Nachweis'), findsNWidgets(2));
-    expect(find.text('Aktuelle PDF-Nachweise'), findsNothing);
-    expect(
-      tester.getTopLeft(compactBadge).dy,
-      lessThan(
-        tester
-            .getTopLeft(
-              find.descendant(
-                of: compactCard,
-                matching: find.text('Einzelnachweis'),
-              ),
-            )
-            .dy,
-      ),
-    );
+    await tester.tapAt(const Offset(8, 8));
+    await tester.pumpAndSettle();
 
     final deletePhotoEvidence = find.byKey(
       const ValueKey('delete-evidence-single_current_photo'),
@@ -523,19 +473,11 @@ void main() {
       find.byKey(const ValueKey('evidence-export-single_current')),
       findsOneWidget,
     );
-    final enabledButton = tester.widget<FilledButton>(
+    final stillEnabledButton = tester.widget<FilledButton>(
       find.widgetWithText(FilledButton, 'Einzelnachweis als PDF erstellen'),
     );
-    expect(enabledButton.onPressed, isNotNull);
-    expect(find.text('Aktueller PDF-Nachweis'), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('current-evidence-badge-single_current_photo')),
-      findsNothing,
-    );
-    expect(
-      find.byKey(const ValueKey('current-evidence-badge-single_current')),
-      findsOneWidget,
-    );
+    expect(stillEnabledButton.onPressed, isNotNull);
+    expect(find.text('Aktueller PDF-Nachweis'), findsNothing);
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('evidence-export-single_current')),
@@ -572,9 +514,6 @@ void main() {
           evidenceReportServiceProvider.overrideWithValue(
             _FailingDeleteEvidenceReportService(),
           ),
-          singleReadingEvidenceManifestProvider(
-            reading.id,
-          ).overrideWith((ref) => unchangedReadingManifest),
         ],
         child: MaterialApp(home: ReadingDetailScreen(readingId: reading.id)),
       ),
@@ -638,9 +577,6 @@ void main() {
         overrides: [
           meterReadingRepositoryProvider.overrideWithValue(readings),
           evidenceExportRepositoryProvider.overrideWithValue(exports),
-          singleReadingEvidenceManifestProvider(
-            reading.id,
-          ).overrideWith((ref) => unchangedReadingManifest),
         ],
         child: MaterialApp(home: ReadingDetailScreen(readingId: reading.id)),
       ),
@@ -708,9 +644,6 @@ void main() {
         overrides: [
           meterReadingRepositoryProvider.overrideWithValue(readings),
           evidenceExportRepositoryProvider.overrideWithValue(exports),
-          singleReadingEvidenceManifestProvider(
-            reading.id,
-          ).overrideWith((ref) => 'current-after-correction'),
         ],
         child: MaterialApp(home: ReadingDetailScreen(readingId: reading.id)),
       ),
