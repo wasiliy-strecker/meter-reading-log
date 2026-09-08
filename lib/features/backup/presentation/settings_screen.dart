@@ -261,21 +261,39 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ? 'Backup konnte nicht gespeichert werden'
                     : 'Backup noch nicht gespeichert',
               ),
-              content: const Text(
-                'Die verschlüsselte Datei liegt nur vorübergehend in der App. Wähle einen Speicherort, damit das Backup erhalten bleibt.',
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Die verschlüsselte Datei liegt nur vorübergehend in der App. Wähle einen Speicherort, damit das Backup erhalten bleibt.',
+                  ),
+                  const SizedBox(height: 20),
+                  FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.error,
+                      foregroundColor: Theme.of(context).colorScheme.onError,
+                    ),
+                    onPressed: () =>
+                        Navigator.pop(context, _UnsavedBackupAction.discard),
+                    icon: const Icon(Icons.delete_outline),
+                    label: const Text(
+                      'Backup verwerfen',
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: () =>
+                        Navigator.pop(context, _UnsavedBackupAction.retry),
+                    icon: const Icon(Icons.folder_open_outlined),
+                    label: const Text(
+                      'Speicherort wählen',
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ],
               ),
-              actions: [
-                TextButton(
-                  onPressed: () =>
-                      Navigator.pop(context, _UnsavedBackupAction.discard),
-                  child: const Text('Verwerfen'),
-                ),
-                FilledButton(
-                  onPressed: () =>
-                      Navigator.pop(context, _UnsavedBackupAction.retry),
-                  child: const Text('Speicherort wählen'),
-                ),
-              ],
             ),
           ),
         ) ??

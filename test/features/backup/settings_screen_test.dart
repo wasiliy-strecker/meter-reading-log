@@ -115,6 +115,21 @@ void main() {
 
     expect(find.text('Backup noch nicht gespeichert'), findsOneWidget);
     expect(find.text('Speicherort wählen'), findsOneWidget);
+    final discardButton = find.widgetWithText(FilledButton, 'Backup verwerfen');
+    final chooseLocationButton = find.widgetWithText(
+      OutlinedButton,
+      'Speicherort wählen',
+    );
+    expect(discardButton, findsOneWidget);
+    expect(chooseLocationButton, findsOneWidget);
+    expect(
+      tester.getSize(discardButton).width,
+      tester.getSize(chooseLocationButton).width,
+    );
+    expect(
+      tester.getTopLeft(discardButton).dy,
+      lessThan(tester.getTopLeft(chooseLocationButton).dy),
+    );
 
     await tester.tap(find.text('Speicherort wählen'));
     await tester.pumpAndSettle();
@@ -170,7 +185,7 @@ void main() {
     );
 
     await _startBackup(tester, service);
-    await tester.tap(find.text('Verwerfen'));
+    await tester.tap(find.text('Backup verwerfen'));
     await tester.pumpAndSettle();
 
     expect(exporter.discarded, hasLength(1));
