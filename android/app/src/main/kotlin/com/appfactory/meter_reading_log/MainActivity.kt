@@ -1,6 +1,7 @@
 package com.appfactory.meter_reading_log
 
 import android.Manifest
+import android.app.Activity
 import android.content.BroadcastReceiver
 import android.content.ClipData
 import android.content.Context
@@ -9,6 +10,8 @@ import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.provider.DocumentsContract
+import android.provider.OpenableColumns
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
@@ -16,11 +19,14 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
+import java.util.concurrent.Executors
 
 class MainActivity : FlutterActivity() {
     private var reminderChannel: MethodChannel? = null
     private var notificationPermissionResult: MethodChannel.Result? = null
+    private var pendingBackupSave: PendingBackupSave? = null
     private var statusReceiverRegistered = false
+    private val backupIoExecutor = Executors.newSingleThreadExecutor()
 
     private val statusReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -39,7 +45,7 @@ class MainActivity : FlutterActivity() {
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             backupShareChannelName,
-        ).setMethodCallHandler(::handleBackupShareMethod)
+        ).setMethodCallHandler(::handleBackupFileMethod)
     }
 
     override fun onStart() {
@@ -74,6 +80,11 @@ class MainActivity : FlutterActivity() {
         super.onStop()
     }
 
+    override fun onDestroy() {
+        backupIoExecutor.shutdown()
+        super.onDestroy()
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -92,6 +103,14 @@ class MainActivity : FlutterActivity() {
         val granted = grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED
         notificationPermissionResult?.success(granted)
         notificationPermissionResult = null
+    }
+
+    @Deprecated("Deprecated in Android")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != backupSaveRequestCode) return
+        val destination = if (resultCode == Activity.RESULT_OK) data?.data else null
+        completeBackupSave(destination)
     }
 
     private fun handleReminderMethod(call: MethodCall, result: MethodChannel.Result) {
@@ -113,11 +132,77 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    private fun handleBackupShareMethod(call: MethodCall, result: MethodChannel.Result) {
-        if (call.method != "shareBackup") {
-            result.notImplemented()
+    private fun handleBackupFileMethod(call: MethodCall, result: MethodChannel.Result) {
+        when (call.method) {
+            "saveBackup" -> saveBackup(call, result)
+            "shareBackup" -> shareBackup(call, result)
+            else -> result.notImplemented()
+        }
+    }
+
+    private fun saveBackup(call: MethodCall, result: MethodChannel.Result) {
+        if (pendingBackupSave != null) {
+            result.error("save_pending", "Eine Speicherortwahl läuft bereits.", null)
             return
         }
+        val arguments = call.arguments as? Map<*, *>
+        val path = arguments?.get("path") as? String
+        if (path.isNullOrBlank()) {
+            result.error("missing_path", "Der Backup-Pfad fehlt.", null)
+            return
+        }
+        try {
+            val backup = validatedBackup(path)
+            pendingBackupSave = PendingBackupSave(backup, result)
+            @Suppress("DEPRECATION")
+            startActivityForResult(
+                Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    type = "application/octet-stream"
+                    putExtra(Intent.EXTRA_TITLE, backup.name)
+                },
+                backupSaveRequestCode,
+            )
+        } catch (error: Exception) {
+            pendingBackupSave = null
+            result.error("save_failed", error.message, null)
+        }
+    }
+
+    private fun completeBackupSave(destination: Uri?) {
+        val request = pendingBackupSave ?: return
+        if (destination == null) {
+            pendingBackupSave = null
+            request.result.success(mapOf("status" to "cancelled"))
+            return
+        }
+        backupIoExecutor.execute {
+            try {
+                request.backup.inputStream().buffered(backupCopyBufferSize).use { input ->
+                    val output = contentResolver.openOutputStream(destination, "w")
+                        ?: throw IllegalStateException("Der Speicherort konnte nicht geöffnet werden.")
+                    output.buffered(backupCopyBufferSize).use { target ->
+                        input.copyTo(target, backupCopyBufferSize)
+                    }
+                }
+                val fileName = destinationDisplayName(destination) ?: request.backup.name
+                runOnUiThread {
+                    pendingBackupSave = null
+                    request.result.success(
+                        mapOf("status" to "saved", "fileName" to fileName),
+                    )
+                }
+            } catch (error: Exception) {
+                deleteIncompleteDestination(destination)
+                runOnUiThread {
+                    pendingBackupSave = null
+                    request.result.error("save_failed", error.message, null)
+                }
+            }
+        }
+    }
+
+    private fun shareBackup(call: MethodCall, result: MethodChannel.Result) {
         val arguments = call.arguments as? Map<*, *>
         val path = arguments?.get("path") as? String
         val title = arguments?.get("title") as? String ?: "ZählerstandLog Backup"
@@ -127,15 +212,7 @@ class MainActivity : FlutterActivity() {
             return
         }
         try {
-            val backupRoot = File(cacheDir, "meter_reading_backups").canonicalFile
-            val backup = File(path).canonicalFile
-            val isInsideBackupRoot = backup.path.startsWith(
-                backupRoot.path + File.separator,
-            )
-            if (!isInsideBackupRoot || !backup.isFile) {
-                result.error("invalid_path", "Die Backup-Datei ist ungültig.", null)
-                return
-            }
+            val backup = validatedBackup(path)
             clearLegacyShareCache()
             val uri = FileProvider.getUriForFile(
                 this,
@@ -163,6 +240,41 @@ class MainActivity : FlutterActivity() {
             result.success(null)
         } catch (error: Exception) {
             result.error("share_failed", error.message, null)
+        }
+    }
+
+    private fun validatedBackup(path: String): File {
+        val backupRoot = File(cacheDir, "meter_reading_backups").canonicalFile
+        val backup = File(path).canonicalFile
+        val isInsideBackupRoot = backup.path.startsWith(
+            backupRoot.path + File.separator,
+        )
+        if (!isInsideBackupRoot || !backup.isFile) {
+            throw IllegalArgumentException("Die Backup-Datei ist ungültig.")
+        }
+        return backup
+    }
+
+    private fun destinationDisplayName(destination: Uri): String? = try {
+        contentResolver.query(
+            destination,
+            arrayOf(OpenableColumns.DISPLAY_NAME),
+            null,
+            null,
+            null,
+        )?.use { cursor ->
+            val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (index >= 0 && cursor.moveToFirst()) cursor.getString(index) else null
+        }
+    } catch (_: Exception) {
+        null
+    }
+
+    private fun deleteIncompleteDestination(destination: Uri) {
+        try {
+            DocumentsContract.deleteDocument(contentResolver, destination)
+        } catch (_: Exception) {
+            // Some document providers do not allow deleting a failed target.
         }
     }
 
@@ -342,8 +454,15 @@ class MainActivity : FlutterActivity() {
     }
 
     companion object {
+        private const val backupCopyBufferSize = 256 * 1024
+        private const val backupSaveRequestCode = 4108
         private const val notificationPermissionRequestCode = 4107
         private const val backupShareChannelName =
             "com.appfactory.meter_reading_log/backup_share"
     }
+
+    private data class PendingBackupSave(
+        val backup: File,
+        val result: MethodChannel.Result,
+    )
 }

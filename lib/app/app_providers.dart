@@ -11,6 +11,7 @@ import '../core/persistence/persistence_bundle.dart';
 import '../core/persistence/persistence_factory.dart';
 import '../core/reminders/local_notification_reminder_repository.dart';
 import '../features/evidence/application/evidence_report_service.dart';
+import '../features/backup/application/backup_file_exporter.dart';
 import '../features/backup/application/encrypted_backup_service.dart';
 import '../features/evidence/domain/evidence_export.dart';
 import '../features/meters/application/meter_services.dart';
@@ -109,6 +110,10 @@ final encryptedBackupServiceProvider = Provider<EncryptedBackupService>(
     reminders: ref.watch(meterReminderRepositoryProvider),
     integrity: ref.watch(integrityServiceProvider),
   ),
+);
+
+final backupFileExporterProvider = Provider<BackupFileExporter>(
+  (ref) => const PlatformBackupFileExporter(),
 );
 
 final metersProvider = StreamProvider<List<Meter>>(

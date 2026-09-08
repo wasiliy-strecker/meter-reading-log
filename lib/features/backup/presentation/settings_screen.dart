@@ -1,12 +1,11 @@
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter/services.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../../../app/app_providers.dart';
 import '../../../app/widgets/app_snack_bar.dart';
+import '../../../core/utils/formatters.dart';
+import '../application/backup_file_exporter.dart';
 import '../application/encrypted_backup_service.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -17,10 +16,6 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  static const _backupShareChannel = MethodChannel(
-    'com.appfactory.meter_reading_log/backup_share',
-  );
-
   bool _working = false;
   String _workingMessage = '';
   BackupProgress? _backupProgress;
@@ -136,49 +131,164 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             },
           );
       if (!mounted) return;
-      await _shareBackup(backup);
+      final exporter = ref.read(backupFileExporterProvider);
+      if (exporter.supportsDirectSave) {
+        await _saveBackup(backup, exporter);
+      } else {
+        _clearWorkingState();
+        await exporter.share(backup);
+      }
     } on BackupException catch (error) {
       _showBackupError(error);
     } catch (error) {
       _showMessage('Backup konnte nicht erstellt werden: $error');
     } finally {
       if (mounted) {
-        setState(() {
-          _working = false;
-          _workingMessage = '';
-          _backupProgress = null;
-        });
+        _clearWorkingState();
       }
     }
   }
 
-  Future<void> _shareBackup(CreatedBackup backup) {
-    final title = 'ZählerstandLog Backup';
-    final sizeInMb = backup.sizeBytes / (1024 * 1024);
-    final text =
-        '${backup.preview.meterCount} Zähler, ${backup.preview.readingCount} Ablesungen · ${sizeInMb.toStringAsFixed(1)} MB';
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      return _backupShareChannel.invokeMethod<void>('shareBackup', {
-        'path': backup.path,
-        'title': title,
-        'text': text,
+  Future<void> _saveBackup(
+    CreatedBackup backup,
+    BackupFileExporter exporter,
+  ) async {
+    while (mounted) {
+      setState(() {
+        _working = true;
+        _workingMessage = 'Backup wird gespeichert …';
+        _backupProgress = null;
       });
+      BackupSaveResult? result;
+      Object? saveError;
+      try {
+        result = await exporter.save(backup);
+      } catch (error) {
+        saveError = error;
+      }
+      if (!mounted) return;
+      _clearWorkingState();
+
+      if (result?.status == BackupSaveStatus.saved) {
+        final share = await _showBackupSavedDialog(
+          backup,
+          result!.fileName ?? _backupFileName(backup.path),
+        );
+        if (share && mounted) {
+          try {
+            await exporter.share(backup);
+          } catch (error) {
+            _showMessage('Backup konnte nicht geteilt werden: $error');
+          }
+        }
+        return;
+      }
+
+      final action = await _showBackupNotSavedDialog(
+        saveFailed: saveError != null,
+      );
+      if (!mounted) return;
+      if (action == _UnsavedBackupAction.retry) continue;
+      try {
+        await exporter.discard(backup);
+      } catch (_) {
+        // The system cache or the next backup will remove a stale temp file.
+      }
+      return;
     }
-    return SharePlus.instance
-        .share(
-          ShareParams(
-            title: title,
-            text: text,
-            files: [
-              XFile(
-                backup.path,
-                mimeType: 'application/octet-stream',
-                name: backup.path.split('/').last,
+  }
+
+  Future<bool> _showBackupSavedDialog(
+    CreatedBackup backup,
+    String fileName,
+  ) async {
+    final sizeInMb = backup.sizeBytes / (1024 * 1024);
+    return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            icon: const Icon(Icons.check_circle_rounded),
+            title: const Text('Backup gespeichert'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('$fileName wurde im gewählten Speicherort abgelegt.'),
+                const SizedBox(height: 12),
+                Text(
+                  '${backup.preview.meterCount} Zähler · '
+                  '${backup.preview.readingCount} Ablesungen · '
+                  '${backup.preview.exportCount} PDF-Nachweise\n'
+                  '${sizeInMb.toStringAsFixed(1)} MB · '
+                  'Erstellt am ${formatDateTime(backup.preview.createdAt)} Uhr',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton.icon(
+                onPressed: () => Navigator.pop(context, true),
+                icon: const Icon(Icons.ios_share_outlined),
+                label: const Text('Teilen'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Fertig'),
               ),
             ],
           ),
-        )
-        .then((_) {});
+        ) ??
+        false;
+  }
+
+  Future<_UnsavedBackupAction> _showBackupNotSavedDialog({
+    required bool saveFailed,
+  }) async {
+    return await showDialog<_UnsavedBackupAction>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => PopScope(
+            canPop: false,
+            child: AlertDialog(
+              icon: Icon(
+                saveFailed
+                    ? Icons.error_outline_rounded
+                    : Icons.info_outline_rounded,
+              ),
+              title: Text(
+                saveFailed
+                    ? 'Backup konnte nicht gespeichert werden'
+                    : 'Backup noch nicht gespeichert',
+              ),
+              content: const Text(
+                'Die verschlüsselte Datei liegt nur vorübergehend in der App. Wähle einen Speicherort, damit das Backup erhalten bleibt.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () =>
+                      Navigator.pop(context, _UnsavedBackupAction.discard),
+                  child: const Text('Verwerfen'),
+                ),
+                FilledButton(
+                  onPressed: () =>
+                      Navigator.pop(context, _UnsavedBackupAction.retry),
+                  child: const Text('Speicherort wählen'),
+                ),
+              ],
+            ),
+          ),
+        ) ??
+        _UnsavedBackupAction.discard;
+  }
+
+  void _clearWorkingState() {
+    if (!mounted) return;
+    setState(() {
+      _working = false;
+      _workingMessage = '';
+      _backupProgress = null;
+    });
   }
 
   Future<void> _restoreBackup() async {
@@ -276,6 +386,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     ScaffoldMessenger.of(context).showSnackBar(AppSnackBar(message: message));
   }
 }
+
+enum _UnsavedBackupAction { retry, discard }
+
+String _backupFileName(String path) => path.split(RegExp(r'[/\\]')).last;
 
 class _BackupWorkOverlay extends StatelessWidget {
   const _BackupWorkOverlay({

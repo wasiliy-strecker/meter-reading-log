@@ -1,11 +1,11 @@
 import 'dart:async';
 
-import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:meter_reading_log/app/app_providers.dart';
 import 'package:meter_reading_log/core/reminders/local_notification_reminder_repository.dart';
+import 'package:meter_reading_log/features/backup/application/backup_file_exporter.dart';
 import 'package:meter_reading_log/features/backup/application/encrypted_backup_service.dart';
 import 'package:meter_reading_log/features/backup/presentation/settings_screen.dart';
 
@@ -36,62 +36,187 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Android backup sharing returns from the progress state', (
-    tester,
-  ) async {
-    const channel = MethodChannel(
-      'com.appfactory.meter_reading_log/backup_share',
-    );
-    MethodCall? sharedCall;
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(channel, (call) async {
-          sharedCall = call;
-          return null;
-        });
-    addTearDown(
-      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(channel, null),
-    );
+  testWidgets(
+    'Android backup saving returns from progress and offers sharing',
+    (tester) async {
+      final exporter = _FakeBackupFileExporter([
+        const BackupSaveResult.saved('gesichertes-backup.zslbackup'),
+      ]);
+      final service = _ControlledBackupService();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            encryptedBackupServiceProvider.overrideWithValue(service),
+            backupFileExporterProvider.overrideWithValue(exporter),
+          ],
+          child: const MaterialApp(home: SettingsScreen()),
+        ),
+      );
 
+      await tester.tap(find.text('Verschlüsseltes Backup erstellen'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).at(0), '123456');
+      await tester.enterText(find.byType(TextField).at(1), '123456');
+      await tester.tap(find.widgetWithText(FilledButton, 'Weiter'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(
+        find.byKey(const ValueKey('backup-progress-overlay')),
+        findsOneWidget,
+      );
+      expect(find.text('Backup wird verschlüsselt'), findsOneWidget);
+      expect(find.text('1 von 2 Dateien'), findsOneWidget);
+      expect(find.text('50 %'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('backup-linear-progress')),
+        findsOneWidget,
+      );
+
+      service.complete();
+      await tester.pumpAndSettle();
+
+      expect(exporter.saved, hasLength(1));
+      expect(
+        find.byKey(const ValueKey('backup-progress-overlay')),
+        findsNothing,
+      );
+      expect(find.text('Backup gespeichert'), findsOneWidget);
+      expect(
+        find.textContaining('gesichertes-backup.zslbackup'),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('Teilen'));
+      await tester.pumpAndSettle();
+
+      expect(exporter.shared, hasLength(1));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('cancelled save can choose a destination again', (tester) async {
+    final exporter = _FakeBackupFileExporter([
+      const BackupSaveResult.cancelled(),
+      const BackupSaveResult.saved('zweiter-versuch.zslbackup'),
+    ]);
     final service = _ControlledBackupService();
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [encryptedBackupServiceProvider.overrideWithValue(service)],
+        overrides: [
+          encryptedBackupServiceProvider.overrideWithValue(service),
+          backupFileExporterProvider.overrideWithValue(exporter),
+        ],
         child: const MaterialApp(home: SettingsScreen()),
       ),
     );
 
-    await tester.tap(find.text('Verschlüsseltes Backup erstellen'));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField).at(0), '123456');
-    await tester.enterText(find.byType(TextField).at(1), '123456');
-    await tester.tap(find.widgetWithText(FilledButton, 'Weiter'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    await _startBackup(tester, service);
 
-    expect(
-      find.byKey(const ValueKey('backup-progress-overlay')),
-      findsOneWidget,
-    );
-    expect(find.text('Backup wird verschlüsselt'), findsOneWidget);
-    expect(find.text('1 von 2 Dateien'), findsOneWidget);
-    expect(find.text('50 %'), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('backup-linear-progress')),
-      findsOneWidget,
-    );
+    expect(find.text('Backup noch nicht gespeichert'), findsOneWidget);
+    expect(find.text('Speicherort wählen'), findsOneWidget);
 
-    service.complete();
+    await tester.tap(find.text('Speicherort wählen'));
     await tester.pumpAndSettle();
 
-    expect(sharedCall?.method, 'shareBackup');
-    expect(
-      (sharedCall?.arguments as Map<Object?, Object?>)['path'],
-      '/tmp/test.zslbackup',
-    );
-    expect(find.byKey(const ValueKey('backup-progress-overlay')), findsNothing);
+    expect(exporter.saved, hasLength(2));
+    expect(find.text('Backup gespeichert'), findsOneWidget);
+    expect(find.textContaining('zweiter-versuch.zslbackup'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('failed save can be retried without recreating the backup', (
+    tester,
+  ) async {
+    final exporter = _FakeBackupFileExporter([
+      StateError('Speichern fehlgeschlagen'),
+      const BackupSaveResult.saved('nach-fehler.zslbackup'),
+    ]);
+    final service = _ControlledBackupService();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          encryptedBackupServiceProvider.overrideWithValue(service),
+          backupFileExporterProvider.overrideWithValue(exporter),
+        ],
+        child: const MaterialApp(home: SettingsScreen()),
+      ),
+    );
+
+    await _startBackup(tester, service);
+
+    expect(find.text('Backup konnte nicht gespeichert werden'), findsOneWidget);
+    await tester.tap(find.text('Speicherort wählen'));
+    await tester.pumpAndSettle();
+
+    expect(exporter.saved, hasLength(2));
+    expect(find.text('Backup gespeichert'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('discard removes a backup that was not saved', (tester) async {
+    final exporter = _FakeBackupFileExporter([
+      const BackupSaveResult.cancelled(),
+    ]);
+    final service = _ControlledBackupService();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          encryptedBackupServiceProvider.overrideWithValue(service),
+          backupFileExporterProvider.overrideWithValue(exporter),
+        ],
+        child: const MaterialApp(home: SettingsScreen()),
+      ),
+    );
+
+    await _startBackup(tester, service);
+    await tester.tap(find.text('Verwerfen'));
+    await tester.pumpAndSettle();
+
+    expect(exporter.discarded, hasLength(1));
+    expect(find.text('Backup noch nicht gespeichert'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+}
+
+Future<void> _startBackup(
+  WidgetTester tester,
+  _ControlledBackupService service,
+) async {
+  await tester.tap(find.text('Verschlüsseltes Backup erstellen'));
+  await tester.pumpAndSettle();
+  await tester.enterText(find.byType(TextField).at(0), '123456');
+  await tester.enterText(find.byType(TextField).at(1), '123456');
+  await tester.tap(find.widgetWithText(FilledButton, 'Weiter'));
+  await tester.pump();
+  service.complete();
+  await tester.pumpAndSettle();
+}
+
+class _FakeBackupFileExporter implements BackupFileExporter {
+  _FakeBackupFileExporter(this._saveOutcomes);
+
+  final List<Object> _saveOutcomes;
+  final List<CreatedBackup> saved = [];
+  final List<CreatedBackup> shared = [];
+  final List<CreatedBackup> discarded = [];
+
+  @override
+  bool get supportsDirectSave => true;
+
+  @override
+  Future<BackupSaveResult> save(CreatedBackup backup) async {
+    saved.add(backup);
+    final outcome = _saveOutcomes.removeAt(0);
+    if (outcome is BackupSaveResult) return outcome;
+    throw outcome;
+  }
+
+  @override
+  Future<void> share(CreatedBackup backup) async => shared.add(backup);
+
+  @override
+  Future<void> discard(CreatedBackup backup) async => discarded.add(backup);
 }
 
 class _ControlledBackupService extends EncryptedBackupService {
