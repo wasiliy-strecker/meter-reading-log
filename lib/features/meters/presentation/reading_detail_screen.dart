@@ -121,14 +121,19 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
           const SizedBox(height: 12),
           _CorrectionHistoryCard(reading: reading, revisions: revisions),
           const SizedBox(height: 20),
+          Text(
+            'Gespeicherte Einzelnachweise',
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 8),
+          _SinglePdfAction(
+            exporting: _exporting,
+            onPressed: () => _export(reading),
+          ),
           if (singleExports.isNotEmpty) ...[
-            Text(
-              'Gespeicherte Einzelnachweise',
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             for (final export in singleExports)
               EvidenceExportCard(
                 export: export,
@@ -142,18 +147,7 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
                 deleting: _deletingExportIds.contains(export.id),
                 onDelete: () => _deleteExport(export),
               ),
-            const SizedBox(height: 10),
           ],
-          FilledButton.icon(
-            onPressed: _exporting ? null : () => _export(reading),
-            icon: const Icon(Icons.picture_as_pdf_outlined),
-            label: const Text(
-              'Einzelnachweis als PDF erstellen',
-              textAlign: TextAlign.center,
-            ),
-          ),
-          const SizedBox(height: 10),
-          const _PdfPurposeCard(),
         ],
       ),
     );
@@ -271,34 +265,52 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
   }
 }
 
-class _PdfPurposeCard extends StatelessWidget {
-  const _PdfPurposeCard();
+class _SinglePdfAction extends StatelessWidget {
+  const _SinglePdfAction({required this.exporting, required this.onPressed});
+
+  final bool exporting;
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return Card(
+      key: const ValueKey('single-pdf-action'),
       color: colors.secondaryContainer.withValues(alpha: 0.55),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.description_outlined, color: colors.primary),
+                Icon(Icons.picture_as_pdf_outlined, color: colors.primary),
                 const SizedBox(width: 10),
                 const Expanded(
-                  child: Text(
-                    pdfPurposeTitle,
-                    style: TextStyle(fontWeight: FontWeight.w800),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'PDF-Nachweis dieser Ablesung',
+                        style: TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      SizedBox(height: 4),
+                      Text(pdfPurposeText),
+                    ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            const Text(pdfPurposeText),
+            const SizedBox(height: 14),
+            FilledButton.icon(
+              onPressed: exporting ? null : onPressed,
+              icon: const Icon(Icons.picture_as_pdf_outlined),
+              label: const Text(
+                'Einzelnachweis als PDF erstellen',
+                textAlign: TextAlign.center,
+              ),
+            ),
           ],
         ),
       ),

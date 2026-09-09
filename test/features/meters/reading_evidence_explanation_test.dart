@@ -67,13 +67,19 @@ void main() {
       expect(find.textContaining(reading.manifestSha256), findsNothing);
 
       await tester.scrollUntilVisible(
-        find.text(pdfPurposeTitle),
+        find.text('PDF-Nachweis dieser Ablesung'),
         250,
         scrollable: scrollable,
       );
       expect(find.text(pdfPurposeText), findsOneWidget);
       expect(find.text(privateDocumentationText), findsNothing);
-      expect(find.byIcon(Icons.description_outlined), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('single-pdf-action')),
+          matching: find.byIcon(Icons.picture_as_pdf_outlined),
+        ),
+        findsNWidgets(2),
+      );
     },
   );
 
@@ -257,7 +263,7 @@ void main() {
   testWidgets('single PDF action immediately shows indeterminate progress', (
     tester,
   ) async {
-    await tester.binding.setSurfaceSize(const Size(430, 1200));
+    await tester.binding.setSurfaceSize(const Size(430, 1600));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final reading = _reading();
     final readings = MemoryReadingRepository()..items[reading.id] = reading;
@@ -287,6 +293,8 @@ void main() {
       250,
       scrollable: scrollable,
     );
+    expect(find.text('PDF-Nachweis dieser Ablesung'), findsOneWidget);
+    expect(find.text(pdfPurposeText), findsOneWidget);
 
     await tester.tap(find.text('Einzelnachweis als PDF erstellen'));
     await tester.pumpAndSettle();
@@ -405,20 +413,22 @@ void main() {
     expect(
       tester
           .getTopLeft(
-            find.byKey(const ValueKey('evidence-export-single_current')),
+            find.widgetWithText(
+              FilledButton,
+              'Einzelnachweis als PDF erstellen',
+            ),
           )
           .dy,
       lessThan(
         tester
             .getTopLeft(
-              find.widgetWithText(
-                FilledButton,
-                'Einzelnachweis als PDF erstellen',
-              ),
+              find.byKey(const ValueKey('evidence-export-single_current')),
             )
             .dy,
       ),
     );
+    expect(find.text('PDF-Nachweis dieser Ablesung'), findsOneWidget);
+    expect(find.text(pdfPurposeText), findsOneWidget);
     expect(
       find.text('Beide aktuellen Varianten bereits erstellt'),
       findsNothing,
