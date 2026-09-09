@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:universal_io/io.dart';
 
 import 'package:flutter/material.dart';
@@ -28,8 +30,22 @@ class MeterDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
+  static const _historyPageSize = 20;
+
   bool _exporting = false;
   final Set<String> _deletingExportIds = {};
+  final TextEditingController _historySearchController =
+      TextEditingController();
+  Timer? _historySearchDebounce;
+  int _visibleReadingLimit = _historyPageSize;
+  String _historyQuery = '';
+
+  @override
+  void dispose() {
+    _historySearchDebounce?.cancel();
+    _historySearchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -76,7 +92,13 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
   }
 
   Widget _buildContent(Meter meter) {
-    final readingsAsync = ref.watch(readingsForMeterProvider(meter.id));
+    final historyPageAsync = ref.watch(
+      meterHistoryPageProvider((
+        meterId: meter.id,
+        limit: _visibleReadingLimit,
+        query: _historyQuery,
+      )),
+    );
     final exportsAsync = ref.watch(evidenceForMeterProvider(meter.id));
     final exports = exportsAsync.value ?? const [];
     final historyExports = exports
@@ -92,80 +114,126 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
         context.pushNamed('captureReading', pathParameters: {'id': meter.id});
     return Scaffold(
       appBar: _appBar(meter.label),
-      body: readingsAsync.when(
+      body: historyPageAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, _) => const Center(
           child: Text('Ablesungen konnten nicht geladen werden.'),
         ),
-        data: (readings) => ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 112),
-          children: [
-            _MeterHeader(
-              meter: meter,
-              readings: readings,
-              onTap: openMeterEditor,
-            ),
-            const SizedBox(height: 12),
-            _MeterActions(
-              onEdit: openMeterEditor,
-              onDelete: () => _deleteMeter(meter),
-            ),
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Zählerverlauf',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
+        data: (page) {
+          final searchActive = _historyQuery.isNotEmpty;
+          return ListView.builder(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 112),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            itemCount: page.readings.length + 2,
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _MeterHeader(
+                      meter: meter,
+                      latestReading: page.latestReading,
+                      onTap: openMeterEditor,
                     ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            if (readings.isEmpty)
-              _EmptyReadings(onTap: captureReading)
-            else
-              for (var index = 0; index < readings.length; index++)
-                _ReadingTile(
-                  reading: readings[index],
-                  previous: index + 1 < readings.length
-                      ? readings[index + 1]
-                      : null,
-                ),
-            if (readings.isNotEmpty || historyExports.isNotEmpty) ...[
-              const SizedBox(height: 22),
-              Text(
-                'Gespeicherte PDF-Nachweise',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 8),
-              if (readings.isNotEmpty) ...[
-                _HistoryPdfAction(
-                  exporting: _exporting,
-                  onPressed: () => _exportHistory(meter, readings),
-                ),
-                if (historyExports.isNotEmpty) const SizedBox(height: 12),
-              ],
-              for (final export in historyExports)
-                EvidenceExportCard(
-                  export: export,
-                  title: 'Zählerverlaufsnachweis',
-                  detail:
-                      '${_readingCountLabel(export.readingIds.length)}\n${export.photoMode.labelFor(export.kind)}',
-                  fileAvailable: availableFiles[export.id] == true,
-                  onTap: availableFiles[export.id] != true
-                      ? null
-                      : () => _openExport(export),
-                  deleting: _deletingExportIds.contains(export.id),
-                  onDelete: () => _deleteExport(export),
-                ),
-            ],
-          ],
-        ),
+                    const SizedBox(height: 12),
+                    _MeterActions(
+                      onEdit: openMeterEditor,
+                      onDelete: () => _deleteMeter(meter),
+                    ),
+                    const SizedBox(height: 18),
+                    Text(
+                      'Zählerverlauf',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    if (page.totalCount >= _historyPageSize) ...[
+                      const SizedBox(height: 10),
+                      _HistorySearchField(
+                        controller: _historySearchController,
+                        onChanged: _onHistorySearchChanged,
+                        onClear: _clearHistorySearch,
+                      ),
+                    ],
+                    if (page.totalCount > 0) ...[
+                      const SizedBox(height: 10),
+                      _HistoryResultCount(
+                        visibleCount: page.readings.length,
+                        totalCount: page.totalCount,
+                        matchingCount: page.matchingCount,
+                        searchActive: searchActive,
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    if (page.totalCount == 0)
+                      _EmptyReadings(onTap: captureReading)
+                    else if (page.matchingCount == 0)
+                      _EmptyHistorySearch(onClear: _clearHistorySearch),
+                  ],
+                );
+              }
+
+              final readingIndex = index - 1;
+              if (readingIndex < page.readings.length) {
+                final previous = searchActive
+                    ? null
+                    : readingIndex + 1 < page.readings.length
+                    ? page.readings[readingIndex + 1]
+                    : page.olderNeighbor;
+                return _ReadingTile(
+                  reading: page.readings[readingIndex],
+                  previous: previous,
+                  showDelta: !searchActive,
+                );
+              }
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (page.hasMore) ...[
+                    const SizedBox(height: 4),
+                    OutlinedButton.icon(
+                      key: const ValueKey('show-more-readings'),
+                      onPressed: _showMoreReadings,
+                      icon: const Icon(Icons.expand_more),
+                      label: const Text('Weitere 20 anzeigen'),
+                    ),
+                  ],
+                  if (page.totalCount > 0 || historyExports.isNotEmpty) ...[
+                    const SizedBox(height: 22),
+                    Text(
+                      'Gespeicherte PDF-Nachweise',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (page.totalCount > 0) ...[
+                      _HistoryPdfAction(
+                        exporting: _exporting,
+                        onPressed: () => _exportHistory(meter),
+                      ),
+                      if (historyExports.isNotEmpty) const SizedBox(height: 12),
+                    ],
+                    for (final export in historyExports)
+                      EvidenceExportCard(
+                        export: export,
+                        title: 'Zählerverlaufsnachweis',
+                        detail:
+                            '${_readingCountLabel(export.readingIds.length)}\n${export.photoMode.labelFor(export.kind)}',
+                        fileAvailable: availableFiles[export.id] == true,
+                        onTap: availableFiles[export.id] != true
+                            ? null
+                            : () => _openExport(export),
+                        deleting: _deletingExportIds.contains(export.id),
+                        onDelete: () => _deleteExport(export),
+                      ),
+                  ],
+                ],
+              );
+            },
+          );
+        },
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: captureReading,
@@ -175,7 +243,40 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
     );
   }
 
-  Future<void> _exportHistory(Meter meter, List<MeterReading> readings) async {
+  void _onHistorySearchChanged(String value) {
+    setState(() {});
+    _historySearchDebounce?.cancel();
+    _historySearchDebounce = Timer(const Duration(milliseconds: 250), () {
+      if (!mounted) return;
+      final query = value.trim();
+      if (query == _historyQuery && _visibleReadingLimit == _historyPageSize) {
+        return;
+      }
+      setState(() {
+        _historyQuery = query;
+        _visibleReadingLimit = _historyPageSize;
+      });
+    });
+  }
+
+  void _clearHistorySearch() {
+    _historySearchDebounce?.cancel();
+    _historySearchController.clear();
+    if (_historyQuery.isEmpty && _visibleReadingLimit == _historyPageSize) {
+      setState(() {});
+      return;
+    }
+    setState(() {
+      _historyQuery = '';
+      _visibleReadingLimit = _historyPageSize;
+    });
+  }
+
+  void _showMoreReadings() {
+    setState(() => _visibleReadingLimit += _historyPageSize);
+  }
+
+  Future<void> _exportHistory(Meter meter) async {
     if (_exporting) return;
     final photoMode = await showEvidencePhotoModeSheet(
       context,
@@ -191,6 +292,7 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
             : 'Ablesungen, aktuelle Fotos und Korrekturen werden für die PDF zusammengestellt.',
         operation: () async {
           final repository = ref.read(meterReadingRepositoryProvider);
+          final readings = await repository.loadForMeter(meter.id);
           final revisionLists = await Future.wait(
             readings.map((reading) => repository.loadRevisions(reading.id)),
           );
@@ -380,21 +482,131 @@ String _readingCountLabel(int count) => switch (count) {
   _ => '$count Ablesungen enthalten',
 };
 
+class _HistorySearchField extends StatelessWidget {
+  const _HistorySearchField({
+    required this.controller,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      key: const ValueKey('history-search-field'),
+      controller: controller,
+      onChanged: onChanged,
+      textInputAction: TextInputAction.search,
+      decoration: InputDecoration(
+        labelText: 'Ablesungen suchen',
+        hintText: 'Datum, Zählerstand oder Notiz',
+        prefixIcon: const Icon(Icons.search),
+        suffixIcon: controller.text.isEmpty
+            ? null
+            : IconButton(
+                tooltip: 'Suche löschen',
+                onPressed: onClear,
+                icon: const Icon(Icons.close),
+              ),
+        border: const OutlineInputBorder(),
+      ),
+    );
+  }
+}
+
+class _HistoryResultCount extends StatelessWidget {
+  const _HistoryResultCount({
+    required this.visibleCount,
+    required this.totalCount,
+    required this.matchingCount,
+    required this.searchActive,
+  });
+
+  final int visibleCount;
+  final int totalCount;
+  final int matchingCount;
+  final bool searchActive;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = searchActive
+        ? matchingCount == 1
+              ? '1 Treffer'
+              : visibleCount < matchingCount
+              ? '$visibleCount von $matchingCount Treffern'
+              : '$matchingCount Treffer'
+        : totalCount == 1
+        ? '1 Ablesung'
+        : visibleCount < totalCount
+        ? '$visibleCount von $totalCount Ablesungen'
+        : '$totalCount Ablesungen';
+    return Text(
+      label,
+      key: const ValueKey('history-result-count'),
+      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+        fontWeight: FontWeight.w700,
+      ),
+    );
+  }
+}
+
+class _EmptyHistorySearch extends StatelessWidget {
+  const _EmptyHistorySearch({required this.onClear});
+
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            Icon(Icons.search_off_outlined, size: 36, color: colors.primary),
+            const SizedBox(height: 10),
+            const Text(
+              'Keine passende Ablesung gefunden.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Suche nach Datum, Zählerstand oder einem Wort aus der Notiz.',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            TextButton.icon(
+              onPressed: onClear,
+              icon: const Icon(Icons.close),
+              label: const Text('Suche löschen'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _MeterHeader extends StatelessWidget {
   const _MeterHeader({
     required this.meter,
-    required this.readings,
+    required this.latestReading,
     required this.onTap,
   });
 
   final Meter meter;
-  final List<MeterReading> readings;
+  final MeterReading? latestReading;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final color = meterColor(meter.type);
-    final latest = readings.firstOrNull;
+    final latest = latestReading;
     return Card(
       key: ValueKey('meter-summary-${meter.id}'),
       clipBehavior: Clip.antiAlias,
@@ -472,17 +684,22 @@ String _reminderSummary(ReadingReminderSchedule reminder) {
 }
 
 class _ReadingTile extends StatelessWidget {
-  const _ReadingTile({required this.reading, this.previous});
+  const _ReadingTile({
+    required this.reading,
+    required this.showDelta,
+    this.previous,
+  });
 
   final MeterReading reading;
   final MeterReading? previous;
+  final bool showDelta;
 
   @override
   Widget build(BuildContext context) {
     final meterAccent = meterColor(reading.meter.type);
     final sameUnit =
         previous == null || previous!.meter.unit == reading.meter.unit;
-    final delta = previous == null || !sameUnit
+    final delta = !showDelta || previous == null || !sameUnit
         ? null
         : reading.value.difference(previous!.value).germanFormatted;
     return Card(
@@ -567,7 +784,7 @@ class _ReadingTile extends StatelessWidget {
                           style: Theme.of(context).textTheme.titleLarge
                               ?.copyWith(fontWeight: FontWeight.w900),
                         ),
-                        if (previous != null && !sameUnit) ...[
+                        if (showDelta && previous != null && !sameUnit) ...[
                           const SizedBox(height: 8),
                           const Text('Einheit seit dieser Ablesung gewechselt'),
                         ] else if (delta != null) ...[
@@ -584,6 +801,30 @@ class _ReadingTile extends StatelessWidget {
                   ),
                 ],
               ),
+              if (reading.note.trim().isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.notes_outlined,
+                      size: 18,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        reading.note.trim(),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),

@@ -19,6 +19,7 @@ import '../features/meters/data/dashboard_repository_factory.dart';
 import '../features/meters/domain/meter.dart';
 import '../features/meters/domain/meter_dashboard_item.dart';
 import '../features/meters/domain/meter_reading.dart';
+import '../features/meters/domain/meter_reading_page.dart';
 import '../features/meters/domain/meter_repositories.dart';
 
 final persistenceBundleProvider = Provider<PersistenceBundle>((ref) {
@@ -146,6 +147,19 @@ final readingsForMeterProvider =
     StreamProvider.family<List<MeterReading>, String>(
       (ref, meterId) =>
           ref.watch(meterReadingRepositoryProvider).watchForMeter(meterId),
+    );
+
+typedef MeterHistoryPageRequest = ({String meterId, int limit, String query});
+
+final meterHistoryPageProvider = StreamProvider.autoDispose
+    .family<MeterReadingPage, MeterHistoryPageRequest>(
+      (ref, request) => ref
+          .watch(meterReadingRepositoryProvider)
+          .watchPageForMeter(
+            request.meterId,
+            limit: request.limit,
+            query: request.query,
+          ),
     );
 
 final readingByIdProvider = FutureProvider.family<MeterReading?, String>(

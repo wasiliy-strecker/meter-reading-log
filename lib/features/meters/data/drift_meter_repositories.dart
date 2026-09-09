@@ -7,6 +7,7 @@ import '../../evidence/domain/evidence_export.dart';
 import '../domain/meter.dart';
 import '../domain/meter_dashboard_item.dart';
 import '../domain/meter_reading.dart';
+import '../domain/meter_reading_page.dart';
 import '../domain/meter_repositories.dart';
 import '../domain/reading_value.dart';
 
@@ -114,6 +115,48 @@ class DriftMeterReadingRepository implements MeterReadingRepository {
   }
 
   @override
+  Stream<MeterReadingPage> watchPageForMeter(
+    String meterId, {
+    required int limit,
+    String query = '',
+  }) {
+    if (limit <= 0) throw ArgumentError.value(limit, 'limit');
+    final normalizedQuery = query.trim().toLowerCase();
+    final searchPredicate = _searchPredicate(normalizedQuery);
+    final pageQuery = database.select(database.readingRecords)
+      ..where(
+        (row) =>
+            row.meterId.equals(meterId) &
+            (searchPredicate ?? const Constant(true)),
+      )
+      ..orderBy([
+        (row) => OrderingTerm.desc(row.capturedAtMillis),
+        (row) => OrderingTerm.desc(row.storedAtMillis),
+        (row) => OrderingTerm.desc(row.id),
+      ])
+      ..limit(limit + 1);
+    return pageQuery.watch().asyncMap((rows) async {
+      final totalCount = await _countForMeter(meterId);
+      final matchingCount = searchPredicate == null
+          ? totalCount
+          : await _countForMeter(meterId, searchPredicate: searchPredicate);
+      final latestReading = searchPredicate == null && rows.isNotEmpty
+          ? _readingFromRow(rows.first)
+          : await _latestForMeter(meterId);
+      final visibleRows = rows.take(limit).toList(growable: false);
+      return MeterReadingPage(
+        readings: visibleRows.map(_readingFromRow).toList(growable: false),
+        totalCount: totalCount,
+        matchingCount: matchingCount,
+        latestReading: latestReading,
+        olderNeighbor: rows.length > limit
+            ? _readingFromRow(rows[limit])
+            : null,
+      );
+    });
+  }
+
+  @override
   Future<List<MeterReading>> loadAll() async {
     final query = database.select(database.readingRecords)
       ..orderBy([(row) => OrderingTerm.desc(row.capturedAtMillis)]);
@@ -133,6 +176,56 @@ class DriftMeterReadingRepository implements MeterReadingRepository {
     final row = await (database.select(
       database.readingRecords,
     )..where((item) => item.id.equals(id))).getSingleOrNull();
+    return row == null ? null : _readingFromRow(row);
+  }
+
+  Expression<bool>? _searchPredicate(String query) {
+    if (query.isEmpty) return null;
+    String escapedLikePattern(String value) => value
+        .replaceAll(r'\', r'\\')
+        .replaceAll('%', r'\%')
+        .replaceAll('_', r'\_');
+
+    final lowercasePattern = '%${escapedLikePattern(query)}%';
+    final uppercasePattern = '%${escapedLikePattern(query.toUpperCase())}%';
+    const formattedLocalDate = CustomExpression<String>(
+      "strftime('%d.%m.%Y', "
+      '"reading_records"."captured_at_millis" / 1000, '
+      "'unixepoch', 'localtime')",
+    );
+    final readings = database.readingRecords;
+    Expression<bool> matchesText(Expression<String> column) =>
+        column.lower().like(lowercasePattern, escapeChar: r'\') |
+        column.like(uppercasePattern, escapeChar: r'\');
+
+    return matchesText(readings.displayValue) |
+        matchesText(readings.note) |
+        formattedLocalDate.like(lowercasePattern, escapeChar: r'\');
+  }
+
+  Future<int> _countForMeter(
+    String meterId, {
+    Expression<bool>? searchPredicate,
+  }) async {
+    final count = countAll();
+    final query = database.selectOnly(database.readingRecords)
+      ..addColumns([count])
+      ..where(database.readingRecords.meterId.equals(meterId));
+    if (searchPredicate != null) query.where(searchPredicate);
+    final row = await query.getSingle();
+    return row.read(count) ?? 0;
+  }
+
+  Future<MeterReading?> _latestForMeter(String meterId) async {
+    final query = database.select(database.readingRecords)
+      ..where((row) => row.meterId.equals(meterId))
+      ..orderBy([
+        (row) => OrderingTerm.desc(row.capturedAtMillis),
+        (row) => OrderingTerm.desc(row.storedAtMillis),
+        (row) => OrderingTerm.desc(row.id),
+      ])
+      ..limit(1);
+    final row = await query.getSingleOrNull();
     return row == null ? null : _readingFromRow(row);
   }
 

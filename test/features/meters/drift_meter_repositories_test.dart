@@ -147,6 +147,96 @@ void main() {
   });
 
   test(
+    'history page limits rows and searches value note and local date',
+    () async {
+      final meter = _meter();
+      await meters.save(meter);
+      final base = DateTime.utc(2026, 8, 1, 12);
+      for (var index = 0; index < 45; index++) {
+        await readings.save(
+          _historyReading(
+            meter,
+            index: index,
+            capturedAt: base.add(Duration(days: index)),
+            note: index == 7 ? 'Seltener ÖLSTAND im Keller' : '',
+          ),
+        );
+      }
+
+      final firstPage = await readings
+          .watchPageForMeter(meter.id, limit: 20)
+          .first;
+
+      expect(firstPage.readings, hasLength(20));
+      expect(firstPage.totalCount, 45);
+      expect(firstPage.matchingCount, 45);
+      expect(firstPage.hasMore, isTrue);
+      expect(firstPage.readings.first.id, 'history_44');
+      expect(firstPage.readings.last.id, 'history_25');
+      expect(firstPage.latestReading?.id, 'history_44');
+      expect(firstPage.olderNeighbor?.id, 'history_24');
+
+      final valueMatch = await readings
+          .watchPageForMeter(meter.id, limit: 20, query: '1044,0')
+          .first;
+      expect(valueMatch.readings.map((reading) => reading.id), ['history_44']);
+      expect(valueMatch.totalCount, 45);
+      expect(valueMatch.matchingCount, 1);
+      expect(valueMatch.latestReading?.id, 'history_44');
+
+      final noteMatch = await readings
+          .watchPageForMeter(meter.id, limit: 20, query: 'ölstand')
+          .first;
+      expect(noteMatch.readings.map((reading) => reading.id), ['history_7']);
+
+      final dateMatch = await readings
+          .watchPageForMeter(meter.id, limit: 20, query: '07.09.2026')
+          .first;
+      expect(dateMatch.readings.map((reading) => reading.id), ['history_37']);
+    },
+  );
+
+  test('history page stays bounded for 5000 readings of one meter', () async {
+    const readingCount = 5000;
+    final meter = _meter();
+    await meters.save(meter);
+    final baseMillis = DateTime.utc(2020, 1, 1).millisecondsSinceEpoch;
+    await database.batch((batch) {
+      batch.insertAll(database.readingRecords, [
+        for (var index = 0; index < readingCount; index++)
+          ReadingRecordsCompanion.insert(
+            id: 'long_history_$index',
+            meterId: meter.id,
+            meterSnapshotJson: jsonEncode(
+              MeterSnapshot.fromMeter(meter).toJson(),
+            ),
+            displayValue: '$index,0',
+            valueDigits: '${index}0',
+            valueScale: 1,
+            capturedAtMillis: baseMillis + index,
+            timezoneOffsetMinutes: 60,
+            storedAtMillis: baseMillis + index,
+            updatedAtMillis: baseMillis + index,
+            source: ReadingSource.camera.name,
+            photoPath: '/tmp/photo.jpg',
+            photoSha256: 'a' * 64,
+            note: const Value('Langzeittest'),
+            manifestSha256: 'b' * 64,
+          ),
+      ]);
+    });
+
+    final stopwatch = Stopwatch()..start();
+    final page = await readings.watchPageForMeter(meter.id, limit: 20).first;
+    stopwatch.stop();
+
+    expect(page.readings, hasLength(20));
+    expect(page.totalCount, readingCount);
+    expect(page.olderNeighbor, isNotNull);
+    expect(stopwatch.elapsed, lessThan(const Duration(seconds: 5)));
+  });
+
+  test(
     'dashboard query stays bounded for 500 meters and 10000 readings',
     () async {
       const meterCount = 500;
@@ -249,5 +339,28 @@ MeterReading _reading(Meter meter) => MeterReading(
       ocrConfidence: 0.8,
     ),
   ],
+  manifestSha256: 'b' * 64,
+);
+
+MeterReading _historyReading(
+  Meter meter, {
+  required int index,
+  required DateTime capturedAt,
+  required String note,
+}) => MeterReading(
+  id: 'history_$index',
+  meterId: meter.id,
+  meter: MeterSnapshot.fromMeter(meter),
+  value: ReadingValue.tryParse('${1000 + index},0')!,
+  capturedAt: capturedAt,
+  timezoneOffsetMinutes: capturedAt.timeZoneOffset.inMinutes,
+  storedAt: capturedAt,
+  updatedAt: capturedAt,
+  source: ReadingSource.camera,
+  photoPath: '/tmp/photo_$index.jpg',
+  photoSha256: 'a' * 64,
+  ocrRawText: '${1000 + index},0',
+  ocrCandidate: '${1000 + index},0',
+  note: note,
   manifestSha256: 'b' * 64,
 );

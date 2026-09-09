@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:meter_reading_log/features/evidence/domain/evidence_export.dart';
 import 'package:meter_reading_log/features/meters/domain/meter.dart';
 import 'package:meter_reading_log/features/meters/domain/meter_reading.dart';
+import 'package:meter_reading_log/features/meters/domain/meter_reading_page.dart';
 import 'package:meter_reading_log/features/meters/domain/meter_repositories.dart';
 import 'package:meter_reading_log/core/reminders/local_notification_reminder_repository.dart';
 
@@ -130,6 +131,10 @@ class MemoryMeterRepository implements MeterRepository {
 class MemoryReadingRepository implements MeterReadingRepository {
   final Map<String, MeterReading> items = {};
   final Map<String, List<ReadingRevision>> revisions = {};
+  int watchPageForMeterCalls = 0;
+  int loadForMeterCalls = 0;
+  int? lastPageLimit;
+  String? lastPageQuery;
 
   @override
   Stream<List<MeterReading>> watchAll() => Stream.value(items.values.toList());
@@ -147,8 +152,10 @@ class MemoryReadingRepository implements MeterReadingRepository {
   Future<List<MeterReading>> loadAll() async => items.values.toList();
 
   @override
-  Future<List<MeterReading>> loadForMeter(String meterId) async =>
-      items.values.where((item) => item.meterId == meterId).toList();
+  Future<List<MeterReading>> loadForMeter(String meterId) async {
+    loadForMeterCalls++;
+    return items.values.where((item) => item.meterId == meterId).toList();
+  }
 
   @override
   Future<List<ReadingRevision>> loadRevisions(String readingId) async =>
@@ -175,6 +182,39 @@ class MemoryReadingRepository implements MeterReadingRepository {
   Stream<List<MeterReading>> watchForMeter(String meterId) => Stream.value(
     items.values.where((item) => item.meterId == meterId).toList(),
   );
+
+  @override
+  Stream<MeterReadingPage> watchPageForMeter(
+    String meterId, {
+    required int limit,
+    String query = '',
+  }) {
+    watchPageForMeterCalls++;
+    lastPageLimit = limit;
+    lastPageQuery = query;
+    final all = items.values.where((item) => item.meterId == meterId).toList()
+      ..sort(_newestReadingFirst);
+    final matching = all
+        .where((reading) => meterReadingMatchesQuery(reading, query))
+        .toList(growable: false);
+    return Stream.value(
+      MeterReadingPage(
+        readings: matching.take(limit).toList(growable: false),
+        totalCount: all.length,
+        matchingCount: matching.length,
+        latestReading: all.isEmpty ? null : all.first,
+        olderNeighbor: matching.length > limit ? matching[limit] : null,
+      ),
+    );
+  }
+}
+
+int _newestReadingFirst(MeterReading left, MeterReading right) {
+  final captured = right.capturedAt.compareTo(left.capturedAt);
+  if (captured != 0) return captured;
+  final stored = right.storedAt.compareTo(left.storedAt);
+  if (stored != 0) return stored;
+  return right.id.compareTo(left.id);
 }
 
 class MemoryEvidenceExportRepository implements EvidenceExportRepository {

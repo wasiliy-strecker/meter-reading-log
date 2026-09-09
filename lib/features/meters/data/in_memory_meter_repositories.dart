@@ -4,7 +4,16 @@ import '../../evidence/domain/evidence_export.dart';
 import '../domain/meter.dart';
 import '../domain/meter_dashboard_item.dart';
 import '../domain/meter_reading.dart';
+import '../domain/meter_reading_page.dart';
 import '../domain/meter_repositories.dart';
+
+int _newestReadingFirst(MeterReading left, MeterReading right) {
+  final captured = right.capturedAt.compareTo(left.capturedAt);
+  if (captured != 0) return captured;
+  final stored = right.storedAt.compareTo(left.storedAt);
+  if (stored != 0) return stored;
+  return right.id.compareTo(left.id);
+}
 
 class InMemoryMeterRepository implements MeterRepository {
   final Map<String, Meter> _items = {};
@@ -63,9 +72,41 @@ class InMemoryMeterReadingRepository implements MeterReadingRepository {
     }
   }
 
+  @override
+  Stream<MeterReadingPage> watchPageForMeter(
+    String meterId, {
+    required int limit,
+    String query = '',
+  }) async* {
+    if (limit <= 0) throw ArgumentError.value(limit, 'limit');
+    yield _pageForMeter(meterId, limit: limit, query: query);
+    await for (final _ in _changes.stream) {
+      yield _pageForMeter(meterId, limit: limit, query: query);
+    }
+  }
+
   List<MeterReading> _forMeter(String id) =>
       _items.values.where((item) => item.meterId == id).toList()
-        ..sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
+        ..sort(_newestReadingFirst);
+
+  MeterReadingPage _pageForMeter(
+    String meterId, {
+    required int limit,
+    required String query,
+  }) {
+    final all = _forMeter(meterId);
+    final matching = all
+        .where((reading) => meterReadingMatchesQuery(reading, query))
+        .toList(growable: false);
+    final visibleCount = matching.length < limit ? matching.length : limit;
+    return MeterReadingPage(
+      readings: matching.take(visibleCount).toList(growable: false),
+      totalCount: all.length,
+      matchingCount: matching.length,
+      latestReading: all.isEmpty ? null : all.first,
+      olderNeighbor: matching.length > limit ? matching[limit] : null,
+    );
+  }
 
   @override
   Future<void> delete(String id) async {

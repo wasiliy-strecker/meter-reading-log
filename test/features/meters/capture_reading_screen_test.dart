@@ -222,6 +222,101 @@ void main() {
     expect(find.text('Dashboard'), findsOneWidget);
   });
 
+  testWidgets(
+    'meter history loads 20 at a time and searches beyond the first page',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(430, 1200));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final meter = Meter(
+        id: 'meter_long_history',
+        label: 'Strom Langzeit',
+        type: MeterType.electricity,
+        unit: 'kWh',
+        createdAt: DateTime.utc(2026, 7, 1),
+        updatedAt: DateTime.utc(2026, 7, 1),
+      );
+      final meters = MemoryMeterRepository()..items[meter.id] = meter;
+      final readings = MemoryReadingRepository();
+      final base = DateTime.utc(2026, 7, 1, 12);
+      for (var index = 0; index < 45; index++) {
+        final capturedAt = base.add(Duration(days: index));
+        readings.items['long_reading_$index'] = MeterReading(
+          id: 'long_reading_$index',
+          meterId: meter.id,
+          meter: MeterSnapshot.fromMeter(meter),
+          value: ReadingValue.tryParse('${1000 + index},0')!,
+          capturedAt: capturedAt,
+          timezoneOffsetMinutes: 120,
+          storedAt: capturedAt,
+          updatedAt: capturedAt,
+          source: ReadingSource.camera,
+          photoPath: '/tmp/long_reading_$index.jpg',
+          photoSha256: 'a' * 64,
+          ocrRawText: '${1000 + index},0',
+          ocrCandidate: '${1000 + index},0',
+          note: index == 3 ? 'Spezialfund im Heizraum' : '',
+          manifestSha256: 'b' * 64,
+        );
+      }
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            meterRepositoryProvider.overrideWithValue(meters),
+            meterReadingRepositoryProvider.overrideWithValue(readings),
+            evidenceExportRepositoryProvider.overrideWithValue(
+              MemoryEvidenceExportRepository(),
+            ),
+          ],
+          child: const MeterReadingLogApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Strom Langzeit'));
+      await tester.pumpAndSettle();
+
+      expect(readings.lastPageLimit, 20);
+      expect(readings.lastPageQuery, isEmpty);
+      expect(find.text('20 von 45 Ablesungen'), findsOneWidget);
+      final search = find.byKey(const ValueKey('history-search-field'));
+      expect(search, findsOneWidget);
+
+      await tester.enterText(search, 'SPEZIALFUND');
+      await tester.pump(const Duration(milliseconds: 249));
+      expect(readings.lastPageQuery, isEmpty);
+      await tester.pump(const Duration(milliseconds: 2));
+      await tester.pumpAndSettle();
+
+      expect(readings.lastPageLimit, 20);
+      expect(readings.lastPageQuery, 'SPEZIALFUND');
+      expect(find.text('1 Treffer'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('reading-card-long_reading_3')),
+        findsOneWidget,
+      );
+      expect(find.text('Spezialfund im Heizraum'), findsOneWidget);
+      expect(find.textContaining('Δ '), findsNothing);
+
+      await tester.tap(find.byTooltip('Suche löschen'));
+      await tester.pumpAndSettle();
+      final showMore = find.byKey(const ValueKey('show-more-readings'));
+      for (
+        var attempt = 0;
+        attempt < 20 && showMore.evaluate().isEmpty;
+        attempt++
+      ) {
+        await tester.drag(find.byType(ListView).last, const Offset(0, -700));
+        await tester.pump();
+      }
+      expect(showMore, findsOneWidget);
+      await tester.tap(showMore);
+      await tester.pumpAndSettle();
+
+      expect(readings.lastPageLimit, 40);
+      expect(readings.lastPageQuery, isEmpty);
+    },
+  );
+
   testWidgets('saved history PDFs keep both creation variants available', (
     tester,
   ) async {
@@ -600,6 +695,7 @@ void main() {
     );
     expect(find.byKey(const ValueKey('pdf-export-progress')), findsOneWidget);
     expect(find.text('Zählerverlauf als PDF erstellen'), findsOneWidget);
+    expect(readings.loadForMeterCalls, 1);
   });
 }
 
