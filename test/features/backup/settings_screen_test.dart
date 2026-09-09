@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:meter_reading_log/app/app_providers.dart';
 import 'package:meter_reading_log/core/reminders/local_notification_reminder_repository.dart';
 import 'package:meter_reading_log/features/backup/application/backup_file_exporter.dart';
+import 'package:meter_reading_log/features/backup/application/backup_file_picker.dart';
 import 'package:meter_reading_log/features/backup/application/encrypted_backup_service.dart';
 import 'package:meter_reading_log/features/backup/presentation/settings_screen.dart';
 
@@ -33,6 +34,66 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Backup-Passwort festlegen'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('valid backup selection opens the password dialog', (
+    tester,
+  ) async {
+    final picker = _FakeBackupFilePicker(['/tmp/import.zslbackup']);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [backupFilePickerProvider.overrideWithValue(picker)],
+        child: const MaterialApp(home: SettingsScreen()),
+      ),
+    );
+
+    await tester.tap(find.text('Backup wiederherstellen'));
+    await tester.pumpAndSettle();
+
+    expect(picker.pickCalls, 1);
+    expect(find.text('Backup-Passwort'), findsOneWidget);
+    expect(find.widgetWithText(TextField, 'Passwort'), findsOneWidget);
+  });
+
+  testWidgets('foreign backup selection is rejected before password entry', (
+    tester,
+  ) async {
+    final picker = _FakeBackupFilePicker([
+      const BackupFilePickException(BackupFilePickFailure.invalidExtension),
+    ]);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [backupFilePickerProvider.overrideWithValue(picker)],
+        child: const MaterialApp(home: SettingsScreen()),
+      ),
+    );
+
+    await tester.tap(find.text('Backup wiederherstellen'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Backup-Passwort'), findsNothing);
+    expect(
+      find.text('Bitte wähle eine ZählerstandLog-Backup-Datei (.zslbackup).'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('cancelled backup selection stays on settings', (tester) async {
+    final picker = _FakeBackupFilePicker([null]);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [backupFilePickerProvider.overrideWithValue(picker)],
+        child: const MaterialApp(home: SettingsScreen()),
+      ),
+    );
+
+    await tester.tap(find.text('Backup wiederherstellen'));
+    await tester.pumpAndSettle();
+
+    expect(picker.pickCalls, 1);
+    expect(find.text('Backup-Passwort'), findsNothing);
+    expect(find.byType(SnackBar), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -244,6 +305,21 @@ class _FakeBackupFileExporter implements BackupFileExporter {
 
   @override
   Future<void> discard(CreatedBackup backup) async => discarded.add(backup);
+}
+
+class _FakeBackupFilePicker implements BackupFilePicker {
+  _FakeBackupFilePicker(this._outcomes);
+
+  final List<Object?> _outcomes;
+  int pickCalls = 0;
+
+  @override
+  Future<String?> pick() async {
+    pickCalls++;
+    final outcome = _outcomes.removeAt(0);
+    if (outcome is Exception) throw outcome;
+    return outcome as String?;
+  }
 }
 
 class _ControlledBackupService extends EncryptedBackupService {

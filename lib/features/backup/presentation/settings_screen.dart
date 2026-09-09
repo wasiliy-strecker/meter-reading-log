@@ -1,4 +1,3 @@
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -6,6 +5,7 @@ import '../../../app/app_providers.dart';
 import '../../../app/widgets/app_snack_bar.dart';
 import '../../../core/utils/formatters.dart';
 import '../application/backup_file_exporter.dart';
+import '../application/backup_file_picker.dart';
 import '../application/encrypted_backup_service.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -311,12 +311,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _restoreBackup() async {
-    final picked = await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const [EncryptedBackupService.extension],
-      allowMultiple: false,
-    );
-    final path = picked?.files.single.path;
+    String? path;
+    try {
+      path = await ref.read(backupFilePickerProvider).pick();
+    } on BackupFilePickException catch (error) {
+      _showMessage(switch (error.failure) {
+        BackupFilePickFailure.invalidExtension =>
+          'Bitte wähle eine ZählerstandLog-Backup-Datei (.zslbackup).',
+        BackupFilePickFailure.unreadableFile =>
+          'Die ausgewählte Backup-Datei konnte nicht geöffnet werden.',
+      });
+      return;
+    } catch (error) {
+      _showMessage('Backup-Datei konnte nicht ausgewählt werden: $error');
+      return;
+    }
     if (path == null || !mounted) return;
     final password = await _askPassword(confirm: false);
     if (password == null) return;
