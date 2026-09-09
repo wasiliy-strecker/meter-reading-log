@@ -223,6 +223,187 @@ void main() {
   });
 
   testWidgets(
+    'lower new reading needs no reason and does not load full history',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(430, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final meter = Meter(
+        id: 'meter_lower_capture',
+        label: 'Strom niedriger',
+        type: MeterType.electricity,
+        unit: 'kWh',
+        createdAt: DateTime.utc(2026, 9, 1),
+        updatedAt: DateTime.utc(2026, 9, 1),
+      );
+      final meters = MemoryMeterRepository()..items[meter.id] = meter;
+      final readings = _CountingHistoryReadingRepository();
+      readings.items['previous_high'] = MeterReading(
+        id: 'previous_high',
+        meterId: meter.id,
+        meter: MeterSnapshot.fromMeter(meter),
+        value: ReadingValue.tryParse('900,0')!,
+        capturedAt: DateTime.utc(2026, 9, 8, 10),
+        timezoneOffsetMinutes: 120,
+        storedAt: DateTime.utc(2026, 9, 8, 10),
+        updatedAt: DateTime.utc(2026, 9, 8, 10),
+        source: ReadingSource.camera,
+        photoPath: '/tmp/previous-high.jpg',
+        photoSha256: 'a' * 64,
+        ocrRawText: '900,0',
+        ocrCandidate: '900,0',
+        manifestSha256: 'b' * 64,
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            meterRepositoryProvider.overrideWithValue(meters),
+            meterReadingRepositoryProvider.overrideWithValue(readings),
+            evidenceExportRepositoryProvider.overrideWithValue(
+              MemoryEvidenceExportRepository(),
+            ),
+            meterPhotoCaptureRepositoryProvider.overrideWithValue(
+              _FixedPhotoRepository(),
+            ),
+            meterOcrRepositoryProvider.overrideWithValue(
+              const _FixedOcrRepository(),
+            ),
+            meterReminderRepositoryProvider.overrideWithValue(
+              NoopMeterReminderRepository(),
+            ),
+          ],
+          child: const MeterReadingLogApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Strom niedriger'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Ablesen / Fotografieren'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Zähler fotografieren'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Grund für niedrigeren'), findsNothing);
+      expect(find.textContaining('niedrigeren Stand'), findsNothing);
+      expect(find.textContaining('Vorheriger Stand'), findsNothing);
+      expect(readings.watchForMeterCalls, 0);
+
+      final save = find.text('Ablesung bestätigen und speichern');
+      await tester.ensureVisible(save);
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+
+      final created = readings.items.values.singleWhere(
+        (reading) => reading.id != 'previous_high',
+      );
+      expect(created.value.displayText, '123,4');
+      expect(created.lowerReadingReason, isNull);
+      expect(readings.watchForMeterCalls, 0);
+    },
+  );
+
+  testWidgets(
+    'lower correction needs no reason and preserves a historical reason',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(430, 2200));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final meter = Meter(
+        id: 'meter_lower_edit',
+        label: 'Gas niedriger',
+        type: MeterType.gas,
+        unit: 'm³',
+        createdAt: DateTime.utc(2026, 9, 1),
+        updatedAt: DateTime.utc(2026, 9, 1),
+      );
+      final meters = MemoryMeterRepository()..items[meter.id] = meter;
+      final readings = _CountingHistoryReadingRepository();
+      readings.items['earlier_high'] = MeterReading(
+        id: 'earlier_high',
+        meterId: meter.id,
+        meter: MeterSnapshot.fromMeter(meter),
+        value: ReadingValue.tryParse('900,0')!,
+        capturedAt: DateTime.utc(2026, 9, 1, 10),
+        timezoneOffsetMinutes: 120,
+        storedAt: DateTime.utc(2026, 9, 1, 10),
+        updatedAt: DateTime.utc(2026, 9, 1, 10),
+        source: ReadingSource.camera,
+        photoPath: '/tmp/earlier-high.jpg',
+        photoSha256: 'a' * 64,
+        ocrRawText: '900,0',
+        ocrCandidate: '900,0',
+        manifestSha256: 'b' * 64,
+      );
+      readings.items['legacy_lower'] = MeterReading(
+        id: 'legacy_lower',
+        meterId: meter.id,
+        meter: MeterSnapshot.fromMeter(meter),
+        value: ReadingValue.tryParse('500,0')!,
+        capturedAt: DateTime.utc(2026, 9, 2, 10),
+        timezoneOffsetMinutes: 120,
+        storedAt: DateTime.utc(2026, 9, 2, 10),
+        updatedAt: DateTime.utc(2026, 9, 2, 10),
+        source: ReadingSource.camera,
+        photoPath: '/tmp/legacy-lower.jpg',
+        photoSha256: 'c' * 64,
+        ocrRawText: '500,0',
+        ocrCandidate: '500,0',
+        lowerReadingReason: LowerReadingReason.meterReplacement,
+        manifestSha256: 'd' * 64,
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            meterRepositoryProvider.overrideWithValue(meters),
+            meterReadingRepositoryProvider.overrideWithValue(readings),
+            evidenceExportRepositoryProvider.overrideWithValue(
+              MemoryEvidenceExportRepository(),
+            ),
+            meterPhotoCaptureRepositoryProvider.overrideWithValue(
+              _FixedPhotoRepository(),
+            ),
+            meterOcrRepositoryProvider.overrideWithValue(
+              const _FixedOcrRepository(),
+            ),
+            meterReminderRepositoryProvider.overrideWithValue(
+              NoopMeterReminderRepository(),
+            ),
+          ],
+          child: const MeterReadingLogApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Gas niedriger'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('reading-card-legacy_lower')));
+      await tester.pumpAndSettle();
+      expect(find.text('Niedrigerer Stand'), findsOneWidget);
+      expect(find.text('Zählerwechsel'), findsOneWidget);
+
+      await tester.tap(find.text('Korrigieren'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField).first, '400,0');
+      expect(find.textContaining('Grund für niedrigeren'), findsNothing);
+      expect(find.textContaining('niedrigeren Stand'), findsNothing);
+      expect(readings.watchForMeterCalls, 0);
+
+      final save = find.text('Korrektur protokollieren');
+      await tester.ensureVisible(save);
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+
+      expect(
+        readings.items['legacy_lower']?.lowerReadingReason,
+        LowerReadingReason.meterReplacement,
+      );
+      expect(readings.items['legacy_lower']?.value.displayText, '400,0');
+      expect(find.text('Niedrigerer Stand'), findsOneWidget);
+      expect(find.text('Zählerwechsel'), findsOneWidget);
+      expect(readings.watchForMeterCalls, 0);
+    },
+  );
+
+  testWidgets(
     'meter history loads 20 at a time and searches beyond the first page',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(430, 1200));
@@ -705,6 +886,16 @@ class _PendingRevisionRepository extends MemoryReadingRepository {
   @override
   Future<List<ReadingRevision>> loadRevisions(String readingId) {
     return _pending.future;
+  }
+}
+
+class _CountingHistoryReadingRepository extends MemoryReadingRepository {
+  int watchForMeterCalls = 0;
+
+  @override
+  Stream<List<MeterReading>> watchForMeter(String meterId) {
+    watchForMeterCalls++;
+    return super.watchForMeter(meterId);
   }
 }
 

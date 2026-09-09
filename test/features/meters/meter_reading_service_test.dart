@@ -69,6 +69,7 @@ void main() {
       expect(updated.photoHistory, hasLength(1));
       expect(updated.photoHistory.single.path, '/tmp/original.jpg');
       expect(updated.photoHistory.single.sha256, 'a' * 64);
+      expect(updated.lowerReadingReason, LowerReadingReason.meterReplacement);
       expect(updated.manifestSha256, hasLength(64));
       expect(photos.deleted, isEmpty);
       expect(reminders.scheduledLatestReadings.last?.id, updated.id);
@@ -150,6 +151,7 @@ MeterReading _reading() {
     ocrRawText: '123,4 kWh',
     ocrCandidate: '123,4',
     ocrConfidence: 0.9,
+    lowerReadingReason: LowerReadingReason.meterReplacement,
     manifestSha256: 'b' * 64,
   );
 }

@@ -114,7 +114,6 @@ class MeterReadingService {
     required String selectedCandidate,
     required DateTime capturedAt,
     required String note,
-    LowerReadingReason? lowerReadingReason,
   }) async {
     final now = DateTime.now().toUtc();
     var reading = MeterReading(
@@ -133,7 +132,6 @@ class MeterReadingService {
       ocrCandidate: selectedCandidate,
       ocrConfidence: ocr.confidence,
       photoAddedAt: photo.capturedAt.toUtc(),
-      lowerReadingReason: lowerReadingReason,
       note: note.trim(),
       manifestSha256: '',
     );
@@ -153,7 +151,6 @@ class MeterReadingService {
     required DateTime capturedAt,
     required String note,
     required String reason,
-    LowerReadingReason? lowerReadingReason,
     StoredMeterPhoto? replacementPhoto,
     MeterOcrResult? replacementOcr,
     String replacementCandidate = '',
@@ -235,8 +232,6 @@ class MeterReadingService {
       photoAddedAt: replacementPhoto == null ? null : changedAt,
       photoHistory: archivedPhotos,
       note: note.trim(),
-      lowerReadingReason: lowerReadingReason,
-      clearLowerReadingReason: lowerReadingReason == null,
       manifestSha256: '',
     );
     updated = updated.copyWith(

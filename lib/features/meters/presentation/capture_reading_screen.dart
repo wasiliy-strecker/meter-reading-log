@@ -37,7 +37,6 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
   String? _selectedUnit;
   late final DateTime _initialCapturedAt;
   late DateTime _capturedAt;
-  LowerReadingReason? _lowerReason;
   bool _working = false;
   bool _saved = false;
   bool _discardDialogOpen = false;
@@ -81,15 +80,7 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
   }
 
   Widget _buildContent(Meter meter) {
-    final readings =
-        ref.watch(readingsForMeterProvider(meter.id)).value ?? const [];
     final selectedUnit = _selectedUnit ?? meter.unit;
-    final parsed = ReadingValue.tryParse(_value.text);
-    final previous = _previousFor(readings, _capturedAt, selectedUnit);
-    final isLower =
-        parsed != null &&
-        previous != null &&
-        parsed.compareTo(previous.value) < 0;
 
     final scaffold = Scaffold(
       appBar: AppBar(
@@ -197,12 +188,7 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
                 value: selectedUnit,
                 labelText: 'Einheit des Zählerstands',
                 enabled: !_working,
-                onChanged: (value) {
-                  setState(() {
-                    _selectedUnit = value;
-                    _lowerReason = null;
-                  });
-                },
+                onChanged: (value) => setState(() => _selectedUnit = value),
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -226,29 +212,7 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
                 value: _capturedAt,
                 onPressed: _pickCapturedAt,
               ),
-              if (isLower) ...[
-                const SizedBox(height: 8),
-                DropdownButtonFormField<LowerReadingReason>(
-                  initialValue: _lowerReason,
-                  decoration: InputDecoration(
-                    labelText: 'Grund für niedrigeren Stand *',
-                    helperText:
-                        'Vorheriger Stand: ${previous.value.displayText} $selectedUnit',
-                  ),
-                  items: [
-                    for (final reason in LowerReadingReason.values)
-                      DropdownMenuItem(
-                        value: reason,
-                        child: Text(reason.label),
-                      ),
-                  ],
-                  onChanged: (value) => setState(() => _lowerReason = value),
-                  validator: (value) => isLower && value == null
-                      ? 'Bitte den niedrigeren Stand begründen.'
-                      : null,
-                ),
-              ],
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _note,
                 decoration: const InputDecoration(
@@ -289,8 +253,7 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
       _value.text.trim().isNotEmpty ||
       _note.text.trim().isNotEmpty ||
       _selectedUnit != null ||
-      _capturedAt != _initialCapturedAt ||
-      _lowerReason != null;
+      _capturedAt != _initialCapturedAt;
 
   Future<void> _handleBack() async {
     if (_working || _discardDialogOpen) return;
@@ -325,23 +288,6 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
     } else {
       context.goNamed('meterDetail', pathParameters: {'id': widget.meterId});
     }
-  }
-
-  MeterReading? _previousFor(
-    List<MeterReading> readings,
-    DateTime capturedAt,
-    String unit,
-  ) {
-    final earlier =
-        readings
-            .where(
-              (reading) =>
-                  reading.meter.unit == unit &&
-                  reading.capturedAt.isBefore(capturedAt.toUtc()),
-            )
-            .toList()
-          ..sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
-    return earlier.firstOrNull;
   }
 
   Future<void> _capture(ReadingSource source) async {
@@ -467,7 +413,6 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
             selectedCandidate: _selectedCandidate,
             capturedAt: _capturedAt,
             note: _note.text,
-            lowerReadingReason: _lowerReason,
           );
       if (selectedUnit != meter.unit) {
         ref.invalidate(meterByIdProvider(meter.id));

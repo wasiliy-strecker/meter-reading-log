@@ -56,7 +56,6 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
   late final MeterPhotoCaptureRepository _photos;
   late final MeterOcrRepository _ocrRepository;
   late DateTime _capturedAt;
-  LowerReadingReason? _lowerReason;
   StoredMeterPhoto? _replacementPhoto;
   MeterOcrResult? _replacementOcr;
   String _selectedCandidate = '';
@@ -74,7 +73,6 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
     _value = TextEditingController(text: widget.reading.value.displayText);
     _note = TextEditingController(text: widget.reading.note);
     _capturedAt = widget.reading.capturedAt.toLocal();
-    _lowerReason = widget.reading.lowerReadingReason;
     WidgetsBinding.instance.addPostFrameCallback((_) => _recoverLostCapture());
   }
 
@@ -91,28 +89,6 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
 
   @override
   Widget build(BuildContext context) {
-    final readings =
-        ref.watch(readingsForMeterProvider(widget.reading.meterId)).value ??
-        const [];
-    final parsed = ReadingValue.tryParse(_value.text);
-    final previous = readings
-        .where(
-          (item) =>
-              item.id != widget.reading.id &&
-              item.meter.unit == widget.reading.meter.unit &&
-              item.capturedAt.isBefore(_capturedAt.toUtc()),
-        )
-        .fold<MeterReading?>(
-          null,
-          (latest, item) =>
-              latest == null || item.capturedAt.isAfter(latest.capturedAt)
-              ? item
-              : latest,
-        );
-    final isLower =
-        parsed != null &&
-        previous != null &&
-        parsed.compareTo(previous.value) < 0;
     final scaffold = Scaffold(
       appBar: AppBar(
         leading: BackButton(onPressed: _handleBack),
@@ -155,24 +131,7 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
             ),
             const SizedBox(height: 12),
             EditableReadingTimeCard(value: _capturedAt, onPressed: _pickDate),
-            if (isLower) ...[
-              const SizedBox(height: 8),
-              DropdownButtonFormField<LowerReadingReason>(
-                initialValue: _lowerReason,
-                decoration: const InputDecoration(
-                  labelText: 'Grund für niedrigeren Stand *',
-                ),
-                items: [
-                  for (final reason in LowerReadingReason.values)
-                    DropdownMenuItem(value: reason, child: Text(reason.label)),
-                ],
-                onChanged: (value) => setState(() => _lowerReason = value),
-                validator: (value) => isLower && value == null
-                    ? 'Bitte den niedrigeren Stand begründen.'
-                    : null,
-              ),
-            ],
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             TextFormField(
               controller: _note,
               decoration: const InputDecoration(labelText: 'Notiz'),
@@ -221,7 +180,6 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
       _note.text.trim() != widget.reading.note ||
       _reason.text.trim().isNotEmpty ||
       _capturedAt != widget.reading.capturedAt.toLocal() ||
-      _lowerReason != widget.reading.lowerReadingReason ||
       _replacementPhoto != null;
 
   Future<void> _handleBack() async {
@@ -522,7 +480,6 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
             capturedAt: _capturedAt,
             note: _note.text,
             reason: _reason.text,
-            lowerReadingReason: _lowerReason,
             replacementPhoto: _replacementPhoto,
             replacementOcr: _replacementOcr,
             replacementCandidate: _selectedCandidate,
