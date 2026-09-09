@@ -141,6 +141,23 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
                       onDelete: () => _deleteMeter(meter),
                     ),
                     const SizedBox(height: 18),
+                    if (page.totalCount > 0) ...[
+                      _HistoryPdfAction(
+                        exporting: _exporting,
+                        onPressed: () => _exportHistory(meter),
+                      ),
+                      if (historyExports.isNotEmpty) const SizedBox(height: 10),
+                    ],
+                    if (historyExports.isNotEmpty)
+                      _SavedHistoryPdfs(
+                        exports: historyExports,
+                        availableFiles: availableFiles,
+                        deletingExportIds: _deletingExportIds,
+                        onOpen: _openExport,
+                        onDelete: _deleteExport,
+                      ),
+                    if (page.totalCount > 0 || historyExports.isNotEmpty)
+                      const SizedBox(height: 22),
                     Text(
                       'Zählerverlauf',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -198,36 +215,6 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
                       icon: const Icon(Icons.expand_more),
                       label: const Text('Weitere 20 anzeigen'),
                     ),
-                  ],
-                  if (page.totalCount > 0 || historyExports.isNotEmpty) ...[
-                    const SizedBox(height: 22),
-                    Text(
-                      'Gespeicherte PDF-Nachweise',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    if (page.totalCount > 0) ...[
-                      _HistoryPdfAction(
-                        exporting: _exporting,
-                        onPressed: () => _exportHistory(meter),
-                      ),
-                      if (historyExports.isNotEmpty) const SizedBox(height: 12),
-                    ],
-                    for (final export in historyExports)
-                      EvidenceExportCard(
-                        export: export,
-                        title: 'Zählerverlaufsnachweis',
-                        detail:
-                            '${_readingCountLabel(export.readingIds.length)}\n${export.photoMode.labelFor(export.kind)}',
-                        fileAvailable: availableFiles[export.id] == true,
-                        onTap: availableFiles[export.id] != true
-                            ? null
-                            : () => _openExport(export),
-                        deleting: _deletingExportIds.contains(export.id),
-                        onDelete: () => _deleteExport(export),
-                      ),
                   ],
                 ],
               );
@@ -470,6 +457,66 @@ class _HistoryPdfAction extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SavedHistoryPdfs extends StatelessWidget {
+  const _SavedHistoryPdfs({
+    required this.exports,
+    required this.availableFiles,
+    required this.deletingExportIds,
+    required this.onOpen,
+    required this.onDelete,
+  });
+
+  final List<EvidenceExportRecord> exports;
+  final Map<String, bool> availableFiles;
+  final Set<String> deletingExportIds;
+  final Future<void> Function(EvidenceExportRecord) onOpen;
+  final Future<void> Function(EvidenceExportRecord) onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final countLabel = exports.length == 1
+        ? '1 Nachweis'
+        : '${exports.length} Nachweise';
+    return Card(
+      key: const ValueKey('saved-history-pdfs'),
+      clipBehavior: Clip.antiAlias,
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          key: const ValueKey('saved-history-pdfs-expansion'),
+          initiallyExpanded: false,
+          leading: Icon(Icons.folder_copy_outlined, color: colors.primary),
+          title: const Text(
+            'Gespeicherte PDF-Nachweise',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+          subtitle: Text(countLabel),
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+          shape: const RoundedRectangleBorder(),
+          collapsedShape: const RoundedRectangleBorder(),
+          children: [
+            for (final export in exports)
+              EvidenceExportCard(
+                export: export,
+                title: 'Zählerverlaufsnachweis',
+                detail:
+                    '${_readingCountLabel(export.readingIds.length)}\n${export.photoMode.labelFor(export.kind)}',
+                fileAvailable: availableFiles[export.id] == true,
+                onTap: availableFiles[export.id] != true
+                    ? null
+                    : () => onOpen(export),
+                deleting: deletingExportIds.contains(export.id),
+                onDelete: () => onDelete(export),
+              ),
           ],
         ),
       ),

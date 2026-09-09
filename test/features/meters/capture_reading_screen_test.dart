@@ -458,6 +458,14 @@ void main() {
 
       expect(readings.lastPageLimit, 20);
       expect(readings.lastPageQuery, isEmpty);
+      final historyPdfAction = find.text('PDF-Nachweis des Zählerverlaufs');
+      final historyTitle = find.text('Zählerverlauf');
+      expect(historyPdfAction, findsOneWidget);
+      expect(
+        tester.getTopLeft(historyPdfAction).dy,
+        lessThan(tester.getTopLeft(historyTitle).dy),
+      );
+      expect(find.text('Gespeicherte PDF-Nachweise'), findsNothing);
       expect(find.text('20 von 45 Ablesungen'), findsOneWidget);
       final search = find.byKey(const ValueKey('history-search-field'));
       expect(search, findsOneWidget);
@@ -592,6 +600,16 @@ void main() {
     final photoCard = find.byKey(
       const ValueKey('evidence-export-history_photos'),
     );
+    expect(find.text('Gespeicherte PDF-Nachweise'), findsOneWidget);
+    expect(find.text('2 Nachweise'), findsOneWidget);
+    expect(compactCard, findsNothing);
+    expect(photoCard, findsNothing);
+    await tester.tap(
+      find.byKey(const ValueKey('saved-history-pdfs-expansion')),
+    );
+    await tester.pumpAndSettle();
+    expect(compactCard, findsOneWidget);
+    expect(photoCard, findsOneWidget);
     expect(
       find.descendant(
         of: compactCard,
@@ -637,7 +655,77 @@ void main() {
     await tester.pumpAndSettle();
   });
 
-  testWidgets('history PDFs follow readings and show progress', (tester) async {
+  testWidgets('saved history PDFs remain accessible without readings', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(430, 1200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final temp = Directory.systemTemp.createTempSync(
+      'history_without_readings_test_',
+    );
+    addTearDown(() => temp.deleteSync(recursive: true));
+    final historyPdf = File('${temp.path}/history.pdf');
+    historyPdf.writeAsBytesSync(const [0x25, 0x50, 0x44, 0x46]);
+    final meter = Meter(
+      id: 'meter_history_without_readings',
+      label: 'Alter Gaszähler',
+      type: MeterType.gas,
+      unit: 'm³',
+      createdAt: DateTime.utc(2026, 9, 1),
+      updatedAt: DateTime.utc(2026, 9, 1),
+    );
+    final meters = MemoryMeterRepository()..items[meter.id] = meter;
+    final exports = MemoryEvidenceExportRepository();
+    exports.items['orphaned_history_export'] = EvidenceExportRecord(
+      id: 'orphaned_history_export',
+      meterId: meter.id,
+      kind: EvidenceExportKind.meterHistory,
+      readingIds: const ['removed_reading'],
+      createdAt: DateTime.utc(2026, 9, 5, 8, 30),
+      fileName: 'alter_verlauf.pdf',
+      filePath: historyPdf.path,
+      pdfSha256: 'c' * 64,
+      manifestSha256: 'd' * 64,
+      photoMode: EvidencePhotoMode.withoutPhotos,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          meterRepositoryProvider.overrideWithValue(meters),
+          meterReadingRepositoryProvider.overrideWithValue(
+            MemoryReadingRepository(),
+          ),
+          evidenceExportRepositoryProvider.overrideWithValue(exports),
+        ],
+        child: const MeterReadingLogApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Alter Gaszähler'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Zählerverlauf als PDF erstellen'), findsNothing);
+    expect(find.text('Gespeicherte PDF-Nachweise'), findsOneWidget);
+    expect(find.text('1 Nachweis'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('evidence-export-orphaned_history_export')),
+      findsNothing,
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('saved-history-pdfs-expansion')),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('evidence-export-orphaned_history_export')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Noch keine Ablesung.'), findsOneWidget);
+  });
+
+  testWidgets('history PDFs precede readings and show progress', (
+    tester,
+  ) async {
     await tester.binding.setSurfaceSize(const Size(430, 3000));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final temp = Directory.systemTemp.createTempSync('history_screen_test_');
@@ -779,15 +867,32 @@ void main() {
       find.byKey(const ValueKey('reading-thumbnail-reading_pdf')),
       findsOneWidget,
     );
-    await tester.scrollUntilVisible(
-      find.text('Gespeicherte PDF-Nachweise'),
-      250,
-      scrollable: find.byType(Scrollable).last,
+    final savedEvidenceTitle = find.text('Gespeicherte PDF-Nachweise');
+    final historyActionTitle = find.text('PDF-Nachweis des Zählerverlaufs');
+    final historySectionTitle = find.text('Zählerverlauf');
+    final historyExportCard = find.byKey(
+      const ValueKey('evidence-export-history_export'),
+    );
+    expect(savedEvidenceTitle, findsOneWidget);
+    expect(find.text('1 Nachweis'), findsOneWidget);
+    expect(historyExportCard, findsNothing);
+    expect(
+      tester.getTopLeft(historyActionTitle).dy,
+      lessThan(tester.getTopLeft(savedEvidenceTitle).dy),
     );
     expect(
-      find.byKey(const ValueKey('evidence-export-history_export')),
-      findsOneWidget,
+      tester.getTopLeft(savedEvidenceTitle).dy,
+      lessThan(tester.getTopLeft(historySectionTitle).dy),
     );
+    expect(
+      tester.getTopLeft(historySectionTitle).dy,
+      lessThan(tester.getTopLeft(readingCard).dy),
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('saved-history-pdfs-expansion')),
+    );
+    await tester.pumpAndSettle();
+    expect(historyExportCard, findsOneWidget);
     expect(
       find.byKey(const ValueKey('current-evidence-badge-history_export')),
       findsNothing,
@@ -806,19 +911,6 @@ void main() {
       findsNothing,
     );
     expect(find.textContaining('cccccccc'), findsNothing);
-    final savedEvidenceTitle = find.text('Gespeicherte PDF-Nachweise');
-    final historyActionTitle = find.text('PDF-Nachweis des Zählerverlaufs');
-    final historyExportCard = find.byKey(
-      const ValueKey('evidence-export-history_export'),
-    );
-    expect(
-      tester.getTopLeft(readingCard).dy,
-      lessThan(tester.getTopLeft(savedEvidenceTitle).dy),
-    );
-    expect(
-      tester.getTopLeft(savedEvidenceTitle).dy,
-      lessThan(tester.getTopLeft(historyActionTitle).dy),
-    );
     expect(
       tester.getTopLeft(historyActionTitle).dy,
       lessThan(tester.getTopLeft(historyExportCard).dy),
@@ -852,6 +944,7 @@ void main() {
       find.byKey(const ValueKey('evidence-export-history_export')),
       findsNothing,
     );
+    expect(find.text('Gespeicherte PDF-Nachweise'), findsNothing);
     expect(find.text('PDF-Nachweis gelöscht.'), findsOneWidget);
     await tester.scrollUntilVisible(
       find.text('Zählerverlauf als PDF erstellen'),
