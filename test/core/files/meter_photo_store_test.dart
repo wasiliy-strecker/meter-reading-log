@@ -58,4 +58,58 @@ void main() {
     expect(decoded!.width, 800);
     expect(decoded.height, 600);
   });
+
+  test('optimized photos do not retain EXIF metadata', () async {
+    final temp = await Directory.systemTemp.createTemp('photo_metadata_');
+    addTearDown(() => temp.delete(recursive: true));
+    final source = File('${temp.path}/with-metadata.jpg');
+    final image = img.Image(width: 800, height: 600)
+      ..exif.imageIfd.make = 'Private camera'
+      ..exif.imageIfd.imageDescription = 'Private location';
+    await source.writeAsBytes(img.encodeJpg(image, quality: 95));
+    final target = File('${temp.path}/optimized.jpg');
+
+    final optimized = await const MeterPhotoOptimizer().optimize(
+      sourcePath: source.path,
+      targetPath: target.path,
+    );
+    final decoded = img.decodeJpg(await target.readAsBytes());
+
+    expect(optimized, isTrue);
+    expect(decoded, isNotNull);
+    expect(decoded!.exif.isEmpty, isTrue);
+  });
+
+  test('an unoptimizable photo is not stored as a raw fallback', () async {
+    final temp = await Directory.systemTemp.createTemp('failed_photo_');
+    addTearDown(() => temp.delete(recursive: true));
+    final source = File('${temp.path}/source.jpg');
+    await source.writeAsBytes([1, 2, 3, 4]);
+    final documents = Directory('${temp.path}/documents');
+    final repository = DeviceMeterPhotoCaptureRepository(
+      optimizer: const _FailingMeterPhotoOptimizer(),
+      photoPicker: (_) async => XFile(source.path),
+      documentsDirectoryProvider: () async => documents,
+    );
+
+    await expectLater(
+      repository.capture(ReadingSource.gallery),
+      throwsA(isA<MeterPhotoProcessingException>()),
+    );
+    final storedFiles = await Directory(
+      '${documents.path}/meter_photos',
+    ).list().toList();
+    expect(storedFiles, isEmpty);
+    expect(await source.readAsBytes(), [1, 2, 3, 4]);
+  });
+}
+
+class _FailingMeterPhotoOptimizer extends MeterPhotoOptimizer {
+  const _FailingMeterPhotoOptimizer();
+
+  @override
+  Future<bool> optimize({
+    required String sourcePath,
+    required String targetPath,
+  }) async => false;
 }

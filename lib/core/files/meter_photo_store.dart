@@ -82,9 +82,7 @@ class DeviceMeterPhotoCaptureRepository implements MeterPhotoCaptureRepository {
       file = await staging.rename(optimizedFile.path);
     } else {
       if (await staging.exists()) await staging.delete();
-      final extension = _safeExtension(p.extension(picked.name));
-      file = File(p.join(directory.path, '$id$extension'));
-      await File(picked.path).copy(file.path);
+      throw const MeterPhotoProcessingException();
     }
     final bytes = await file.readAsBytes();
     return StoredMeterPhoto(
@@ -95,14 +93,6 @@ class DeviceMeterPhotoCaptureRepository implements MeterPhotoCaptureRepository {
     );
   }
 
-  String _safeExtension(String value) {
-    return switch (value.toLowerCase()) {
-      '.png' => '.png',
-      '.heic' || '.heif' => '.heic',
-      _ => '.jpg',
-    };
-  }
-
   @override
   Future<void> delete(String path) async {
     final file = File(path);
@@ -110,4 +100,12 @@ class DeviceMeterPhotoCaptureRepository implements MeterPhotoCaptureRepository {
       await file.delete();
     }
   }
+}
+
+class MeterPhotoProcessingException implements Exception {
+  const MeterPhotoProcessingException();
+
+  @override
+  String toString() =>
+      'Das Foto konnte nicht sicher optimiert werden. Bitte wähle es erneut aus.';
 }

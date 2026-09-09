@@ -613,7 +613,7 @@ void main() {
     expect(find.text('Nachweise'), findsNothing);
     expect(
       find.text(
-        'Fotos auswerten, Zählerstände speichern und PDFs erstellen – alles passiert lokal auf deinem Gerät. Die App überträgt deine Zählerdaten nicht an einen Server.',
+        'Fotos, Zählerstände, OCR und PDFs werden lokal auf deinem Gerät verarbeitet. Die App überträgt deine Zählerdaten nicht an einen Server.',
       ),
       findsOneWidget,
     );

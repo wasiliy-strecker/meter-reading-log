@@ -75,6 +75,8 @@ Future<bool> _optimizeMeterPhotoWithDart(Map<String, Object> input) async {
             interpolation: img.Interpolation.linear,
           );
   }
+  normalized.exif.clear();
+  normalized.iccProfile = null;
   await target.writeAsBytes(
     img.encodeJpg(normalized, quality: input['jpegQuality']! as int),
     flush: true,

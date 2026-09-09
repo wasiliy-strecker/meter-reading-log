@@ -13,6 +13,62 @@ import 'package:meter_reading_log/features/backup/presentation/settings_screen.d
 import '../../support/fakes.dart';
 
 void main() {
+  testWidgets('privacy policy opens the dedicated German URL', (tester) async {
+    Uri? openedUri;
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: SettingsScreen(
+            privacyPolicyLauncher: (uri) async {
+              openedUri = uri;
+              return true;
+            },
+          ),
+        ),
+      ),
+    );
+
+    final button = find.byKey(const ValueKey('open-privacy-policy'));
+    await tester.drag(find.byType(ListView), const Offset(0, -300));
+    await tester.pumpAndSettle();
+    await tester.tap(button);
+    await tester.pump();
+
+    expect(
+      openedUri,
+      Uri.parse(
+        'https://www.appfabrik-ai.de/de/apps/zaehlerstandlog/datenschutz/',
+      ),
+    );
+    expect(find.textContaining('contact@appfabrik-ai.de'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('failed privacy policy launch shows a helpful message', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: SettingsScreen(privacyPolicyLauncher: (_) async => false),
+        ),
+      ),
+    );
+
+    final button = find.byKey(const ValueKey('open-privacy-policy'));
+    await tester.drag(find.byType(ListView), const Offset(0, -300));
+    await tester.pumpAndSettle();
+    await tester.tap(button);
+    await tester.pump();
+
+    expect(
+      find.text(
+        'Die Datenschutzerklärung konnte nicht geöffnet werden. Bitte versuche es erneut.',
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('backup password dialog closes cleanly when cancelled', (
     tester,
   ) async {

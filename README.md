@@ -15,7 +15,8 @@ PDF-Nachweise mit Fotos und Korrekturen.
   optionale eigene Einheiten
 - Einheit kann beim Bestätigen einer Ablesung angepasst werden; historische
   Ablesungen behalten ihre ursprüngliche Einheit
-- unveränderte Ablage des aufgenommenen Originalfotos im privaten App-Speicher
+- lokal gespeicherte Nachweisfotos, als JPEG mit maximal 1920 Pixeln an der
+  längsten Kante optimiert und ohne übernommene Aufnahme-/Standortmetadaten
 - lokale ML-Kit-OCR mit Kandidatenauswahl und verpflichtender Bestätigung
 - exakte Dezimalwerte ohne Gleitkomma-Rundungsfehler
 - chronologischer Verlauf mit Verbrauchsdifferenzen
@@ -37,10 +38,12 @@ werden im Nachweis ausdrücklich als solche markiert.
 
 - Fotos, OCR, Verlauf, PDFs und Backups werden lokal verarbeitet.
 - Die Android-App fordert keine `INTERNET`-Berechtigung an.
+- Android-Systembackups für die privaten App-Daten sind deaktiviert; Backups
+  werden ausschließlich bewusst und verschlüsselt in der App erstellt.
 - Es gibt kein Konto, keine Cloud-Synchronisation, keine Server-KI, keine
   Werbung und keine Analytics.
-- Das verschlüsselte Backup verlässt das Gerät nur über eine vom Nutzer
-  ausgelöste Teilen-Aktion.
+- Das verschlüsselte Backup verlässt die private App-Ablage nur, wenn der
+  Nutzer einen Speicherort auswählt oder eine Teilen-Aktion auslöst.
 
 ## Architektur
 

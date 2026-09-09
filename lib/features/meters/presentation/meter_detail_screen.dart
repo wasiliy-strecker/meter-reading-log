@@ -367,7 +367,7 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
       context,
       title: 'Zähler löschen?',
       message:
-          'Alle Ablesungen, Originalfotos und lokal gespeicherten PDF-Nachweise dieses Zählers werden dauerhaft entfernt. Bereits extern geteilte Dateien bleiben bestehen.',
+          'Alle Ablesungen, Nachweisfotos und lokal gespeicherten PDF-Nachweise dieses Zählers werden dauerhaft entfernt. Bereits extern geteilte Dateien bleiben bestehen.',
     );
     if (!confirmed) return;
     await ref.read(meterServiceProvider).delete(meter.id);

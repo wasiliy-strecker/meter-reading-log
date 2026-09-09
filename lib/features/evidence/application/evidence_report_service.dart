@@ -687,7 +687,7 @@ class EvidenceReportService {
         height: 80,
         alignment: pw.Alignment.center,
         color: PdfColors.grey200,
-        child: pw.Text('Originalfoto konnte nicht eingebettet werden.'),
+        child: pw.Text('Nachweisfoto konnte nicht eingebettet werden.'),
       );
     }
   }

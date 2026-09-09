@@ -458,7 +458,7 @@ class _CaptureGuidance extends StatelessWidget {
             const Text('• Zählernummer nach Möglichkeit mitfotografieren'),
             const SizedBox(height: 10),
             Text(
-              'Das Originalfoto wird unverändert lokal gespeichert. Der erkannte Wert muss vor dem Speichern bestätigt werden.',
+              'Das Nachweisfoto wird für die lokale Speicherung auf maximal 1920 Pixel an der längsten Kante verkleinert und als JPEG optimiert. Aufnahme- und Standortmetadaten werden nicht übernommen. Der erkannte Wert muss vor dem Speichern bestätigt werden.',
               style: TextStyle(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),

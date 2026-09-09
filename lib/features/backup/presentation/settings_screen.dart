@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/app_providers.dart';
 import '../../../app/widgets/app_snack_bar.dart';
@@ -8,8 +9,12 @@ import '../application/backup_file_exporter.dart';
 import '../application/backup_file_picker.dart';
 import '../application/encrypted_backup_service.dart';
 
+typedef PrivacyPolicyLauncher = Future<bool> Function(Uri uri);
+
 class SettingsScreen extends ConsumerStatefulWidget {
-  const SettingsScreen({super.key});
+  const SettingsScreen({super.key, this.privacyPolicyLauncher});
+
+  final PrivacyPolicyLauncher? privacyPolicyLauncher;
 
   @override
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
@@ -77,22 +82,49 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Card(
+                  Card(
                     child: Padding(
-                      padding: EdgeInsets.all(18),
+                      padding: const EdgeInsets.all(18),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
+                          const Text(
                             'ZählerstandLog 0.1.0',
                             style: TextStyle(fontWeight: FontWeight.w800),
                           ),
-                          SizedBox(height: 8),
-                          Text(
-                            'Fotos auswerten, Zählerstände speichern und PDFs erstellen – alles passiert lokal auf deinem Gerät. Die App überträgt deine Zählerdaten nicht an einen Server.',
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Fotos, Zählerstände, OCR und PDFs werden lokal auf deinem Gerät verarbeitet. Die App überträgt deine Zählerdaten nicht an einen Server.',
                           ),
-                          SizedBox(height: 10),
-                          Text('Quellcode-Lizenz: Mozilla Public License 2.0'),
+                          const SizedBox(height: 10),
+                          const Text(
+                            'Deine Daten bleiben gespeichert, bis du sie in der App löschst oder die App-Daten entfernst. Extern gespeicherte PDFs und Backups löschst du am jeweiligen Speicherort.',
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            'Entwickler und Datenschutzkontakt\n'
+                            'Wasiliy Strecker · AppFabrik AI\n'
+                            'contact@appfabrik-ai.de',
+                            style: TextStyle(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              key: const ValueKey('open-privacy-policy'),
+                              onPressed: _openPrivacyPolicy,
+                              icon: const Icon(Icons.open_in_new_rounded),
+                              label: const Text('Datenschutzerklärung öffnen'),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'Quellcode-Lizenz: Mozilla Public License 2.0',
+                          ),
                         ],
                       ),
                     ),
@@ -111,6 +143,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _openPrivacyPolicy() async {
+    final launcher = widget.privacyPolicyLauncher ?? _launchPrivacyPolicy;
+    var opened = false;
+    try {
+      opened = await launcher(
+        Uri.parse(
+          'https://www.appfabrik-ai.de/de/apps/zaehlerstandlog/datenschutz/',
+        ),
+      );
+    } on Object {
+      opened = false;
+    }
+    if (!opened && mounted) {
+      _showMessage(
+        'Die Datenschutzerklärung konnte nicht geöffnet werden. Bitte versuche es erneut.',
+      );
+    }
   }
 
   Future<void> _createBackup() async {
@@ -413,6 +464,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(AppSnackBar(message: message));
   }
+}
+
+Future<bool> _launchPrivacyPolicy(Uri uri) {
+  return launchUrl(uri, mode: LaunchMode.externalApplication);
 }
 
 enum _UnsavedBackupAction { retry, discard }
