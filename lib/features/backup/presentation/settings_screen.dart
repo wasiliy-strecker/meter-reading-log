@@ -9,12 +9,12 @@ import '../application/backup_file_exporter.dart';
 import '../application/backup_file_picker.dart';
 import '../application/encrypted_backup_service.dart';
 
-typedef PrivacyPolicyLauncher = Future<bool> Function(Uri uri);
+typedef ExternalUrlLauncher = Future<bool> Function(Uri uri);
 
 class SettingsScreen extends ConsumerStatefulWidget {
-  const SettingsScreen({super.key, this.privacyPolicyLauncher});
+  const SettingsScreen({super.key, this.externalUrlLauncher});
 
-  final PrivacyPolicyLauncher? privacyPolicyLauncher;
+  final ExternalUrlLauncher? externalUrlLauncher;
 
   @override
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
@@ -76,7 +76,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                   const SizedBox(height: 18),
                   Text(
-                    'Datenschutz und Lizenz',
+                    'Datenschutz',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
@@ -88,11 +88,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'ZählerstandLog 0.1.0',
-                            style: TextStyle(fontWeight: FontWeight.w800),
-                          ),
-                          const SizedBox(height: 8),
                           const Text(
                             'Fotos, Zählerstände, OCR und PDFs werden lokal auf deinem Gerät verarbeitet. Die App überträgt deine Zählerdaten nicht an einen Server.',
                           ),
@@ -121,12 +116,41 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               label: const Text('Datenschutzerklärung öffnen'),
                             ),
                           ),
-                          const SizedBox(height: 12),
-                          const Text(
-                            'Quellcode-Lizenz: Mozilla Public License 2.0',
-                          ),
                         ],
                       ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    'Über ZählerstandLog',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Card(
+                    clipBehavior: Clip.antiAlias,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Padding(
+                          padding: EdgeInsets.all(18),
+                          child: Text(
+                            'ZählerstandLog 0.1.0',
+                            style: TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                        const Divider(height: 1),
+                        ListTile(
+                          key: const ValueKey('open-source-code'),
+                          leading: const Icon(Icons.code_rounded),
+                          title: const Text('Quellcode auf GitHub'),
+                          subtitle: const Text('Open Source · MPL 2.0'),
+                          trailing: const Icon(Icons.open_in_new_rounded),
+                          enabled: !_working,
+                          onTap: _openSourceCode,
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -146,21 +170,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _openPrivacyPolicy() async {
-    final launcher = widget.privacyPolicyLauncher ?? _launchPrivacyPolicy;
+    await _openExternalUrl(
+      Uri.parse(
+        'https://www.appfabrik-ai.de/de/apps/zaehlerstandlog/datenschutz/',
+      ),
+      'Die Datenschutzerklärung konnte nicht geöffnet werden. Bitte versuche es erneut.',
+    );
+  }
+
+  Future<void> _openSourceCode() async {
+    await _openExternalUrl(
+      Uri.parse('https://github.com/wasiliy-strecker/meter-reading-log'),
+      'Der Quellcode konnte nicht geöffnet werden. Bitte versuche es erneut.',
+    );
+  }
+
+  Future<void> _openExternalUrl(Uri uri, String failureMessage) async {
+    final launcher = widget.externalUrlLauncher ?? _launchExternalUrl;
     var opened = false;
     try {
-      opened = await launcher(
-        Uri.parse(
-          'https://www.appfabrik-ai.de/de/apps/zaehlerstandlog/datenschutz/',
-        ),
-      );
+      opened = await launcher(uri);
     } on Object {
       opened = false;
     }
     if (!opened && mounted) {
-      _showMessage(
-        'Die Datenschutzerklärung konnte nicht geöffnet werden. Bitte versuche es erneut.',
-      );
+      _showMessage(failureMessage);
     }
   }
 
@@ -466,7 +500,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 }
 
-Future<bool> _launchPrivacyPolicy(Uri uri) {
+Future<bool> _launchExternalUrl(Uri uri) {
   return launchUrl(uri, mode: LaunchMode.externalApplication);
 }
 

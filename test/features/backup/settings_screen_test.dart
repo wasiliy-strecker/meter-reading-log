@@ -19,7 +19,7 @@ void main() {
       ProviderScope(
         child: MaterialApp(
           home: SettingsScreen(
-            privacyPolicyLauncher: (uri) async {
+            externalUrlLauncher: (uri) async {
               openedUri = uri;
               return true;
             },
@@ -47,6 +47,11 @@ void main() {
       findsOneWidget,
     );
     expect(find.textContaining('contact@appfabrik-ai.de'), findsOneWidget);
+    expect(find.text('Datenschutz und Lizenz'), findsNothing);
+    expect(
+      find.text('Quellcode-Lizenz: Mozilla Public License 2.0'),
+      findsNothing,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -56,7 +61,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         child: MaterialApp(
-          home: SettingsScreen(privacyPolicyLauncher: (_) async => false),
+          home: SettingsScreen(externalUrlLauncher: (_) async => false),
         ),
       ),
     );
@@ -70,6 +75,65 @@ void main() {
     expect(
       find.text(
         'Die Datenschutzerklärung konnte nicht geöffnet werden. Bitte versuche es erneut.',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('source code card opens the public GitHub repository', (
+    tester,
+  ) async {
+    Uri? openedUri;
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: SettingsScreen(
+            externalUrlLauncher: (uri) async {
+              openedUri = uri;
+              return true;
+            },
+          ),
+        ),
+      ),
+    );
+
+    await tester.drag(find.byType(ListView), const Offset(0, -900));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Über ZählerstandLog'), findsOneWidget);
+    expect(find.text('ZählerstandLog 0.1.0'), findsOneWidget);
+    expect(find.text('Quellcode auf GitHub'), findsOneWidget);
+    expect(find.text('Open Source · MPL 2.0'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('open-source-code')));
+    await tester.pump();
+
+    expect(
+      openedUri,
+      Uri.parse('https://github.com/wasiliy-strecker/meter-reading-log'),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('failed source code launch shows a helpful message', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: SettingsScreen(externalUrlLauncher: (_) async => false),
+        ),
+      ),
+    );
+
+    await tester.drag(find.byType(ListView), const Offset(0, -900));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('open-source-code')));
+    await tester.pump();
+
+    expect(
+      find.text(
+        'Der Quellcode konnte nicht geöffnet werden. Bitte versuche es erneut.',
       ),
       findsOneWidget,
     );
