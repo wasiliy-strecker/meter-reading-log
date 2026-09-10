@@ -98,7 +98,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           ),
                           const SizedBox(height: 10),
                           const Text(
-                            'Deine Daten bleiben gespeichert, bis du sie in der App löschst oder die App-Daten entfernst. Extern gespeicherte PDFs und Backups löschst du am jeweiligen Speicherort.',
+                            'Deine Daten bleiben lokal auf deinem Gerät gespeichert, bis du sie in der App löschst oder die App-Daten entfernst. Extern gespeicherte PDFs und Backups löschst du am jeweiligen Speicherort.',
                           ),
                           const SizedBox(height: 10),
                           Text(

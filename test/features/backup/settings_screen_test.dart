@@ -40,6 +40,12 @@ void main() {
         'https://www.appfabrik-ai.de/de/apps/zaehlerstandlog/datenschutz/',
       ),
     );
+    expect(
+      find.text(
+        'Deine Daten bleiben lokal auf deinem Gerät gespeichert, bis du sie in der App löschst oder die App-Daten entfernst. Extern gespeicherte PDFs und Backups löschst du am jeweiligen Speicherort.',
+      ),
+      findsOneWidget,
+    );
     expect(find.textContaining('contact@appfabrik-ai.de'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
