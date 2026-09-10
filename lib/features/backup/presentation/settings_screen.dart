@@ -27,6 +27,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final appVersion = ref.watch(appVersionProvider);
+    final appTitle = appVersion.isEmpty
+        ? 'ZählerstandLog'
+        : 'ZählerstandLog $appVersion';
     return PopScope(
       canPop: !_working,
       child: Scaffold(
@@ -133,11 +137,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const Padding(
-                          padding: EdgeInsets.all(18),
+                        Padding(
+                          padding: const EdgeInsets.all(18),
                           child: Text(
-                            'ZählerstandLog 0.1.0',
-                            style: TextStyle(fontWeight: FontWeight.w800),
+                            appTitle,
+                            style: const TextStyle(fontWeight: FontWeight.w800),
                           ),
                         ),
                         const Divider(height: 1),

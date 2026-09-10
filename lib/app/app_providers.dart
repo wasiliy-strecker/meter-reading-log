@@ -23,6 +23,8 @@ import '../features/meters/domain/meter_reading.dart';
 import '../features/meters/domain/meter_reading_page.dart';
 import '../features/meters/domain/meter_repositories.dart';
 
+final appVersionProvider = Provider<String>((ref) => '');
+
 final persistenceBundleProvider = Provider<PersistenceBundle>((ref) {
   final bundle = createPersistenceBundle();
   ref.onDispose(bundle.dispose);

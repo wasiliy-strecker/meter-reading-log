@@ -73,6 +73,15 @@ flutter test
 flutter build apk --debug
 ```
 
+Für einen Play-Store-Build muss `android/key.properties` anhand von
+`android/key.properties.example` eingerichtet sein und auf einen privaten
+Upload-Keystore unter `android/app/` verweisen. Beide Dateien bleiben außerhalb
+von Git. Anschließend entsteht das signierte Android App Bundle mit:
+
+```bash
+flutter build appbundle --release
+```
+
 Die native Kamera, ML-Kit-OCR, Benachrichtigungen und der Share-Sheet benötigen
 ein Android-Gerät. iOS ist als Projekt-Shell vorbereitet, aber nicht das
 Release-Ziel der ersten Version.

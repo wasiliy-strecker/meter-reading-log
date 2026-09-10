@@ -17,6 +17,7 @@ void main() {
     Uri? openedUri;
     await tester.pumpWidget(
       ProviderScope(
+        overrides: [appVersionProvider.overrideWithValue('1.0.0')],
         child: MaterialApp(
           home: SettingsScreen(
             externalUrlLauncher: (uri) async {
@@ -86,6 +87,7 @@ void main() {
     Uri? openedUri;
     await tester.pumpWidget(
       ProviderScope(
+        overrides: [appVersionProvider.overrideWithValue('1.0.0')],
         child: MaterialApp(
           home: SettingsScreen(
             externalUrlLauncher: (uri) async {
@@ -101,7 +103,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Über ZählerstandLog'), findsOneWidget);
-    expect(find.text('ZählerstandLog 0.1.0'), findsOneWidget);
+    expect(find.text('ZählerstandLog 1.0.0'), findsOneWidget);
     expect(find.text('Quellcode auf GitHub'), findsOneWidget);
     expect(find.text('Open Source · MPL 2.0'), findsOneWidget);
 
