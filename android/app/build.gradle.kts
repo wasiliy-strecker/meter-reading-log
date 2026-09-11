@@ -55,6 +55,19 @@ android {
         versionName = flutter.versionName
     }
 
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("store") {
+            dimension = "distribution"
+            manifestPlaceholders["appLabel"] = "ZählerstandLog"
+        }
+        create("dev") {
+            dimension = "distribution"
+            applicationIdSuffix = ".dev"
+            manifestPlaceholders["appLabel"] = "ZählerstandLog Dev"
+        }
+    }
+
     signingConfigs {
         create("release") {
             if (hasReleaseKeystore) {
@@ -73,6 +86,15 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+        }
+    }
+}
+
+androidComponents {
+    beforeVariants(selector().withFlavor("distribution" to "store")) { variant ->
+        // Reserve the Play package identity for production-signed release builds.
+        if (variant.buildType != "release") {
+            variant.enable = false
         }
     }
 }

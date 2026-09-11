@@ -37,7 +37,8 @@ werden im Nachweis ausdrücklich als solche markiert.
 ## Datenschutz
 
 - Fotos, OCR, Verlauf, PDFs und Backups werden lokal verarbeitet.
-- Die Android-App fordert keine `INTERNET`-Berechtigung an.
+- Die Android-Release-App fordert keine `INTERNET`-Berechtigung an.
+  Debug-/Profile-Builds benötigen sie für Flutter-Entwicklungswerkzeuge.
 - Android-Systembackups für die privaten App-Daten sind deaktiviert; Backups
   werden ausschließlich bewusst und verschlüsselt in der App erstellt.
 - Es gibt kein Konto, keine Cloud-Synchronisation, keine Server-KI, keine
@@ -70,8 +71,34 @@ dart run build_runner build
 dart format lib test
 flutter analyze
 flutter test
-flutter build apk --debug
+flutter build apk --debug --flavor dev
 ```
+
+Android bietet zwei parallel installierbare Varianten mit getrennten Daten und
+Berechtigungen:
+
+| Variante | App-Name | Paketkennung |
+| --- | --- | --- |
+| `dev` | ZählerstandLog Dev | `com.appfactory.meter_reading_log.dev` |
+| `store` | ZählerstandLog | `com.appfactory.meter_reading_log` |
+
+Lokale Android-Entwicklung verwendet immer `dev`:
+
+```bash
+flutter run --flavor dev -d <device-id>
+```
+
+Für ein datenbewahrendes APK-Update auf dem Smartphone:
+
+```bash
+flutter build apk --debug --flavor dev
+adb -s <device-id> install -r -t -g --no-streaming build/app/outputs/flutter-apk/app-dev-debug.apk
+```
+
+Debug-Optionen wie die minütliche Erinnerung stehen im Dev-Debug-Build bereit.
+Store-Debug- und Store-Profile-Builds sind deaktiviert, damit lokale Entwicklung
+die Paketkennung der Play-Version nicht belegt. `flutter install` nicht verwenden,
+da es bestehende App-Daten bei einer Deinstallation verlieren kann.
 
 Für einen Play-Store-Build muss `android/key.properties` anhand von
 `android/key.properties.example` eingerichtet sein und auf einen privaten
@@ -79,8 +106,19 @@ Upload-Keystore unter `android/app/` verweisen. Beide Dateien bleiben außerhalb
 von Git. Anschließend entsteht das signierte Android App Bundle mit:
 
 ```bash
-flutter build appbundle --release
+flutter build appbundle --release --flavor store
 ```
+
+Das AAB liegt unter `build/app/outputs/bundle/storeRelease/app-store-release.aab`.
+Interne Play-Tests verwenden dieselbe Store-Variante wie die Veröffentlichung.
+Ein bereits veröffentlichter Test-Release bleibt durch die Einführung der
+Dev-Variante gültig. Für einen späteren neuen Upload den Versionscode erhöhen.
+
+Beim einmaligen Umstieg von einer alten Debug-Installation mit Store-Paketkennung
+zuerst ein verschlüsseltes Backup außerhalb der App speichern. Die neue Dev-App
+zusätzlich installieren, das Backup dort wiederherstellen und die Daten prüfen.
+Erst danach die alte Debug-App bewusst deinstallieren und die Store-App über
+Google Play beziehen. Beide Varianten synchronisieren ihre Daten nicht automatisch.
 
 Die native Kamera, ML-Kit-OCR, Benachrichtigungen und der Share-Sheet benötigen
 ein Android-Gerät. iOS ist als Projekt-Shell vorbereitet, aber nicht das
