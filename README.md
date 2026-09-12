@@ -121,22 +121,44 @@ da es bestehende App-Daten bei einer Deinstallation verlieren kann.
 Für einen Play-Store-Build muss `android/key.properties` anhand von
 `android/key.properties.example` eingerichtet sein und auf einen privaten
 Upload-Keystore unter `android/app/` verweisen. Beide Dateien bleiben außerhalb
-von Git. Anschließend entsteht das signierte Android App Bundle mit:
+von Git. Für einen neuen internen Play-Release zuerst die Buildnummer hinter
+`+` in `pubspec.yaml` erhöhen. Anschließend entsteht mit Bash, Flutter und `jq`
+das signierte Android App Bundle:
 
 ```bash
-flutter build appbundle --release --flavor store
+./scripts/build_internal_test_aab.sh
 ```
 
-Das AAB liegt unter `build/app/outputs/bundle/storeRelease/app-store-release.aab`.
-Interne Play-Tests verwenden dieselbe Store-Variante wie die Veröffentlichung.
-Ein bereits veröffentlichter Test-Release bleibt durch die Einführung der
-Dev-Variante gültig. Für einen späteren neuen Upload den Versionscode erhöhen.
+Das Skript baut ausschließlich `store`/`release` und prüft Paketkennung,
+Variante und Version anhand der Build-Metadaten. Die Datei für den Upload heißt
+`build/releases/internal-test/zaehlerstandlog-<version>-build-<code>-internal-test.aab`.
+Vorhandene versionierte Dateien werden nicht überschrieben; für denselben
+Release die vorhandene Datei verwenden. Das Skript erhöht keine Version und
+installiert, löscht oder veröffentlicht nichts. Bei Bedarf kann der Flutter-Pfad
+über `FLUTTER_BIN` gesetzt werden.
 
-Beim einmaligen Umstieg von einer alten Debug-Installation mit Store-Paketkennung
-zuerst ein verschlüsseltes Backup außerhalb der App speichern. Die neue Dev-App
-zusätzlich installieren, das Backup dort wiederherstellen und die Daten prüfen.
-Erst danach die alte Debug-App bewusst deinstallieren und die Store-App über
-Google Play beziehen. Beide Varianten synchronisieren ihre Daten nicht automatisch.
+Das ursprüngliche Build-Artefakt liegt unter
+`build/app/outputs/bundle/storeRelease/app-store-release.aab`. Benannte
+Upload-Dateien bleiben außerhalb dieses Build-Ordners, damit Flutter sie nicht
+mit einem neuen Build-Ergebnis verwechselt. Maßgeblich ist der abschließend
+vom Skript ausgegebene Pfad; ältere bereits ausgelieferte Dateien bleiben erhalten.
+Interne Play-Tests verwenden dieselbe Store-Variante wie die Veröffentlichung.
+Dev bleibt währenddessen installiert und unverändert nutzbar. Der Agent liefert
+die geprüfte Datei, öffnet den Ordner und gibt Titel sowie deutsche Release-Notizen
+aus; der Nutzer lädt sie in Play Console hoch und aktualisiert über Google Play.
+Ein Test-Release braucht weder ein angeschlossenes Gerät noch einen Datenumzug.
+Der genaue Agentenablauf ist in [AGENTS.md](AGENTS.md) festgehalten.
+
+Nur bei einem Altbestand mit Store-Paketkennung und Debug-Signatur ist ein
+einmaliger Umstieg nötig: externes verschlüsseltes Backup speichern,
+Wiederherstellung in Dev prüfen und die alte Debug-App erst nach ausdrücklicher
+Freigabe entfernen. Das ist kein wiederkehrender Release-Schritt. Beide Varianten
+synchronisieren ihre Daten nicht automatisch.
+
+Ist der Play-Test nicht sichtbar, auch das aktive Konto in der Android-Play-Store-App
+prüfen, nicht nur im Browser. Eine fehlende Store-Seite ist noch kein Beleg für
+einen Signaturkonflikt. Ein konkreter Konflikt bei der Installation darf nicht
+durch ungefragtes Löschen einer App behoben werden.
 
 Die native Kamera, ML-Kit-OCR, Benachrichtigungen und der Share-Sheet benötigen
 ein Android-Gerät. iOS ist als Projekt-Shell vorbereitet, aber nicht das

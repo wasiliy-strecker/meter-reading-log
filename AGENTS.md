@@ -49,15 +49,84 @@ APKs nur datenbewahrend installieren:
 adb -s <device-id> install -r -t -g --no-streaming build/app/outputs/flutter-apk/app-dev-debug.apk
 ```
 
-Die Play-Installation niemals mit einem lokalen APK ersetzen. Beim einmaligen
-Wechsel von der alten Debug-App mit Store-Paketkennung zuerst ein externes
-verschlüsseltes Backup erstellen und in der neuen Dev-App prüfen. Die alte
-Installation erst nach ausdrücklicher Freigabe zur Deinstallation entfernen.
+Die Play-Installation niemals mit einem lokalen APK ersetzen. Dev und Store
+bleiben parallel installiert. Ein Test-Release erfordert weder ein verbundenes
+Smartphone noch eine Neuinstallation, Deinstallation oder Datenübertragung.
 Dev und Store besitzen getrennte Daten und Android-Berechtigungen; ein Backup
-kann über die bestehende Wiederherstellung übertragen werden.
+kann auf ausdrücklichen Wunsch über die bestehende Wiederherstellung übertragen
+werden.
+
+Vor einem APK-Update die exakte Ziel-Paketkennung, installierte Version,
+Debug-Flag und Installer prüfen. Bei möglicher abweichender Signierung zuerst
+die Zertifikate prüfen. Ein Play-App-Signing-Zertifikat muss nicht dem lokalen
+Upload-Zertifikat entsprechen. `INSTALL_FAILED_UPDATE_INCOMPATIBLE` nicht durch
+automatische Deinstallation umgehen.
+
+Die frühere Debug-App ohne `.dev` war ein einmaliger Altbestand; der Umstieg
+auf parallele Dev-/Play-Installationen wurde bereits durchgeführt. Diesen
+Umzug nicht bei jedem Release wiederholen. Nur falls tatsächlich erneut eine
+alte Debug-Installation mit Store-Paketkennung gefunden wird: zuerst externes
+verschlüsseltes Backup und Wiederherstellung prüfen, dann eine ausdrückliche
+Freigabe zur Deinstallation genau dieser alten Installation einholen.
 
 Nach Android-Buildänderungen zusätzlich das Store-AAB bauen und Paketkennung,
 Release-Signatur sowie das zusammengeführte Manifest ohne Netzwerkrechte prüfen.
 Das Store-AAB liegt unter `build/app/outputs/bundle/storeRelease/app-store-release.aab`.
 Ein bereits hochgeladener Play-Release wird durch lokale Dev-Änderungen nicht
 ersetzt; für einen späteren neuen Play-Upload muss der Versionscode erhöht werden.
+
+## Schneller interner Test-Release
+
+Bei „Test-Release erstellen“ den etablierten Ablauf selbstständig ausführen,
+ohne erneut nach Dev-/Store-Aufteilung, Datenumzug oder Neuinstallation zu fragen:
+
+1. Arbeitsstand und `pubspec.yaml` prüfen. Für einen neuen Upload die Buildnummer
+   hinter `+` erhöhen, größer als alle bekannten bereits hochgeladenen Codes.
+   Den Versionsnamen nur bei fachlichem Anlass ändern. Normale Dev-Arbeit und
+   Dokumentationsänderungen brauchen keine neue Release-Version.
+2. Die oben vorgeschriebenen Prüfungen ausführen, danach:
+
+   ```bash
+   ./scripts/build_internal_test_aab.sh
+   ```
+
+   Voraussetzungen: Flutter, Bash, `jq` und die bestehende private
+   Upload-Signierung. Das Skript baut ausschließlich Store/Release, prüft
+   Paketkennung, Variante und Version aus den Build-Metadaten und erzeugt:
+   `build/releases/internal-test/zaehlerstandlog-<version>-build-<code>-internal-test.aab`.
+   Es verändert keine Versionsnummer, überschreibt keine vorhandene benannte
+   Datei und installiert, löscht oder veröffentlicht nichts.
+3. Genau diese versionierte Datei nennen und ihren Ordner öffnen. Einen kurzen
+   Release-Titel und direkt kopierbare deutsche Notizen mit `<de-DE>`-Tags
+   liefern, ohne Aufzählungszeichen. Nicht versehentlich das alte
+   `build/app/outputs/bundle/release/app-release.aab` aushändigen.
+4. Der Nutzer lädt die Datei in den internen Play-Test hoch und aktualisiert die
+   Store-App über Google Play. Dev bleibt unverändert nutzbar. Kein automatischer
+   Play-Upload und keine Veröffentlichung ohne entsprechenden Auftrag.
+
+Existiert die benannte AAB-Datei bereits, nicht für einen erneuten Download
+neu bauen oder die Version erhöhen: den vorhandenen Release aushändigen. Nur
+ein wirklich neuer Upload benötigt eine neue Buildnummer. Rückfragen auf
+fehlende Informationen, rechtliche Bestätigungen durch den Nutzer und mögliche
+Datenverluste beschränken.
+
+Benannte Upload-Dateien außerhalb von `build/app/outputs/bundle/` ablegen:
+Flutter kann dort sonst eine ältere AAB als Build-Ergebnis anzeigen. Maßgeblich
+ist der abschließend vom Skript geprüfte und ausgegebene Pfad. Die früher dort
+abgelegte versionierte Datei bleibt erhalten und wird ebenfalls gegen
+versehentliches erneutes Erstellen derselben Version geschützt.
+
+## Wenn der Play-Test nicht verfügbar ist
+
+Zuerst zwischen fehlender Store-Seite und fehlgeschlagener Installation
+unterscheiden. Aktiven Release, ausgewählte/gespeicherte Testerliste und
+Testbeitritt prüfen. Insbesondere das Konto **in der Android-Play-Store-App**
+kontrollieren; das korrekte Browserkonto allein reicht nicht. Danach konkrete
+Gerätekompatibilität oder Installations-/Signaturfehler prüfen. Wartezeit oder
+Cache nicht ohne Befund als Ursache behaupten. Google-Nutzungsbedingungen
+bestätigt der Nutzer selbst.
+
+Beim bisherigen Umstieg gab es zwei getrennte Ursachen: eine alte Debug-App
+mit Store-Paketkennung und ein anderes aktives Play-Store-Konto als im Browser.
+Beides wurde behoben; eine bereits funktionierende Play-/Dev-Aufteilung nicht
+erneut umbauen.
