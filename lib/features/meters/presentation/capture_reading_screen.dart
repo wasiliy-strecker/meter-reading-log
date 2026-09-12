@@ -14,6 +14,7 @@ import '../domain/meter.dart';
 import '../domain/meter_reading.dart';
 import '../domain/reading_value.dart';
 import 'editable_reading_time_card.dart';
+import 'meter_photo_examples.dart';
 import 'meter_unit_field.dart';
 
 class CaptureReadingScreen extends ConsumerStatefulWidget {
@@ -95,6 +96,7 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
           children: [
             if (_photo == null) ...[
               const _CaptureGuidance(),
+              MeterPhotoExamplesButton(enabled: !_working),
               const SizedBox(height: 18),
               FilledButton.icon(
                 onPressed: _working
@@ -343,9 +345,14 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
     final source = await showModalBottomSheet<ReadingSource>(
       context: context,
       builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        child: ListView(
+          shrinkWrap: true,
+          padding: EdgeInsets.zero,
           children: [
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: MeterPhotoExamplesButton(),
+            ),
             ListTile(
               leading: const Icon(Icons.photo_camera_outlined),
               title: const Text('Neu fotografieren'),

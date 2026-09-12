@@ -13,6 +13,7 @@ import 'package:meter_reading_log/features/evidence/domain/evidence_export.dart'
 import 'package:meter_reading_log/features/meters/domain/meter.dart';
 import 'package:meter_reading_log/features/meters/domain/meter_reading.dart';
 import 'package:meter_reading_log/features/meters/domain/reading_value.dart';
+import 'package:meter_reading_log/features/meters/presentation/meter_photo_examples.dart';
 
 import '../../support/fakes.dart';
 
@@ -39,6 +40,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          meterPhotoExamplesEnabledProvider.overrideWithValue(true),
           meterRepositoryProvider.overrideWithValue(meters),
           meterReadingRepositoryProvider.overrideWithValue(readings),
           evidenceExportRepositoryProvider.overrideWithValue(
@@ -66,6 +68,15 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Ablesen / Fotografieren'), findsWidgets);
 
+    expect(find.text('Beispielfotos'), findsNothing);
+    await tester.tap(find.text('Beispiele ansehen'));
+    await tester.pumpAndSettle();
+    expect(find.text('Beispielfotos'), findsOneWidget);
+    await tester.tap(find.byTooltip('Schließen'));
+    await tester.pumpAndSettle();
+    expect(photos.captureCount, 0);
+    expect(readings.items, isEmpty);
+
     await tester.tap(find.text('Zähler fotografieren'));
     await tester.pumpAndSettle();
 
@@ -77,6 +88,18 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Ablesen / Fotografieren'), findsWidgets);
     expect(find.text('Neues Foto aufnehmen oder auswählen'), findsOneWidget);
+
+    await tester.tap(find.text('Neues Foto aufnehmen oder auswählen'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Beispiele ansehen'));
+    await tester.pumpAndSettle();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('Neu fotografieren'), findsOneWidget);
+    expect(find.text('Aus Galerie wählen'), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(photos.captureCount, 1);
 
     expect(find.text('Ersetzen'), findsNothing);
     expect(find.text('Neues Foto aufnehmen oder auswählen'), findsOneWidget);
@@ -148,6 +171,13 @@ void main() {
     await tester.tap(find.text('Neues Foto für Korrektur'));
     await tester.pumpAndSettle();
     expect(find.text('Neues Nachweisfoto'), findsOneWidget);
+    final capturesBeforeExamples = photos.captureCount;
+    await tester.tap(find.text('Beispiele ansehen'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Schließen'));
+    await tester.pumpAndSettle();
+    expect(find.text('Neues Nachweisfoto'), findsOneWidget);
+    expect(photos.captureCount, capturesBeforeExamples);
     await tester.tap(find.text('Aus Galerie wählen'));
     await tester.pumpAndSettle();
     expect(

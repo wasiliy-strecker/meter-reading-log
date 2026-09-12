@@ -14,6 +14,7 @@ import '../../../core/ocr/meter_ocr_repository.dart';
 import '../domain/meter_reading.dart';
 import '../domain/reading_value.dart';
 import 'editable_reading_time_card.dart';
+import 'meter_photo_examples.dart';
 
 class EditReadingScreen extends ConsumerWidget {
   const EditReadingScreen({super.key, required this.readingId});
@@ -357,8 +358,9 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
       context: context,
       showDragHandle: true,
       builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        child: ListView(
+          shrinkWrap: true,
+          padding: EdgeInsets.zero,
           children: [
             const ListTile(
               title: Text(
@@ -366,6 +368,10 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
                 style: TextStyle(fontWeight: FontWeight.w800),
               ),
               subtitle: Text('Quelle für das Korrekturfoto auswählen'),
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: MeterPhotoExamplesButton(),
             ),
             ListTile(
               leading: const Icon(Icons.photo_camera_outlined),

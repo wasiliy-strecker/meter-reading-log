@@ -15,6 +15,24 @@ compare the OCR candidate with the visible reading. The app deliberately
 requires manual confirmation because punctuation and roller transitions can be
 misread by OCR.
 
+## In-app development preview
+
+The `dev` flavor bundles reduced JPEG previews of these four PNGs for the
+optional **Beispiele ansehen** gallery before camera/gallery
+selection, photo replacement, and correction. This is a read-only illustration:
+viewing a sample does not import it, trigger OCR, or create a reading.
+
+The entry point requires `appFlavor == 'dev'`, and the individual asset entries
+in `pubspec.yaml` are restricted to that flavor. Store and unflavored builds
+do not bundle the example photos. The original PNGs are never bundled; they
+remain unchanged for manual OCR testing independently of this preview.
+
+Regenerate the committed previews with
+`dart run scripts/prepare_meter_photo_examples.dart` from the app directory.
+Output: `assets/dev/meter_photo_examples/`, JPEG, at most 1024 pixels on the
+longest edge and 150 KiB per image. This does not change processing of users'
+actual evidence photos.
+
 ## Generation prompt set
 
 All four prompts requested a portrait, straight-on, photorealistic and

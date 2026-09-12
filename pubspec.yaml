@@ -85,6 +85,19 @@ flutter:
   assets:
     - assets/fonts/Roboto-Regular.ttf
     - assets/fonts/Roboto-Bold.ttf
+    # Synthetic viewing examples: never include these in the Store variant.
+    - path: assets/dev/meter_photo_examples/01_strom_digital_001842-7_kwh.jpg
+      flavors:
+        - dev
+    - path: assets/dev/meter_photo_examples/02_gas_mechanisch_004731-82_m3.jpg
+      flavors:
+        - dev
+    - path: assets/dev/meter_photo_examples/03_wasser_000286-4_m3.jpg
+      flavors:
+        - dev
+    - path: assets/dev/meter_photo_examples/04_strom_alt_012958-6_kwh.jpg
+      flavors:
+        - dev
 
   # To add assets to your application, add an assets section, like this:
   # assets:
