@@ -200,6 +200,8 @@ class LocalNotificationReminderRepository implements MeterReminderRepository {
         'latestValue': latestReading?.value.displayText,
         'latestUnit': latestReading?.meter.unit,
         'interval': schedule.interval.name,
+        if (schedule.startsAt != null)
+          'startsAtMillis': schedule.startsAt!.millisecondsSinceEpoch,
         'day': schedule.day,
         'month': schedule.month,
         'hour': schedule.hour,
@@ -318,6 +320,22 @@ class LocalNotificationReminderRepository implements MeterReminderRepository {
 }
 
 DateTime nextReminderDate(ReadingReminderSchedule schedule, DateTime now) {
+  if (schedule.interval == ReminderInterval.hourly) {
+    final startsAt = schedule.startsAt;
+    if (startsAt == null) {
+      throw ArgumentError(
+        'Die stündliche Erinnerung benötigt einen Startzeitpunkt.',
+      );
+    }
+    final start = startsAt.toUtc();
+    final current = now.toUtc();
+    if (start.isAfter(current)) return start.toLocal();
+    final elapsedHours =
+        current.difference(start).inMicroseconds ~/
+        Duration.microsecondsPerHour;
+    return start.add(Duration(hours: elapsedHours + 1)).toLocal();
+  }
+
   if (schedule.interval == ReminderInterval.minutely) {
     return DateTime(
       now.year,

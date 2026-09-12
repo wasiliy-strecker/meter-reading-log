@@ -9,6 +9,7 @@ import '../features/meters/presentation/edit_reading_screen.dart';
 import '../features/meters/presentation/home_screen.dart';
 import '../features/meters/presentation/meter_detail_screen.dart';
 import '../features/meters/presentation/meter_form_screen.dart';
+import '../features/meters/presentation/meter_history_screen.dart';
 import '../features/meters/presentation/reading_detail_screen.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -25,6 +26,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         name: 'meterDetail',
         builder: (_, state) =>
             MeterDetailScreen(meterId: state.pathParameters['id'] ?? ''),
+      ),
+      GoRoute(
+        path: '/meter/:id/history',
+        name: 'meterHistory',
+        builder: (_, state) =>
+            MeterHistoryScreen(meterId: state.pathParameters['id'] ?? ''),
       ),
       GoRoute(
         path: '/meter/:id/edit',

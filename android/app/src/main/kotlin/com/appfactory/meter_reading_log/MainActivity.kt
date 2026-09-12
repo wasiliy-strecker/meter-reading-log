@@ -342,6 +342,7 @@ class MainActivity : FlutterActivity() {
         val meterType = arguments?.get("meterType") as? String
         val meterTypeLabel = arguments?.get("meterTypeLabel") as? String
         val interval = arguments?.get("interval") as? String
+        val startsAtMillis = (arguments?.get("startsAtMillis") as? Number)?.toLong()
         val day = arguments?.get("day") as? Int
         val hour = arguments?.get("hour") as? Int
         val minute = arguments?.get("minute") as? Int
@@ -351,7 +352,8 @@ class MainActivity : FlutterActivity() {
             meterType.isNullOrBlank() || meterTypeLabel.isNullOrBlank() ||
             interval.isNullOrBlank() ||
             day == null || hour == null ||
-            minute == null || deliveryMode.isNullOrBlank()
+            minute == null || deliveryMode.isNullOrBlank() ||
+            (interval == "hourly" && startsAtMillis == null)
         ) {
             result.error("invalid_schedule", "Erinnerungsdaten sind unvollständig.", null)
             return
@@ -369,6 +371,7 @@ class MainActivity : FlutterActivity() {
             hour = hour,
             minute = minute,
             deliveryMode = deliveryMode,
+            startsAtMillis = startsAtMillis,
         )
         ReminderScheduler.cancelPending(this, meterId)
         ReminderStore.save(this, reminder)

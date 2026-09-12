@@ -456,7 +456,7 @@ void main() {
   );
 
   testWidgets(
-    'meter history loads 20 at a time and searches beyond the first page',
+    'meter previews five readings and opens searchable fixed history pages',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(430, 1200));
       addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -508,7 +508,7 @@ void main() {
       await tester.tap(find.text('Strom Langzeit'));
       await tester.pumpAndSettle();
 
-      expect(readings.lastPageLimit, 20);
+      expect(readings.lastPageLimit, 5);
       expect(readings.lastPageQuery, isEmpty);
       final historyPdfAction = find.text('PDF-Nachweis des Zählerverlaufs');
       final historyTitle = find.text('Zählerverlauf');
@@ -518,7 +518,19 @@ void main() {
         lessThan(tester.getTopLeft(historyTitle).dy),
       );
       expect(find.text('Gespeicherte PDF-Nachweise'), findsNothing);
-      expect(find.text('20 von 45 Ablesungen'), findsOneWidget);
+      expect(find.text('5 von 45 Ablesungen'), findsOneWidget);
+      expect(find.byKey(const ValueKey('history-search-field')), findsNothing);
+      final openHistory = find.byKey(const ValueKey('open-meter-history'));
+      await tester.scrollUntilVisible(
+        openHistory,
+        400,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.tap(openHistory);
+      await tester.pumpAndSettle();
+      expect(readings.lastPageLimit, 20);
+      expect(readings.lastPageOffset, 0);
+      expect(find.text('1–20 von 45 Ablesungen'), findsOneWidget);
       final search = find.byKey(const ValueKey('history-search-field'));
       expect(search, findsOneWidget);
 
@@ -540,21 +552,38 @@ void main() {
 
       await tester.tap(find.byTooltip('Suche löschen'));
       await tester.pumpAndSettle();
-      final showMore = find.byKey(const ValueKey('show-more-readings'));
-      for (
-        var attempt = 0;
-        attempt < 20 && showMore.evaluate().isEmpty;
-        attempt++
-      ) {
-        await tester.drag(find.byType(ListView).last, const Offset(0, -700));
-        await tester.pump();
-      }
-      expect(showMore, findsOneWidget);
-      await tester.tap(showMore);
+      await tester.tap(find.byKey(const ValueKey('history-next-page')));
       await tester.pumpAndSettle();
 
-      expect(readings.lastPageLimit, 40);
+      expect(readings.lastPageLimit, 20);
+      expect(readings.lastPageOffset, 20);
       expect(readings.lastPageQuery, isEmpty);
+      expect(find.text('21–40 von 45 Ablesungen'), findsOneWidget);
+      expect(find.text('Seite 2 von 3'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('reading-card-long_reading_44')),
+        findsNothing,
+      );
+      await tester.tap(find.byKey(const ValueKey('history-next-page')));
+      await tester.pumpAndSettle();
+      expect(readings.lastPageOffset, 40);
+      expect(find.text('41–45 von 45 Ablesungen'), findsOneWidget);
+      expect(
+        tester
+            .widget<OutlinedButton>(
+              find.byKey(const ValueKey('history-next-page')),
+            )
+            .onPressed,
+        isNull,
+      );
+      await tester.tap(find.byKey(const ValueKey('history-previous-page')));
+      await tester.pumpAndSettle();
+      expect(readings.lastPageOffset, 20);
+      await tester.enterText(search, 'SPEZIALFUND');
+      await tester.pump(const Duration(milliseconds: 251));
+      await tester.pumpAndSettle();
+      expect(readings.lastPageOffset, 0);
+      expect(find.text('1 Treffer'), findsOneWidget);
     },
   );
 

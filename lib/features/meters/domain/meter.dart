@@ -216,11 +216,12 @@ MeterUnitOption? meterUnitOption(String unit) {
 String meterUnitDescription(String unit) =>
     meterUnitOption(unit)?.description ?? 'Eigene Einheit dieses Zählers';
 
-enum ReminderInterval { minutely, daily, weekly, monthly, yearly }
+enum ReminderInterval { minutely, hourly, daily, weekly, monthly, yearly }
 
 extension ReminderIntervalLabel on ReminderInterval {
   String get label => switch (this) {
     ReminderInterval.minutely => 'Minütlich (Dev)',
+    ReminderInterval.hourly => 'Stündlich',
     ReminderInterval.daily => 'Täglich',
     ReminderInterval.weekly => 'Wöchentlich',
     ReminderInterval.monthly => 'Monatlich',
@@ -256,7 +257,8 @@ class ReadingReminderSchedule {
     required this.minute,
     this.month,
     this.deliveryMode = ReminderDeliveryMode.normal,
-  });
+    this.startsAt,
+  }) : assert(interval != ReminderInterval.hourly || startsAt != null);
 
   final ReminderInterval interval;
   final int day;
@@ -264,6 +266,7 @@ class ReadingReminderSchedule {
   final int minute;
   final int? month;
   final ReminderDeliveryMode deliveryMode;
+  final DateTime? startsAt;
 
   Map<String, dynamic> toJson() => {
     'interval': interval.name,
@@ -272,11 +275,22 @@ class ReadingReminderSchedule {
     'minute': minute,
     'month': month,
     'deliveryMode': deliveryMode.name,
+    if (startsAt != null) 'startsAt': startsAt!.toUtc().toIso8601String(),
   };
 
   factory ReadingReminderSchedule.fromJson(Map<String, dynamic> json) {
+    final interval = ReminderInterval.values.byName(json['interval'] as String);
+    final startsAt = json['startsAt'] == null
+        ? null
+        : DateTime.parse(json['startsAt'] as String).toUtc();
+    if (interval == ReminderInterval.hourly && startsAt == null) {
+      throw const FormatException(
+        'Die stündliche Erinnerung benötigt einen Startzeitpunkt.',
+      );
+    }
     return ReadingReminderSchedule(
-      interval: ReminderInterval.values.byName(json['interval'] as String),
+      interval: interval,
+      startsAt: startsAt,
       day: (json['day'] as num).toInt(),
       hour: (json['hour'] as num).toInt(),
       minute: (json['minute'] as num).toInt(),

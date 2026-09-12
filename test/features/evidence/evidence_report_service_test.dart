@@ -2,17 +2,153 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
+import 'package:intl/intl.dart';
+import 'package:meter_reading_log/core/integrity/integrity_service.dart';
 import 'package:meter_reading_log/core/files/evidence_photo_asset_repository.dart';
 import 'package:meter_reading_log/features/evidence/application/evidence_report_service.dart';
 import 'package:meter_reading_log/features/evidence/domain/evidence_export.dart';
 import 'package:meter_reading_log/features/meters/domain/meter.dart';
 import 'package:meter_reading_log/features/meters/domain/meter_reading.dart';
+import 'package:meter_reading_log/features/meters/domain/meter_reading_order.dart';
 import 'package:meter_reading_log/features/meters/domain/reading_value.dart';
 
 import '../../support/fakes.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test(
+    'descending history rows retain positive, negative and unit-aware deltas',
+    () {
+      final older = _reading(
+        '/tmp/photo.jpg',
+      ).copyWith(value: ReadingValue.tryParse('100,0'));
+      final newer = _reading(
+        '/tmp/photo.jpg',
+        id: 'newer',
+        capturedAt: DateTime.utc(2026, 9, 1),
+      ).copyWith(value: ReadingValue.tryParse('125,5'));
+      final rows = EvidenceReportService.historyTableData([
+        newer,
+        older,
+      ], DateFormat('yyyy-MM-dd'));
+      expect(rows.first[1], '125,5 kWh');
+      expect(rows.first[2], '25,5 kWh');
+      expect(rows.last[2], '–');
+      final reset = newer.copyWith(value: ReadingValue.tryParse('10,0'));
+      expect(
+        EvidenceReportService.historyTableData([
+          reset,
+          older,
+        ], DateFormat())[0][2],
+        '-90,0 kWh',
+      );
+      final differentUnit = MeterReading.fromJson({
+        ...older.toJson(),
+        'meter': MeterSnapshot.fromMeter(
+          _meter().copyWith(unit: 'MWh'),
+        ).toJson(),
+      });
+      expect(
+        EvidenceReportService.historyTableData([
+          newer,
+          differentUnit,
+        ], DateFormat())[0][2],
+        '– (Einheit gewechselt)',
+      );
+    },
+  );
+
+  for (final photoMode in EvidencePhotoMode.values) {
+    test(
+      'history is newest first in $photoMode without changing the content manifest',
+      () async {
+        final temp = await Directory.systemTemp.createTemp(
+          'history_order_test_',
+        );
+        addTearDown(() => temp.delete(recursive: true));
+        final photo = File('${temp.path}/photo.jpg');
+        await photo.writeAsBytes(
+          img.encodeJpg(img.Image(width: 20, height: 20)),
+        );
+        final older = _reading(photo.path, id: 'old');
+        final newer = _reading(
+          photo.path,
+          id: 'new',
+          capturedAt: DateTime.utc(2026, 9, 1),
+        );
+        final service = EvidenceReportService(
+          exports: MemoryEvidenceExportRepository(),
+          documentsDirectoryProvider: () async => temp,
+        );
+        final report = await service.createHistory(
+          meter: _meter(),
+          readings: [newer, older],
+          revisions: const {},
+          photoMode: photoMode,
+        );
+        expect(report.record.readingIds, ['new', 'old']);
+        const integrity = IntegrityService();
+        final legacyManifest = await integrity.sha256Text(
+          integrity.canonicalJson({
+            'schema': 'meter_reading_evidence_v3',
+            'reportMeter': MeterSnapshot.fromMeter(_meter()).toJson(),
+            'readings': [
+              older,
+              newer,
+            ].map(integrity.normalizedReadingData).toList(),
+            'revisions': {'old': <Object>[], 'new': <Object>[]},
+          }),
+        );
+        expect(report.record.manifestSha256, legacyManifest);
+        expect(report.bytes.take(4), [0x25, 0x50, 0x44, 0x46]);
+      },
+    );
+  }
+
+  test(
+    'equal timestamps use stored timestamp then ID, matching the history query',
+    () {
+      final a = _reading('/tmp/photo.jpg', id: 'a');
+      final b = _reading('/tmp/photo.jpg', id: 'b');
+      final storedLater = _reading(
+        '/tmp/photo.jpg',
+        id: 'c',
+        storedAt: a.storedAt.add(const Duration(minutes: 1)),
+      );
+      final readings = [a, storedLater, b]..sort(compareReadingsNewestFirst);
+      expect(readings.map((r) => r.id), ['c', 'b', 'a']);
+    },
+  );
+
+  test('exports a complete year of daily readings without photos', () async {
+    final temp = await Directory.systemTemp.createTemp('daily_year_pdf_test_');
+    addTearDown(() => temp.delete(recursive: true));
+    final service = EvidenceReportService(
+      exports: MemoryEvidenceExportRepository(),
+      documentsDirectoryProvider: () async => temp,
+    );
+    final start = DateTime.utc(2025, 1, 1, 12);
+    final readings = List.generate(
+      365,
+      (i) => _reading(
+        '/tmp/not-needed.jpg',
+        id: 'daily_$i',
+        capturedAt: start.add(Duration(days: i)),
+        storedAt: start.add(Duration(days: i)),
+      ).copyWith(value: ReadingValue.tryParse('${1000 + i},0')),
+    );
+    final report = await service.createHistory(
+      meter: _meter(),
+      readings: readings,
+      revisions: const {},
+      photoMode: EvidencePhotoMode.withoutPhotos,
+    );
+    expect(report.record.readingIds, hasLength(365));
+    expect(report.record.readingIds.first, 'daily_364');
+    expect(report.record.readingIds.last, 'daily_0');
+    expect(await File(report.record.filePath).exists(), isTrue);
+  });
 
   test('older export JSON defaults to the legacy all-photo mode', () {
     final record = EvidenceExportRecord.fromJson({

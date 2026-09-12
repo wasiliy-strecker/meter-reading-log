@@ -134,6 +134,7 @@ class MemoryReadingRepository implements MeterReadingRepository {
   int watchPageForMeterCalls = 0;
   int loadForMeterCalls = 0;
   int? lastPageLimit;
+  int? lastPageOffset;
   String? lastPageQuery;
 
   @override
@@ -187,10 +188,12 @@ class MemoryReadingRepository implements MeterReadingRepository {
   Stream<MeterReadingPage> watchPageForMeter(
     String meterId, {
     required int limit,
+    int offset = 0,
     String query = '',
   }) {
     watchPageForMeterCalls++;
     lastPageLimit = limit;
+    lastPageOffset = offset;
     lastPageQuery = query;
     final all = items.values.where((item) => item.meterId == meterId).toList()
       ..sort(_newestReadingFirst);
@@ -199,11 +202,14 @@ class MemoryReadingRepository implements MeterReadingRepository {
         .toList(growable: false);
     return Stream.value(
       MeterReadingPage(
-        readings: matching.take(limit).toList(growable: false),
+        offset: offset,
+        readings: matching.skip(offset).take(limit).toList(growable: false),
         totalCount: all.length,
         matchingCount: matching.length,
         latestReading: all.isEmpty ? null : all.first,
-        olderNeighbor: matching.length > limit ? matching[limit] : null,
+        olderNeighbor: matching.length > offset + limit
+            ? matching[offset + limit]
+            : null,
       ),
     );
   }

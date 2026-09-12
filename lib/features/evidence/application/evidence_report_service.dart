@@ -15,6 +15,7 @@ import '../../../core/utils/id_generator.dart';
 import '../../meters/application/reading_revision_photos.dart';
 import '../../meters/domain/meter.dart';
 import '../../meters/domain/meter_reading.dart';
+import '../../meters/domain/meter_reading_order.dart';
 import '../../meters/domain/meter_repositories.dart';
 import '../domain/evidence_export.dart';
 
@@ -96,6 +97,8 @@ class EvidenceReportService {
       revisions,
       reportMeter,
     );
+    // Keep the existing manifest normalization separate from presentation.
+    sortedReadings.sort(compareReadingsNewestFirst);
     return _create(
       readings: sortedReadings,
       revisions: revisions,
@@ -416,22 +419,28 @@ class EvidenceReportService {
       headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
       headerDecoration: pw.BoxDecoration(color: PdfColor.fromHex('#D7EEE9')),
       cellPadding: const pw.EdgeInsets.all(6),
-      data: [
-        for (var index = 0; index < readings.length; index++)
-          [
-            '${date.format(readings[index].capturedAt.toLocal())}'
-                '${readings[index].wasFutureAtStorage ? '\nBei Speicherung zukünftig' : ''}',
-            '${readings[index].value.displayText} ${readings[index].meter.unit}',
-            index == 0
-                ? '–'
-                : readings[index].meter.unit != readings[index - 1].meter.unit
-                ? '– (Einheit gewechselt)'
-                : '${readings[index].value.difference(readings[index - 1].value).germanFormatted} ${readings[index].meter.unit}',
-            readings[index].source.label,
-          ],
-      ],
+      data: historyTableData(readings, date),
     );
   }
+
+  @visibleForTesting
+  static List<List<String>> historyTableData(
+    List<MeterReading> readings,
+    DateFormat date,
+  ) => [
+    for (var index = 0; index < readings.length; index++)
+      [
+        '${date.format(readings[index].capturedAt.toLocal())}'
+            '${readings[index].wasFutureAtStorage ? '\nBei Speicherung zukünftig' : ''}',
+        '${readings[index].value.displayText} ${readings[index].meter.unit}',
+        index == readings.length - 1
+            ? '–'
+            : readings[index].meter.unit != readings[index + 1].meter.unit
+            ? '– (Einheit gewechselt)'
+            : '${readings[index].value.difference(readings[index + 1].value).germanFormatted} ${readings[index].meter.unit}',
+        readings[index].source.label,
+      ],
+  ];
 
   static List<pw.Widget> _readingSection({
     required MeterReading reading,

@@ -156,7 +156,12 @@ final readingsForMeterProvider =
           ref.watch(meterReadingRepositoryProvider).watchForMeter(meterId),
     );
 
-typedef MeterHistoryPageRequest = ({String meterId, int limit, String query});
+typedef MeterHistoryPageRequest = ({
+  String meterId,
+  int limit,
+  int offset,
+  String query,
+});
 
 final meterHistoryPageProvider = StreamProvider.autoDispose
     .family<MeterReadingPage, MeterHistoryPageRequest>(
@@ -165,6 +170,7 @@ final meterHistoryPageProvider = StreamProvider.autoDispose
           .watchPageForMeter(
             request.meterId,
             limit: request.limit,
+            offset: request.offset,
             query: request.query,
           ),
     );

@@ -6,16 +6,18 @@ class MeterReadingPage {
     required this.totalCount,
     required this.matchingCount,
     required this.latestReading,
+    this.offset = 0,
     this.olderNeighbor,
   });
 
   final List<MeterReading> readings;
   final int totalCount;
   final int matchingCount;
+  final int offset;
   final MeterReading? latestReading;
   final MeterReading? olderNeighbor;
 
-  bool get hasMore => readings.length < matchingCount;
+  bool get hasMore => offset + readings.length < matchingCount;
 }
 
 bool meterReadingMatchesQuery(MeterReading reading, String rawQuery) {

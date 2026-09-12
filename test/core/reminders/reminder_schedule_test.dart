@@ -3,6 +3,108 @@ import 'package:meter_reading_log/core/reminders/local_notification_reminder_rep
 import 'package:meter_reading_log/features/meters/domain/meter.dart';
 
 void main() {
+  group('hourly reminders anchored to their selected start', () {
+    final start = DateTime.utc(2026, 9, 15, 12, 30);
+    final schedule = ReadingReminderSchedule(
+      interval: ReminderInterval.hourly,
+      day: 1,
+      hour: 14,
+      minute: 30,
+      startsAt: start,
+    );
+
+    test('waits until the start and advances strictly beyond now', () {
+      expect(
+        nextReminderDate(
+          schedule,
+          start.subtract(const Duration(days: 3)),
+        ).toUtc(),
+        start,
+      );
+      expect(
+        nextReminderDate(schedule, start).toUtc(),
+        start.add(const Duration(hours: 1)),
+      );
+      expect(
+        nextReminderDate(
+          schedule,
+          start.add(const Duration(minutes: 59, seconds: 59)),
+        ).toUtc(),
+        start.add(const Duration(hours: 1)),
+      );
+    });
+
+    test(
+      'delays and restarts skip missed hours without shifting the anchor',
+      () {
+        final delayed = start.add(
+          const Duration(days: 5, hours: 7, minutes: 23),
+        );
+        expect(
+          nextReminderDate(schedule, delayed).toUtc(),
+          start.add(const Duration(days: 5, hours: 8)),
+        );
+        final restored = ReadingReminderSchedule.fromJson(schedule.toJson());
+        expect(restored.startsAt, start);
+        expect(
+          nextReminderDate(restored, delayed),
+          nextReminderDate(schedule, delayed),
+        );
+      },
+    );
+
+    test('hourly starts serialize to UTC and survive local conversion', () {
+      final restored = ReadingReminderSchedule.fromJson({
+        ...schedule.toJson(),
+        'startsAt': '2026-09-15T14:30:00+02:00',
+      });
+      expect(restored.startsAt, start);
+      expect(restored.toJson()['startsAt'], start.toIso8601String());
+    });
+
+    test(
+      'missing hourly anchor is rejected, old daily schedules still load',
+      () {
+        final json = schedule.toJson()..remove('startsAt');
+        expect(
+          () => ReadingReminderSchedule.fromJson(json),
+          throwsFormatException,
+        );
+        final old = ReadingReminderSchedule.fromJson({
+          ...json,
+          'interval': 'daily',
+        });
+        expect(old.startsAt, isNull);
+        expect(old.interval, ReminderInterval.daily);
+      },
+    );
+
+    for (final startText in [
+      '2026-03-29T01:30:00+01:00',
+      '2026-10-25T02:30:00+02:00',
+    ]) {
+      test(
+        'keeps 60 elapsed minutes over daylight saving change $startText',
+        () {
+          final anchor = DateTime.parse(startText);
+          final dstSchedule = ReadingReminderSchedule(
+            interval: ReminderInterval.hourly,
+            day: 1,
+            hour: 0,
+            minute: 30,
+            startsAt: anchor,
+          );
+          var current = anchor;
+          for (var index = 0; index < 5; index++) {
+            final next = nextReminderDate(dstSchedule, current).toUtc();
+            expect(next.difference(current), const Duration(hours: 1));
+            current = next;
+          }
+        },
+      );
+    }
+  });
+
   test('minutely dev reminder advances to the next full minute', () {
     const schedule = ReadingReminderSchedule(
       interval: ReminderInterval.minutely,

@@ -118,9 +118,11 @@ class DriftMeterReadingRepository implements MeterReadingRepository {
   Stream<MeterReadingPage> watchPageForMeter(
     String meterId, {
     required int limit,
+    int offset = 0,
     String query = '',
   }) {
     if (limit <= 0) throw ArgumentError.value(limit, 'limit');
+    if (offset < 0) throw ArgumentError.value(offset, 'offset');
     final normalizedQuery = query.trim().toLowerCase();
     final searchPredicate = _searchPredicate(normalizedQuery);
     final pageQuery = database.select(database.readingRecords)
@@ -134,17 +136,19 @@ class DriftMeterReadingRepository implements MeterReadingRepository {
         (row) => OrderingTerm.desc(row.storedAtMillis),
         (row) => OrderingTerm.desc(row.id),
       ])
-      ..limit(limit + 1);
+      ..limit(limit + 1, offset: offset);
     return pageQuery.watch().asyncMap((rows) async {
       final totalCount = await _countForMeter(meterId);
       final matchingCount = searchPredicate == null
           ? totalCount
           : await _countForMeter(meterId, searchPredicate: searchPredicate);
-      final latestReading = searchPredicate == null && rows.isNotEmpty
+      final latestReading =
+          offset == 0 && searchPredicate == null && rows.isNotEmpty
           ? _readingFromRow(rows.first)
           : await _latestForMeter(meterId);
       final visibleRows = rows.take(limit).toList(growable: false);
       return MeterReadingPage(
+        offset: offset,
         readings: visibleRows.map(_readingFromRow).toList(growable: false),
         totalCount: totalCount,
         matchingCount: matchingCount,

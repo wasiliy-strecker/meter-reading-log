@@ -18,6 +18,7 @@ abstract interface class MeterReadingRepository {
   Stream<MeterReadingPage> watchPageForMeter(
     String meterId, {
     required int limit,
+    int offset = 0,
     String query = '',
   });
   Future<List<MeterReading>> loadAll();

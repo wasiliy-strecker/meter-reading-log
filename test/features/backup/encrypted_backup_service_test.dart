@@ -17,6 +17,50 @@ import '../../support/fakes.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test(
+    'hourly reminder start survives an encrypted backup and rescheduling',
+    () async {
+      final temp = await Directory.systemTemp.createTemp('hourly_backup_test_');
+      addTearDown(() => temp.delete(recursive: true));
+      final start = DateTime.utc(2030, 9, 15, 12, 30);
+      final meter = _meter().copyWith(
+        reminder: ReadingReminderSchedule(
+          interval: ReminderInterval.hourly,
+          day: 1,
+          hour: 14,
+          minute: 30,
+          startsAt: start,
+        ),
+      );
+      final sourceMeters = MemoryMeterRepository()..items[meter.id] = meter;
+      final source = EncryptedBackupService(
+        meters: sourceMeters,
+        readings: MemoryReadingRepository(),
+        exports: MemoryEvidenceExportRepository(),
+        reminders: NoopMeterReminderRepository(),
+        kdfIterations: 1000,
+        temporaryDirectoryProvider: () async => temp,
+        documentsDirectoryProvider: () async => temp,
+      );
+      final backup = await source.create('123456');
+      final targetRoot = await Directory('${temp.path}/restored').create();
+      final restoredMeters = MemoryMeterRepository();
+      final reminders = NoopMeterReminderRepository();
+      final target = EncryptedBackupService(
+        meters: restoredMeters,
+        readings: MemoryReadingRepository(),
+        exports: MemoryEvidenceExportRepository(),
+        reminders: reminders,
+        kdfIterations: 1000,
+        temporaryDirectoryProvider: () async => targetRoot,
+        documentsDirectoryProvider: () async => targetRoot,
+      );
+      await target.restore(backup.path, '123456');
+      expect(restoredMeters.items[meter.id]!.reminder!.startsAt, start);
+      expect(reminders.scheduledMeters.single.reminder!.startsAt, start);
+    },
+  );
+
   test('accepts six-character passwords and rejects shorter ones', () async {
     final temp = await Directory.systemTemp.createTemp('backup_password_test_');
     addTearDown(() => temp.delete(recursive: true));

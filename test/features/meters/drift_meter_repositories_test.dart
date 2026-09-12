@@ -4,9 +4,11 @@ import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:meter_reading_log/core/persistence/app_database.dart';
 import 'package:meter_reading_log/features/meters/data/drift_meter_repositories.dart';
+import 'package:meter_reading_log/features/meters/data/in_memory_meter_repositories.dart';
 import 'package:meter_reading_log/features/evidence/domain/evidence_export.dart';
 import 'package:meter_reading_log/features/meters/domain/meter.dart';
 import 'package:meter_reading_log/features/meters/domain/meter_reading.dart';
+import 'package:meter_reading_log/features/meters/domain/meter_reading_order.dart';
 import 'package:meter_reading_log/features/meters/domain/reading_value.dart';
 
 void main() {
@@ -23,6 +25,45 @@ void main() {
   });
 
   tearDown(() => database.close());
+
+  test(
+    'Drift and memory pages agree on equal timestamps without duplicates',
+    () async {
+      final memory = InMemoryMeterReadingRepository();
+      addTearDown(memory.dispose);
+      final meter = _meter();
+      await meters.save(meter);
+      final entries = List.generate(
+        30,
+        (i) => _historyReading(
+          meter,
+          index: i,
+          capturedAt: DateTime.utc(2026, 9, 1),
+          note: '',
+        ),
+      );
+      for (final reading in entries) {
+        await readings.save(reading);
+        await memory.save(reading);
+      }
+      entries.sort(compareReadingsNewestFirst);
+      for (final repository in [readings, memory]) {
+        final first = await repository
+            .watchPageForMeter(meter.id, limit: 20)
+            .first;
+        final second = await repository
+            .watchPageForMeter(meter.id, limit: 20, offset: 20)
+            .first;
+        expect(
+          [...first.readings, ...second.readings].map((r) => r.id),
+          entries.map((r) => r.id),
+        );
+        expect(first.olderNeighbor!.id, second.readings.first.id);
+        expect(second.latestReading!.id, entries.first.id);
+        expect(second.hasMore, isFalse);
+      }
+    },
+  );
 
   test('persists meter, reading and append-only revision', () async {
     final meter = _meter();
@@ -176,6 +217,31 @@ void main() {
       expect(firstPage.latestReading?.id, 'history_44');
       expect(firstPage.olderNeighbor?.id, 'history_24');
 
+      final secondPage = await readings
+          .watchPageForMeter(meter.id, limit: 20, offset: 20)
+          .first;
+      expect(secondPage.offset, 20);
+      expect(secondPage.readings, hasLength(20));
+      expect(secondPage.readings.first.id, 'history_24');
+      expect(secondPage.readings.last.id, 'history_5');
+      expect(secondPage.olderNeighbor?.id, 'history_4');
+      expect(secondPage.latestReading?.id, 'history_44');
+      expect(secondPage.hasMore, isTrue);
+      final lastPage = await readings
+          .watchPageForMeter(meter.id, limit: 20, offset: 40)
+          .first;
+      expect(lastPage.readings, hasLength(5));
+      expect(lastPage.hasMore, isFalse);
+      expect(lastPage.olderNeighbor, isNull);
+      expect(
+        {
+          ...firstPage.readings,
+          ...secondPage.readings,
+          ...lastPage.readings,
+        }.map((r) => r.id).toSet(),
+        hasLength(45),
+      );
+
       final valueMatch = await readings
           .watchPageForMeter(meter.id, limit: 20, query: '1044,0')
           .first;
@@ -234,6 +300,23 @@ void main() {
     expect(page.totalCount, readingCount);
     expect(page.olderNeighbor, isNotNull);
     expect(stopwatch.elapsed, lessThan(const Duration(seconds: 5)));
+    final lastPage = await readings
+        .watchPageForMeter(meter.id, limit: 20, offset: 4980)
+        .first;
+    expect(lastPage.readings, hasLength(20));
+    expect(lastPage.latestReading?.id, 'long_history_4999');
+    expect(lastPage.hasMore, isFalse);
+    final searchPage = await readings
+        .watchPageForMeter(
+          meter.id,
+          limit: 20,
+          offset: 200,
+          query: 'Langzeittest',
+        )
+        .first;
+    expect(searchPage.readings, hasLength(20));
+    expect(searchPage.matchingCount, 5000);
+    expect(searchPage.readings.first.id, 'long_history_4799');
   });
 
   test(

@@ -27,6 +27,7 @@ internal data class StoredReminder(
     val hour: Int,
     val minute: Int,
     val deliveryMode: String,
+    val startsAtMillis: Long? = null,
 ) {
     val isPunctual: Boolean
         get() = deliveryMode == "punctualWithSound"
@@ -44,12 +45,21 @@ internal data class StoredReminder(
         .put("hour", hour)
         .put("minute", minute)
         .put("deliveryMode", deliveryMode)
+        .put("startsAtMillis", startsAtMillis)
         .toString()
 
     fun nextTriggerAfter(
         nowMillis: Long,
         zoneId: ZoneId = ZoneId.systemDefault(),
     ): Long {
+        if (interval == "hourly") {
+            val start = requireNotNull(startsAtMillis) {
+                "An hourly reminder needs a start timestamp"
+            }
+            if (start > nowMillis) return start
+            val hourMillis = 60L * 60L * 1000L
+            return start + ((nowMillis - start) / hourMillis + 1L) * hourMillis
+        }
         val now = Instant.ofEpochMilli(nowMillis).atZone(zoneId)
         val time = LocalTime.of(hour.coerceIn(0, 23), minute.coerceIn(0, 59))
         val candidate = when (interval) {
@@ -158,7 +168,9 @@ internal data class StoredReminder(
                 hour = json.getInt("hour"),
                 minute = json.getInt("minute"),
                 deliveryMode = json.optString("deliveryMode", "normal"),
-            )
+                startsAtMillis = if (json.isNull("startsAtMillis")) null
+                    else json.getLong("startsAtMillis"),
+            ).takeIf { it.interval != "hourly" || it.startsAtMillis != null }
         } catch (_: Exception) {
             null
         }

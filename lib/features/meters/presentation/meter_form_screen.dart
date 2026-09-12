@@ -9,6 +9,7 @@ import '../../../app/app_providers.dart';
 import '../../../app/widgets/app_snack_bar.dart';
 import '../../../app/widgets/confirm_dialog.dart';
 import '../../../core/reminders/local_notification_reminder_repository.dart';
+import '../../../core/utils/formatters.dart';
 import '../domain/meter.dart';
 import '../domain/meter_reading.dart';
 import 'meter_unit_field.dart';
@@ -25,6 +26,7 @@ typedef _MeterFormSnapshot = ({
   int? month,
   int? hour,
   int? minute,
+  DateTime? startsAt,
   ReminderDeliveryMode? deliveryMode,
 });
 
@@ -79,6 +81,7 @@ class _MeterFormState extends ConsumerState<_MeterForm>
   late int _weekday;
   late int _month;
   late TimeOfDay _time;
+  late DateTime _hourlyStartsAt;
   late ReminderDeliveryMode _deliveryMode;
   late final _MeterFormSnapshot _initialSnapshot;
   bool _saving = false;
@@ -103,6 +106,20 @@ class _MeterFormState extends ConsumerState<_MeterForm>
         : savedUnit;
     final reminder = meter?.reminder;
     final now = DateTime.now();
+    _hourlyStartsAt =
+        reminder?.startsAt?.toLocal() ??
+        now
+            .toUtc()
+            .subtract(
+              Duration(
+                minutes: now.minute,
+                seconds: now.second,
+                milliseconds: now.millisecond,
+                microseconds: now.microsecond,
+              ),
+            )
+            .add(const Duration(hours: 1))
+            .toLocal();
     _reminderEnabled = reminder != null;
     _interval = reminder?.interval ?? ReminderInterval.monthly;
     if (!kDebugMode && _interval == ReminderInterval.minutely) {
@@ -333,6 +350,46 @@ class _MeterFormState extends ConsumerState<_MeterForm>
                               ),
                             ],
                           ),
+                        ] else if (_interval == ReminderInterval.hourly) ...[
+                          Text(
+                            'Startdatum',
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                          Text(
+                            formatDate(_hourlyStartsAt),
+                            key: const ValueKey('hourly-start-date'),
+                          ),
+                          const SizedBox(height: 8),
+                          OutlinedButton.icon(
+                            key: const ValueKey('hourly-pick-date'),
+                            onPressed: _saving ? null : _pickHourlyDate,
+                            icon: const Icon(Icons.calendar_month_outlined),
+                            label: const Text('Datum ändern'),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Startzeit',
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                          Text(
+                            TimeOfDay.fromDateTime(
+                              _hourlyStartsAt,
+                            ).format(context),
+                            key: const ValueKey('hourly-start-time'),
+                          ),
+                          const SizedBox(height: 8),
+                          OutlinedButton.icon(
+                            key: const ValueKey('hourly-pick-time'),
+                            onPressed: _saving ? null : _pickHourlyTime,
+                            icon: const Icon(Icons.schedule_outlined),
+                            label: const Text('Uhrzeit ändern'),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Ab dem gewählten Start alle 60 Minuten. '
+                            'Nächste Erinnerung: ${formatDateTime(nextReminderDate(ReadingReminderSchedule(interval: ReminderInterval.hourly, day: 1, hour: _hourlyStartsAt.hour, minute: _hourlyStartsAt.minute, startsAt: _hourlyStartsAt), DateTime.now()))} Uhr.',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
                         ] else ...[
                           Align(
                             alignment: Alignment.centerLeft,
@@ -503,15 +560,25 @@ class _MeterFormState extends ConsumerState<_MeterForm>
       day: switch (interval) {
         ReminderInterval.weekly => _weekday,
         ReminderInterval.monthly || ReminderInterval.yearly => _dayOfMonth,
-        ReminderInterval.minutely || ReminderInterval.daily || null => null,
+        ReminderInterval.minutely ||
+        ReminderInterval.hourly ||
+        ReminderInterval.daily ||
+        null => null,
       },
       month: interval == ReminderInterval.yearly ? _month : null,
       hour: interval == null || interval == ReminderInterval.minutely
           ? null
+          : interval == ReminderInterval.hourly
+          ? _hourlyStartsAt.hour
           : _time.hour,
       minute: interval == null || interval == ReminderInterval.minutely
           ? null
+          : interval == ReminderInterval.hourly
+          ? _hourlyStartsAt.minute
           : _time.minute,
+      startsAt: interval == ReminderInterval.hourly
+          ? _hourlyStartsAt.toUtc()
+          : null,
       deliveryMode: interval == null ? null : _deliveryMode,
     );
   }
@@ -587,11 +654,20 @@ class _MeterFormState extends ConsumerState<_MeterForm>
               ReminderInterval.weekly => _weekday,
               ReminderInterval.monthly ||
               ReminderInterval.yearly => _dayOfMonth,
-              ReminderInterval.minutely || ReminderInterval.daily => 1,
+              ReminderInterval.minutely ||
+              ReminderInterval.hourly ||
+              ReminderInterval.daily => 1,
             },
             month: _interval == ReminderInterval.yearly ? _month : null,
-            hour: _time.hour,
-            minute: _time.minute,
+            hour: _interval == ReminderInterval.hourly
+                ? _hourlyStartsAt.hour
+                : _time.hour,
+            minute: _interval == ReminderInterval.hourly
+                ? _hourlyStartsAt.minute
+                : _time.minute,
+            startsAt: _interval == ReminderInterval.hourly
+                ? _hourlyStartsAt.toUtc()
+                : null,
             deliveryMode: _deliveryMode,
           )
         : null;
@@ -655,6 +731,54 @@ class _MeterFormState extends ConsumerState<_MeterForm>
     FocusScope.of(context).unfocus();
     final value = await showTimePicker(context: context, initialTime: _time);
     if (value != null && mounted) setState(() => _time = value);
+  }
+
+  Future<void> _pickHourlyDate() async {
+    FocusScope.of(context).unfocus();
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _hourlyStartsAt,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100, 12, 31),
+    );
+    if (!mounted || date == null) return;
+    _setHourlyStart(date, TimeOfDay.fromDateTime(_hourlyStartsAt));
+  }
+
+  Future<void> _pickHourlyTime() async {
+    FocusScope.of(context).unfocus();
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(_hourlyStartsAt),
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+        child: child!,
+      ),
+    );
+    if (!mounted || time == null) return;
+    _setHourlyStart(_hourlyStartsAt, time);
+  }
+
+  void _setHourlyStart(DateTime date, TimeOfDay time) {
+    final candidate = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time.hour,
+      time.minute,
+    );
+    if (candidate.hour != time.hour ||
+        candidate.minute != time.minute ||
+        candidate.day != date.day) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        AppSnackBar(
+          message:
+              'Diese Uhrzeit ist wegen der Zeitumstellung nicht verfügbar. Bitte wähle eine andere Uhrzeit.',
+        ),
+      );
+      return;
+    }
+    setState(() => _hourlyStartsAt = candidate);
   }
 
   Future<void> _selectDeliveryMode(ReminderDeliveryMode mode) async {

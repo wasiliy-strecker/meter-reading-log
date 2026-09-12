@@ -139,6 +139,60 @@ void main() {
     expect(reminder.day, DateTime.monday);
   });
 
+  testWidgets('hourly reminder saves an editable start date and time', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(430, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final meters = MemoryMeterRepository();
+    final reminders = NoopMeterReminderRepository();
+    await tester.pumpWidget(_testApp(meters: meters, reminders: reminders));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Zähler anlegen'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Bezeichnung *'),
+      'Strom stündlich',
+    );
+    await tester.tap(find.text('Ableseerinnerung'));
+    await tester.pumpAndSettle();
+    final interval = find.byType(DropdownButtonFormField<ReminderInterval>);
+    await tester.tap(interval);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Stündlich').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Startdatum'), findsOneWidget);
+    expect(find.text('Startzeit'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('hourly-pick-date')));
+    await tester.pumpAndSettle();
+    tester
+        .widget<CalendarDatePicker>(find.byType(CalendarDatePicker))
+        .onDateChanged(DateTime(2030, 9, 15));
+    await tester.pump();
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    expect(find.text('15.09.2030'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('hourly-pick-time')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.keyboard_outlined));
+    await tester.pumpAndSettle();
+    final inputs = find.descendant(
+      of: find.byType(TimePickerDialog),
+      matching: find.byType(TextFormField),
+    );
+    await tester.enterText(inputs.at(0), '14');
+    await tester.enterText(inputs.at(1), '30');
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    expect(find.text('14:30'), findsOneWidget);
+    await tester.tap(find.text('Zähler speichern'));
+    await tester.pumpAndSettle();
+    final stored = meters.items.values.single.reminder!;
+    expect(stored.interval, ReminderInterval.hourly);
+    expect(stored.startsAt, DateTime(2030, 9, 15, 14, 30).toUtc());
+    expect(reminders.scheduledMeters.last.reminder!.startsAt, stored.startsAt);
+  });
+
   testWidgets('normal reminder test shows progress and uses meter details', (
     tester,
   ) async {

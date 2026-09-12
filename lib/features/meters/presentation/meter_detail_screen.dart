@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:universal_io/io.dart';
 
 import 'package:flutter/material.dart';
@@ -19,6 +17,7 @@ import '../../evidence/presentation/evidence_photo_mode_sheet.dart';
 import '../domain/meter.dart';
 import '../domain/meter_reading.dart';
 import 'meter_visuals.dart';
+import 'reading_history_tile.dart';
 
 class MeterDetailScreen extends ConsumerStatefulWidget {
   const MeterDetailScreen({super.key, required this.meterId});
@@ -30,23 +29,10 @@ class MeterDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
-  static const _historyPageSize = 20;
+  static const _historyPreviewSize = 5;
 
   bool _exporting = false;
   final Set<String> _deletingExportIds = {};
-  final TextEditingController _historySearchController =
-      TextEditingController();
-  Timer? _historySearchDebounce;
-  int _visibleReadingLimit = _historyPageSize;
-  String _historyQuery = '';
-
-  @override
-  void dispose() {
-    _historySearchDebounce?.cancel();
-    _historySearchController.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     final meterAsync = ref.watch(meterByIdProvider(widget.meterId));
@@ -95,8 +81,9 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
     final historyPageAsync = ref.watch(
       meterHistoryPageProvider((
         meterId: meter.id,
-        limit: _visibleReadingLimit,
-        query: _historyQuery,
+        limit: _historyPreviewSize,
+        offset: 0,
+        query: '',
       )),
     );
     final exportsAsync = ref.watch(evidenceForMeterProvider(meter.id));
@@ -120,7 +107,6 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
           child: Text('Ablesungen konnten nicht geladen werden.'),
         ),
         data: (page) {
-          final searchActive = _historyQuery.isNotEmpty;
           return ListView.builder(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 112),
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
@@ -164,56 +150,47 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    if (page.totalCount >= _historyPageSize) ...[
-                      const SizedBox(height: 10),
-                      _HistorySearchField(
-                        controller: _historySearchController,
-                        onChanged: _onHistorySearchChanged,
-                        onClear: _clearHistorySearch,
-                      ),
-                    ],
                     if (page.totalCount > 0) ...[
-                      const SizedBox(height: 10),
-                      _HistoryResultCount(
-                        visibleCount: page.readings.length,
-                        totalCount: page.totalCount,
-                        matchingCount: page.matchingCount,
-                        searchActive: searchActive,
+                      const SizedBox(height: 8),
+                      Text(
+                        page.totalCount == 1
+                            ? '1 Ablesung'
+                            : '${page.readings.length} von ${page.totalCount} Ablesungen',
+                        style: Theme.of(context).textTheme.labelLarge,
                       ),
                     ],
                     const SizedBox(height: 8),
                     if (page.totalCount == 0)
-                      _EmptyReadings(onTap: captureReading)
-                    else if (page.matchingCount == 0)
-                      _EmptyHistorySearch(onClear: _clearHistorySearch),
+                      _EmptyReadings(onTap: captureReading),
                   ],
                 );
               }
 
               final readingIndex = index - 1;
               if (readingIndex < page.readings.length) {
-                final previous = searchActive
-                    ? null
-                    : readingIndex + 1 < page.readings.length
+                final previous = readingIndex + 1 < page.readings.length
                     ? page.readings[readingIndex + 1]
                     : page.olderNeighbor;
-                return _ReadingTile(
+                return ReadingHistoryTile(
                   reading: page.readings[readingIndex],
                   previous: previous,
-                  showDelta: !searchActive,
+                  showDelta: true,
                 );
               }
 
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (page.hasMore) ...[
+                  if (page.totalCount > 0) ...[
                     const SizedBox(height: 4),
                     OutlinedButton.icon(
-                      key: const ValueKey('show-more-readings'),
-                      onPressed: _showMoreReadings,
-                      icon: const Icon(Icons.expand_more),
-                      label: const Text('Weitere 20 anzeigen'),
+                      key: const ValueKey('open-meter-history'),
+                      onPressed: () => context.pushNamed(
+                        'meterHistory',
+                        pathParameters: {'id': meter.id},
+                      ),
+                      icon: const Icon(Icons.manage_search_outlined),
+                      label: const Text('Alle Ablesungen anzeigen'),
                     ),
                   ],
                 ],
@@ -228,39 +205,6 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
         label: const Text('Ablesen / Fotografieren'),
       ),
     );
-  }
-
-  void _onHistorySearchChanged(String value) {
-    setState(() {});
-    _historySearchDebounce?.cancel();
-    _historySearchDebounce = Timer(const Duration(milliseconds: 250), () {
-      if (!mounted) return;
-      final query = value.trim();
-      if (query == _historyQuery && _visibleReadingLimit == _historyPageSize) {
-        return;
-      }
-      setState(() {
-        _historyQuery = query;
-        _visibleReadingLimit = _historyPageSize;
-      });
-    });
-  }
-
-  void _clearHistorySearch() {
-    _historySearchDebounce?.cancel();
-    _historySearchController.clear();
-    if (_historyQuery.isEmpty && _visibleReadingLimit == _historyPageSize) {
-      setState(() {});
-      return;
-    }
-    setState(() {
-      _historyQuery = '';
-      _visibleReadingLimit = _historyPageSize;
-    });
-  }
-
-  void _showMoreReadings() {
-    setState(() => _visibleReadingLimit += _historyPageSize);
   }
 
   Future<void> _exportHistory(Meter meter) async {
@@ -529,116 +473,6 @@ String _readingCountLabel(int count) => switch (count) {
   _ => '$count Ablesungen enthalten',
 };
 
-class _HistorySearchField extends StatelessWidget {
-  const _HistorySearchField({
-    required this.controller,
-    required this.onChanged,
-    required this.onClear,
-  });
-
-  final TextEditingController controller;
-  final ValueChanged<String> onChanged;
-  final VoidCallback onClear;
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      key: const ValueKey('history-search-field'),
-      controller: controller,
-      onChanged: onChanged,
-      textInputAction: TextInputAction.search,
-      decoration: InputDecoration(
-        labelText: 'Ablesungen suchen',
-        hintText: 'Datum, Zählerstand oder Notiz',
-        prefixIcon: const Icon(Icons.search),
-        suffixIcon: controller.text.isEmpty
-            ? null
-            : IconButton(
-                tooltip: 'Suche löschen',
-                onPressed: onClear,
-                icon: const Icon(Icons.close),
-              ),
-        border: const OutlineInputBorder(),
-      ),
-    );
-  }
-}
-
-class _HistoryResultCount extends StatelessWidget {
-  const _HistoryResultCount({
-    required this.visibleCount,
-    required this.totalCount,
-    required this.matchingCount,
-    required this.searchActive,
-  });
-
-  final int visibleCount;
-  final int totalCount;
-  final int matchingCount;
-  final bool searchActive;
-
-  @override
-  Widget build(BuildContext context) {
-    final label = searchActive
-        ? matchingCount == 1
-              ? '1 Treffer'
-              : visibleCount < matchingCount
-              ? '$visibleCount von $matchingCount Treffern'
-              : '$matchingCount Treffer'
-        : totalCount == 1
-        ? '1 Ablesung'
-        : visibleCount < totalCount
-        ? '$visibleCount von $totalCount Ablesungen'
-        : '$totalCount Ablesungen';
-    return Text(
-      label,
-      key: const ValueKey('history-result-count'),
-      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-        fontWeight: FontWeight.w700,
-      ),
-    );
-  }
-}
-
-class _EmptyHistorySearch extends StatelessWidget {
-  const _EmptyHistorySearch({required this.onClear});
-
-  final VoidCallback onClear;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            Icon(Icons.search_off_outlined, size: 36, color: colors.primary),
-            const SizedBox(height: 10),
-            const Text(
-              'Keine passende Ablesung gefunden.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              'Suche nach Datum, Zählerstand oder einem Wort aus der Notiz.',
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
-            TextButton.icon(
-              onPressed: onClear,
-              icon: const Icon(Icons.close),
-              label: const Text('Suche löschen'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _MeterHeader extends StatelessWidget {
   const _MeterHeader({
     required this.meter,
@@ -718,6 +552,8 @@ String _reminderSummary(ReadingReminderSchedule reminder) {
       '${reminder.hour.toString().padLeft(2, '0')}:${reminder.minute.toString().padLeft(2, '0')} Uhr';
   final schedule = switch (reminder.interval) {
     ReminderInterval.minutely => 'minütlich (Dev)',
+    ReminderInterval.hourly =>
+      'stündlich ab ${formatDateTime(reminder.startsAt!)} Uhr',
     ReminderInterval.daily => 'täglich um $time',
     ReminderInterval.weekly =>
       'wöchentlich am ${reminderWeekdayLabel(reminder.day)} um $time',
@@ -728,187 +564,6 @@ String _reminderSummary(ReadingReminderSchedule reminder) {
   return reminder.deliveryMode == ReminderDeliveryMode.punctualWithSound
       ? '$schedule · pünktlich mit Ton'
       : schedule;
-}
-
-class _ReadingTile extends StatelessWidget {
-  const _ReadingTile({
-    required this.reading,
-    required this.showDelta,
-    this.previous,
-  });
-
-  final MeterReading reading;
-  final MeterReading? previous;
-  final bool showDelta;
-
-  @override
-  Widget build(BuildContext context) {
-    final meterAccent = meterColor(reading.meter.type);
-    final sameUnit =
-        previous == null || previous!.meter.unit == reading.meter.unit;
-    final delta = !showDelta || previous == null || !sameUnit
-        ? null
-        : reading.value.difference(previous!.value).germanFormatted;
-    return Card(
-      key: ValueKey('reading-card-${reading.id}'),
-      margin: const EdgeInsets.only(bottom: 10),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => context.pushNamed(
-          'readingDetail',
-          pathParameters: {'id': reading.id},
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Semantics(
-                label: 'Abgelesen am ${formatDateTime(reading.capturedAt)} Uhr',
-                child: SizedBox(
-                  width: double.infinity,
-                  child: DecoratedBox(
-                    key: ValueKey('reading-date-badge-${reading.id}'),
-                    decoration: BoxDecoration(
-                      color: meterAccent.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.calendar_month_outlined,
-                            size: 17,
-                            color: meterAccent,
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              'Abgelesen · ${formatDateTime(reading.capturedAt)} Uhr',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.labelLarge
-                                  ?.copyWith(
-                                    color: meterAccent,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  _ReadingPhotoThumbnail(reading: reading),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Zählerstand',
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurfaceVariant,
-                                fontWeight: FontWeight.w700,
-                              ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${reading.value.displayText} ${reading.meter.unit}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(fontWeight: FontWeight.w900),
-                        ),
-                        if (showDelta && previous != null && !sameUnit) ...[
-                          const SizedBox(height: 8),
-                          const Text('Einheit seit dieser Ablesung gewechselt'),
-                        ] else if (delta != null) ...[
-                          const SizedBox(height: 8),
-                          Text('Δ $delta ${reading.meter.unit}'),
-                        ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Icon(
-                    Icons.chevron_right,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ],
-              ),
-              if (reading.note.trim().isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      Icons.notes_outlined,
-                      size: 18,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        reading.note.trim(),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ReadingPhotoThumbnail extends StatelessWidget {
-  const _ReadingPhotoThumbnail({required this.reading});
-
-  final MeterReading reading;
-
-  @override
-  Widget build(BuildContext context) {
-    final fallbackColor = Theme.of(context).colorScheme.primaryContainer;
-    return Semantics(
-      label: 'Foto zur Ablesung ${reading.value.displayText}',
-      image: true,
-      child: ClipRRect(
-        key: ValueKey('reading-thumbnail-${reading.id}'),
-        borderRadius: BorderRadius.circular(14),
-        child: SizedBox.square(
-          dimension: 92,
-          child: Image.file(
-            File(reading.photoPath),
-            fit: BoxFit.cover,
-            cacheWidth: 240,
-            errorBuilder: (_, _, _) => ColoredBox(
-              color: fallbackColor,
-              child: const Icon(Icons.broken_image_outlined, size: 30),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class _EmptyReadings extends StatelessWidget {
