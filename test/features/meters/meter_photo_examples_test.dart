@@ -3,7 +3,6 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:meter_reading_log/app/app_theme.dart';
@@ -13,24 +12,23 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('previews are small JPEGs rather than full-size original fixtures', () {
+    var totalBytes = 0;
     for (final example in meterPhotoExamples) {
       expect(example.asset, startsWith('assets/dev/meter_photo_examples/'));
       expect(example.asset, endsWith('.jpg'));
       final bytes = File(example.asset).readAsBytesSync();
+      totalBytes += bytes.length;
       expect(bytes.length, lessThanOrEqualTo(150 * 1024));
       final decoded = img.decodeJpg(bytes)!;
       expect(decoded.width, lessThanOrEqualTo(1024));
       expect(decoded.height, lessThanOrEqualTo(1024));
     }
+    expect(totalBytes, lessThanOrEqualTo(400 * 1024));
   });
 
   test(
-    'visibility and bundled images are restricted to the dev flavor',
+    'all four compact examples are bundled in every flavor without originals',
     () async {
-      final container = ProviderContainer();
-      addTearDown(container.dispose);
-      final isDev = appFlavor == 'dev';
-      expect(container.read(meterPhotoExamplesEnabledProvider), isDev);
       final manifest = await AssetManifest.loadFromAssetBundle(rootBundle);
       final bundledExamples = manifest.listAssets().where(
         (asset) => asset.contains('meter_photo_examples/'),
@@ -41,22 +39,23 @@ void main() {
       );
       expect(
         bundledExamples,
-        unorderedEquals(isDev ? meterPhotoExamples.map((e) => e.asset) : []),
+        unorderedEquals(meterPhotoExamples.map((e) => e.asset)),
       );
       for (final example in meterPhotoExamples) {
-        if (isDev) {
-          expect(
-            (await rootBundle.load(example.asset)).lengthInBytes,
-            greaterThan(0),
-          );
-        }
+        final bundledBytes = await rootBundle.load(example.asset);
+        expect(
+          bundledBytes.buffer.asUint8List(
+            bundledBytes.offsetInBytes,
+            bundledBytes.lengthInBytes,
+          ),
+          File(example.asset).readAsBytesSync(),
+        );
       }
     },
   );
 
   Future<_ExampleAssetBundle> pumpButton(
     WidgetTester tester, {
-    bool visible = true,
     bool enabled = true,
     double textScale = 1,
     bool dark = false,
@@ -64,34 +63,29 @@ void main() {
   }) async {
     final bundle = _ExampleAssetBundle(failImages: failImages);
     await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          meterPhotoExamplesEnabledProvider.overrideWithValue(visible),
-        ],
-        child: DefaultAssetBundle(
-          bundle: bundle,
-          child: MaterialApp(
-            theme: dark ? AppTheme.dark() : AppTheme.light(),
-            builder: (context, child) => MediaQuery(
-              data: MediaQuery.of(
-                context,
-              ).copyWith(textScaler: TextScaler.linear(textScale)),
-              child: child!,
-            ),
-            home: Scaffold(body: MeterPhotoExamplesButton(enabled: enabled)),
+      DefaultAssetBundle(
+        bundle: bundle,
+        child: MaterialApp(
+          theme: dark ? AppTheme.dark() : AppTheme.light(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: TextScaler.linear(textScale)),
+            child: child!,
           ),
+          home: Scaffold(body: MeterPhotoExamplesButton(enabled: enabled)),
         ),
       ),
     );
     return bundle;
   }
 
-  testWidgets('hidden in non-dev UI without loading example images', (
+  testWidgets('visible by default without loading example images early', (
     tester,
   ) async {
-    final bundle = await pumpButton(tester, visible: false);
+    final bundle = await pumpButton(tester);
 
-    expect(find.text('Beispiele ansehen'), findsNothing);
+    expect(find.text('Beispiele ansehen'), findsOneWidget);
     expect(bundle.loadedImages, isEmpty);
   });
 
@@ -236,8 +230,8 @@ class _ExampleAssetBundle extends CachingAssetBundle {
     if (!key.contains('meter_photo_examples/')) return rootBundle.load(key);
     loadedImages.add(key);
     if (failImages) throw FlutterError('Synthetic missing image');
-    // Tiny, synthetic image keeps layout tests independent of the selected
-    // flavor. Actual asset inclusion/exclusion is verified above in each flavor.
+    // Tiny, synthetic image keeps layout tests fast. The real bundled previews
+    // are verified against the committed files above in each flavor.
     return ByteData.sublistView(
       base64Decode(
         'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',

@@ -98,8 +98,7 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
               const _CaptureGuidance(),
               // The card contributes 4px of bottom margin: 14 + 4 gives the
               // same visible 18px gap as below the examples button.
-              if (ref.watch(meterPhotoExamplesEnabledProvider))
-                const SizedBox(height: 14),
+              const SizedBox(height: 14),
               MeterPhotoExamplesButton(enabled: !_working),
               const SizedBox(height: 18),
               FilledButton.icon(

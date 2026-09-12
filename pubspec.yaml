@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+3
+version: 1.0.0+4
 
 environment:
   sdk: ^3.11.5
@@ -87,19 +87,12 @@ flutter:
   assets:
     - assets/fonts/Roboto-Regular.ttf
     - assets/fonts/Roboto-Bold.ttf
-    # Synthetic viewing examples: never include these in the Store variant.
-    - path: assets/dev/meter_photo_examples/01_strom_digital_001842-7_kwh.jpg
-      flavors:
-        - dev
-    - path: assets/dev/meter_photo_examples/02_gas_mechanisch_004731-82_m3.jpg
-      flavors:
-        - dev
-    - path: assets/dev/meter_photo_examples/03_wasser_000286-4_m3.jpg
-      flavors:
-        - dev
-    - path: assets/dev/meter_photo_examples/04_strom_alt_012958-6_kwh.jpg
-      flavors:
-        - dev
+    # Small synthetic viewing examples for all variants; keep original PNGs out.
+    # The existing asset paths are retained from the initial Dev preview.
+    - assets/dev/meter_photo_examples/01_strom_digital_001842-7_kwh.jpg
+    - assets/dev/meter_photo_examples/02_gas_mechanisch_004731-82_m3.jpg
+    - assets/dev/meter_photo_examples/03_wasser_000286-4_m3.jpg
+    - assets/dev/meter_photo_examples/04_strom_alt_012958-6_kwh.jpg
 
   # To add assets to your application, add an assets section, like this:
   # assets:

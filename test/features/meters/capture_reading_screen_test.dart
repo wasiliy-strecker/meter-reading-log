@@ -13,7 +13,6 @@ import 'package:meter_reading_log/features/evidence/domain/evidence_export.dart'
 import 'package:meter_reading_log/features/meters/domain/meter.dart';
 import 'package:meter_reading_log/features/meters/domain/meter_reading.dart';
 import 'package:meter_reading_log/features/meters/domain/reading_value.dart';
-import 'package:meter_reading_log/features/meters/presentation/meter_photo_examples.dart';
 
 import '../../support/fakes.dart';
 
@@ -40,7 +39,6 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          meterPhotoExamplesEnabledProvider.overrideWithValue(true),
           meterRepositoryProvider.overrideWithValue(meters),
           meterReadingRepositoryProvider.overrideWithValue(readings),
           evidenceExportRepositoryProvider.overrideWithValue(

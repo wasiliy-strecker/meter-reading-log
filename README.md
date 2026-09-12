@@ -118,15 +118,18 @@ Store-Debug- und Store-Profile-Builds sind deaktiviert, damit lokale Entwicklung
 die Paketkennung der Play-Version nicht belegt. `flutter install` nicht verwenden,
 da es bestehende App-Daten bei einer Deinstallation verlieren kann.
 
-In der Dev-Variante öffnet „Beispiele ansehen“ vor der Fotoauswahl eine
+In Dev und Store öffnet „Beispiele ansehen“ vor der Fotoauswahl eine
 optionale Galerie mit vier synthetischen Zählerfotos, auch beim Ersetzen und
 Korrigieren. Die Bilder dienen ausschließlich zur Ansicht, werden erst beim
-Öffnen geladen und sind über `flavors: [dev]` vom Store-Asset-Bundle ausgeschlossen.
+Öffnen geladen. Ab `1.0.0+4` sind sie auch im internen Play-Test und in der
+Store-Version enthalten, ohne Entwickleroption oder zusätzliche Berechtigung.
 Gebündelt werden nur Vorschau-JPEGs unter `assets/dev/meter_photo_examples/`
 (maximal 1024 Pixel, 150 KiB pro Bild). Die großen Originale unter
 `test/manual_fixtures/meter_photos/` bleiben unverändert und werden nicht
 mitgeliefert. Vorschauen bei Bedarf mit
 `dart run scripts/prepare_meter_photo_examples.dart` aus dem App-Verzeichnis erzeugen.
+Der historische `assets/dev/`-Pfad bleibt bestehen; er beschränkt die Beispiele
+nicht mehr auf die Dev-Variante.
 
 Für einen Play-Store-Build muss `android/key.properties` anhand von
 `android/key.properties.example` eingerichtet sein und auf einen privaten

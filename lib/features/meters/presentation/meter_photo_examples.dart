@@ -1,12 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-// Keep visibility aligned with the dev-only assets in pubspec.yaml. Debug
-// mode alone is not sufficient: other flavors must not expose this preview.
-final meterPhotoExamplesEnabledProvider = Provider<bool>(
-  (ref) => appFlavor == 'dev',
-);
 
 const meterPhotoExamples = [
   (
@@ -27,25 +19,21 @@ const meterPhotoExamples = [
   ),
 ];
 
-class MeterPhotoExamplesButton extends ConsumerStatefulWidget {
+class MeterPhotoExamplesButton extends StatefulWidget {
   const MeterPhotoExamplesButton({super.key, this.enabled = true});
 
   final bool enabled;
 
   @override
-  ConsumerState<MeterPhotoExamplesButton> createState() =>
+  State<MeterPhotoExamplesButton> createState() =>
       _MeterPhotoExamplesButtonState();
 }
 
-class _MeterPhotoExamplesButtonState
-    extends ConsumerState<MeterPhotoExamplesButton> {
+class _MeterPhotoExamplesButtonState extends State<MeterPhotoExamplesButton> {
   bool _opening = false;
 
   @override
   Widget build(BuildContext context) {
-    if (!ref.watch(meterPhotoExamplesEnabledProvider)) {
-      return const SizedBox.shrink();
-    }
     return Align(
       alignment: Alignment.center,
       child: TextButton.icon(
