@@ -19,15 +19,20 @@ oder durch nicht deterministische Serialisierung geschwächt werden. Die App
 darf lokale Prüfsummen nicht als amtlichen Zeitstempel oder garantierte
 Beweiskraft bezeichnen.
 
-Vor jedem Commit ausführen:
+## Prüfungen nach Änderungsart
 
-```bash
-dart run build_runner build
-dart format lib test
-flutter analyze
-flutter test
-flutter build apk --debug --flavor dev
-```
+- Reine Dokumentationsänderungen: Inhalt, Konsistenz und `git diff --check`
+  prüfen. Keine Flutter-Codegenerierung, Analyse, Tests, Builds oder Geräteaktionen.
+- Dart-/UI-Änderungen: `dart format lib test`, `flutter analyze` und passende
+  fokussierte `flutter test <testdateien>` ausführen. Bei übergreifenden Änderungen
+  und vor Releases die vollständige Suite mit `flutter test` ausführen.
+- `dart run build_runner build` nur bei geänderten Generator-Eingaben oder
+  Generator-Konfiguration ausführen, etwa Drift-Schema oder Annotationen.
+- `flutter build apk --debug --flavor dev` nur bei einem konkreten Build-Grund
+  nach den folgenden Geräteregeln, nicht pauschal vor jedem Commit.
+
+Ein Commit oder Aufgabenabschluss allein ist kein Grund für einen APK-Build;
+auch kein zusätzlicher Hintergrund-„Prüfbuild“ bei reinen UI-Anpassungen.
 
 ## Android-Varianten und Gerätetests
 
@@ -57,8 +62,8 @@ kann auf ausdrücklichen Wunsch über die bestehende Wiederherstellung übertrag
 werden.
 
 Für Schrift-, Abstands- und andere reine Dart/UI-Anpassungen zuerst die laufende
-Dev-Verbindung mit Hot Reload aktualisieren; nicht für jede Vorschau ein APK
-neu installieren. `default-flavor: dev` in `pubspec.yaml` hält auch die
+Dev-Verbindung mit Hot Reload aktualisieren; dafür kein APK neu bauen oder
+installieren. `default-flavor: dev` in `pubspec.yaml` hält auch die
 Dev-Konstanten und Dev-Assets beim erneuten Verbinden korrekt:
 
 ```bash
@@ -66,6 +71,10 @@ flutter attach --debug --app-id com.appfactory.meter_reading_log.dev -d <device-
 ```
 
 Die Verbindung für weitere UI-Iterationen offen halten (`r` für Hot Reload).
+Änderungen an `main()`, `initState()`, Initialisierung oder von Hot Reload nicht
+unterstützte Dart-Änderungen bei Bedarf mit Hot Restart (`R`) übernehmen; das
+erfordert keinen APK-Build. Kompilierungsfehler zuerst beheben, nicht durch
+Neubau umgehen. Vor einem Neustart ungespeicherte Eingaben berücksichtigen.
 Falls die Verbindung zur manuell geöffneten App nicht klappt, die Dev-App bei
 einem sicheren UI-Zustand ohne ungespeicherte Eingaben mit Debug-Startparametern
 neu starten und erneut verbinden, statt sie zu installieren:
@@ -75,9 +84,23 @@ adb -s <device-id> shell am start -S -n com.appfactory.meter_reading_log.dev/com
 ```
 
 Hot Reload aktualisiert die laufende Sitzung, nicht das dauerhaft installierte
-APK. Die vorgeschriebenen Build-Prüfungen vor einem Commit bleiben davon getrennt;
-sie erfordern keine erneute Installation. Store-Release-Befehle geben weiterhin
-ausdrücklich `--flavor store` an.
+APK; das gilt auch für Hot Restart. Nicht behaupten, die Live-Änderung sei nach
+einem Kaltstart weiterhin installiert. Eine fehlende Live-Verbindung allein ist
+kein Build-Grund.
+
+Ein Dev-APK nur neu bauen, wenn nativer Code, native Plugins, Manifest,
+Berechtigungen oder Android-Buildkonfiguration geändert wurden, keine passende
+Dev-Installation vorhanden ist oder ausdrücklich ein dauerhaft aktualisiertes
+APK gewünscht wird. Den konkreten Grund vor dem Build kurz nennen.
+
+Bei Assets und Abhängigkeiten nur die nötige Vorbereitung durchführen, etwa
+`flutter pub get`, danach passend reloaden oder neu starten. Nicht jede Asset-,
+reine Dart-Paket- oder `pubspec.yaml`-Änderung verlangt einen APK-Build. Erst wenn
+die native Installation oder eine nicht über die Live-Sitzung aktualisierbare
+gebündelte Ressource betroffen ist, entsprechend neu bauen.
+
+Maßgeblich ist die [Flutter-Anleitung zu Hot Reload und Neustarts](https://docs.flutter.dev/tools/hot-reload).
+Store-Release-Befehle geben weiterhin ausdrücklich `--flavor store` an.
 
 Vor einem APK-Update die exakte Ziel-Paketkennung, installierte Version,
 Debug-Flag und Installer prüfen. Bei möglicher abweichender Signierung zuerst
@@ -107,7 +130,9 @@ ohne erneut nach Dev-/Store-Aufteilung, Datenumzug oder Neuinstallation zu frage
    hinter `+` erhöhen, größer als alle bekannten bereits hochgeladenen Codes.
    Den Versionsnamen nur bei fachlichem Anlass ändern. Normale Dev-Arbeit und
    Dokumentationsänderungen brauchen keine neue Release-Version.
-2. Die oben vorgeschriebenen Prüfungen ausführen, danach:
+2. Formatierung, Analyse und die vollständige Testsuite ausführen;
+   Codegenerierung nur bei betroffenen Generator-Eingaben oder Konfiguration.
+   Kein zusätzlicher Dev-APK-Build allein wegen des Releases. Danach:
 
    ```bash
    ./scripts/build_internal_test_aab.sh
