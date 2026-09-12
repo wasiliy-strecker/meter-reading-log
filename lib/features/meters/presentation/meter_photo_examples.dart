@@ -47,11 +47,19 @@ class _MeterPhotoExamplesButtonState
       return const SizedBox.shrink();
     }
     return Align(
-      alignment: Alignment.centerLeft,
+      alignment: Alignment.center,
       child: TextButton.icon(
         onPressed: widget.enabled && !_opening ? _showExamples : null,
-        icon: const Icon(Icons.collections_outlined, size: 20),
-        label: const Text('Beispiele ansehen'),
+        style: TextButton.styleFrom(
+          minimumSize: const Size(0, 48),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        icon: const Icon(Icons.collections_outlined, size: 22),
+        label: const Text('Beispiele ansehen', textAlign: TextAlign.center),
       ),
     );
   }

@@ -56,6 +56,29 @@ Dev und Store besitzen getrennte Daten und Android-Berechtigungen; ein Backup
 kann auf ausdrücklichen Wunsch über die bestehende Wiederherstellung übertragen
 werden.
 
+Für Schrift-, Abstands- und andere reine Dart/UI-Anpassungen zuerst die laufende
+Dev-Verbindung mit Hot Reload aktualisieren; nicht für jede Vorschau ein APK
+neu installieren. `default-flavor: dev` in `pubspec.yaml` hält auch die
+Dev-Konstanten und Dev-Assets beim erneuten Verbinden korrekt:
+
+```bash
+flutter attach --debug --app-id com.appfactory.meter_reading_log.dev -d <device-id>
+```
+
+Die Verbindung für weitere UI-Iterationen offen halten (`r` für Hot Reload).
+Falls die Verbindung zur manuell geöffneten App nicht klappt, die Dev-App bei
+einem sicheren UI-Zustand ohne ungespeicherte Eingaben mit Debug-Startparametern
+neu starten und erneut verbinden, statt sie zu installieren:
+
+```bash
+adb -s <device-id> shell am start -S -n com.appfactory.meter_reading_log.dev/com.appfactory.meter_reading_log.MainActivity --ez enable-dart-profiling true --ez enable-checked-mode true --ez verify-entry-points true
+```
+
+Hot Reload aktualisiert die laufende Sitzung, nicht das dauerhaft installierte
+APK. Die vorgeschriebenen Build-Prüfungen vor einem Commit bleiben davon getrennt;
+sie erfordern keine erneute Installation. Store-Release-Befehle geben weiterhin
+ausdrücklich `--flavor store` an.
+
 Vor einem APK-Update die exakte Ziel-Paketkennung, installierte Version,
 Debug-Flag und Installer prüfen. Bei möglicher abweichender Signierung zuerst
 die Zertifikate prüfen. Ein Play-App-Signing-Zertifikat muss nicht dem lokalen

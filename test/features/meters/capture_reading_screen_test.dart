@@ -68,6 +68,30 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Ablesen / Fotografieren'), findsWidgets);
 
+    final examplesButton = find.widgetWithText(TextButton, 'Beispiele ansehen');
+    final cameraButton = find.widgetWithText(
+      FilledButton,
+      'Zähler fotografieren',
+    );
+    final guidanceCard = find.ancestor(
+      of: find.text('Für eine gute Erkennung'),
+      matching: find.byType(Card),
+    );
+    final guidanceSurface = find.descendant(
+      of: guidanceCard,
+      matching: find.byType(Material),
+    );
+    final examplesBounds = tester.getRect(examplesButton);
+    final gapAbove =
+        examplesBounds.top - tester.getRect(guidanceSurface).bottom;
+    final gapBelow = tester.getRect(cameraButton).top - examplesBounds.bottom;
+    expect(
+      examplesBounds.center.dx,
+      closeTo(tester.getCenter(cameraButton).dx, 0.01),
+    );
+    expect(gapAbove, closeTo(18, 0.01));
+    expect(gapBelow, closeTo(gapAbove, 0.01));
+
     expect(find.text('Beispielfotos'), findsNothing);
     await tester.tap(find.text('Beispiele ansehen'));
     await tester.pumpAndSettle();

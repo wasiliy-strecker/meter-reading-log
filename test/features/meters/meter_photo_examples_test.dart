@@ -104,6 +104,25 @@ void main() {
     expect(bundle.loadedImages, isEmpty);
   });
 
+  testWidgets('example action is centered with a larger label and icon', (
+    tester,
+  ) async {
+    await pumpButton(tester);
+    final button = find.widgetWithText(TextButton, 'Beispiele ansehen');
+    expect(
+      tester.getCenter(button).dx,
+      closeTo(tester.getCenter(find.byType(Scaffold)).dx, 0.01),
+    );
+    final style = tester.widget<TextButton>(button).style!;
+    expect(style.textStyle!.resolve({})!.fontSize, 15);
+    expect(style.textStyle!.resolve({})!.fontWeight, FontWeight.w500);
+    expect(
+      tester.widget<Icon>(find.byIcon(Icons.collections_outlined)).size,
+      22,
+    );
+    expect(tester.getSize(button).height, greaterThanOrEqualTo(48));
+  });
+
   testWidgets('opens only on demand, supports swiping and arrows, and closes', (
     tester,
   ) async {
