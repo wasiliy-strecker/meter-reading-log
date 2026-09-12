@@ -104,7 +104,7 @@ void main() {
     expect(bundle.loadedImages, isEmpty);
   });
 
-  testWidgets('example action is centered with a larger label and icon', (
+  testWidgets('example action is centered with a compact label and icon', (
     tester,
   ) async {
     await pumpButton(tester);
@@ -114,11 +114,11 @@ void main() {
       closeTo(tester.getCenter(find.byType(Scaffold)).dx, 0.01),
     );
     final style = tester.widget<TextButton>(button).style!;
-    expect(style.textStyle!.resolve({})!.fontSize, 15);
+    expect(style.textStyle!.resolve({})!.fontSize, 14);
     expect(style.textStyle!.resolve({})!.fontWeight, FontWeight.w500);
     expect(
       tester.widget<Icon>(find.byIcon(Icons.collections_outlined)).size,
-      22,
+      20,
     );
     expect(tester.getSize(button).height, greaterThanOrEqualTo(48));
   });

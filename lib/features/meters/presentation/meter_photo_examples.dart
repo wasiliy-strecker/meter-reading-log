@@ -54,11 +54,11 @@ class _MeterPhotoExamplesButtonState
           minimumSize: const Size(0, 48),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
-            fontSize: 15,
+            fontSize: 14,
             fontWeight: FontWeight.w500,
           ),
         ),
-        icon: const Icon(Icons.collections_outlined, size: 22),
+        icon: const Icon(Icons.collections_outlined, size: 20),
         label: const Text('Beispiele ansehen', textAlign: TextAlign.center),
       ),
     );
