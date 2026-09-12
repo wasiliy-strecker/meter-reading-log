@@ -36,6 +36,10 @@ werden im Nachweis ausdrücklich als solche markiert.
 
 ## Datenschutz
 
+Die vollständige [Datenschutzerklärung](https://wasiliy-strecker.github.io/meter-reading-log/datenschutz/)
+und ihre [englische Fassung](https://wasiliy-strecker.github.io/meter-reading-log/privacy/)
+werden unabhängig von der AppFabrik-Website über GitHub Pages bereitgestellt.
+
 - Fotos, OCR, Verlauf, PDFs und Backups werden lokal verarbeitet.
 - Die Android-Release-App fordert keine `INTERNET`-Berechtigung an.
   Debug-/Profile-Builds benötigen sie für Flutter-Entwicklungswerkzeuge.
@@ -45,6 +49,20 @@ werden im Nachweis ausdrücklich als solche markiert.
   Werbung und keine Analytics.
 - Das verschlüsselte Backup verlässt die private App-Ablage nur, wenn der
   Nutzer einen Speicherort auswählt oder eine Teilen-Aktion auslöst.
+
+### Veröffentlichung der Datenschutzerklärung
+
+Die statischen Datenschutzseiten liegen unter `docs/`. GitHub Pages veröffentlicht
+den Ordner `/docs` aus `main` (Deploy from a branch); `.nojekyll` deaktiviert
+die Jekyll-Verarbeitung. HTML und CSS benötigen keine externen Assets, Skripte
+oder Build-Abhängigkeiten. App-Daten werden dort nicht abgelegt.
+
+In der Play Console unter **App-Inhalte → Datenschutzerklärung** dieselbe
+deutsche URL wie in der App hinterlegen. Der neue App-Link ist im Store-Bundle
+`1.0.0+2` enthalten. Bereits installierte Builds mit dem alten AppFabrik-Link
+werden dadurch nicht geändert; die bisherige Webseite für diese Builds
+erreichbar lassen. Änderungen an der Erklärung künftig in beiden Sprachfassungen
+pflegen und das Aktualisierungsdatum anpassen.
 
 ## Architektur
 

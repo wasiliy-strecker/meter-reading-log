@@ -13,7 +13,9 @@ import 'package:meter_reading_log/features/backup/presentation/settings_screen.d
 import '../../support/fakes.dart';
 
 void main() {
-  testWidgets('privacy policy opens the dedicated German URL', (tester) async {
+  testWidgets('privacy policy opens the German GitHub Pages URL', (
+    tester,
+  ) async {
     Uri? openedUri;
     await tester.pumpWidget(
       ProviderScope(
@@ -38,7 +40,7 @@ void main() {
     expect(
       openedUri,
       Uri.parse(
-        'https://www.appfabrik-ai.de/de/apps/zaehlerstandlog/datenschutz/',
+        'https://wasiliy-strecker.github.io/meter-reading-log/datenschutz/',
       ),
     );
     expect(

@@ -176,7 +176,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _openPrivacyPolicy() async {
     await _openExternalUrl(
       Uri.parse(
-        'https://www.appfabrik-ai.de/de/apps/zaehlerstandlog/datenschutz/',
+        'https://wasiliy-strecker.github.io/meter-reading-log/datenschutz/',
       ),
       'Die Datenschutzerklärung konnte nicht geöffnet werden. Bitte versuche es erneut.',
     );

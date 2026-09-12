@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Privacy Policy · ZählerstandLog</title>
+  <meta name="description" content="Privacy policy for ZählerstandLog (Meter Reading Log): local meter data, photos, PDF reports and encrypted backups.">
+  <link rel="canonical" href="https://wasiliy-strecker.github.io/meter-reading-log/privacy/">
+  <link rel="alternate" hreflang="de" href="https://wasiliy-strecker.github.io/meter-reading-log/datenschutz/">
+  <link rel="alternate" hreflang="en" href="https://wasiliy-strecker.github.io/meter-reading-log/privacy/">
+  <link rel="stylesheet" href="../assets/privacy.css">
+</head>
+<body>
+  <a class="skip-link" href="#content">Skip to content</a>
+  <header class="site-header">
+    <a class="brand" href="../">ZählerstandLog</a>
+    <nav aria-label="Language and source code">
+      <a href="../datenschutz/" lang="de" hreflang="de">Deutsch</a>
+      <a href="https://github.com/wasiliy-strecker/meter-reading-log">Source code</a>
+    </nav>
+  </header>
+  <main id="content">
+    <header class="page-title">
+      <p class="eyebrow">Stored locally. Under your control.</p>
+      <h1>Privacy Policy</h1>
+      <p class="meta">Last updated: September 12, 2026</p>
+    </header>
+    <aside class="notice" aria-label="Summary">
+      Your meter data stays on your device. No account, cloud synchronization, advertising or analytics in the app.
+    </aside>
+    <article>
+    <p>This Privacy Policy applies to the Meter Reading Log mobile app, called Z&auml;hlerstandLog in German. It explains which data the app handles on the device and when data can leave the device.</p>
+
+    <h2>Controller and contact</h2>
+    <p>Responsible: Wasiliy Strecker, AppFabrik AI, Ludwigstrasse 23, 86152 Augsburg, Germany.</p>
+    <p>Privacy and legal contact: <a href="mailto:contact@appfabrik-ai.de">contact@appfabrik-ai.de</a>. User support: <a href="mailto:support@appfabrik-ai.de">support@appfabrik-ai.de</a>.</p>
+
+    <h2>Data handled by the app</h2>
+    <ul class="list">
+      <li>Meter label, meter type, unit, meter number and location description.</li>
+      <li>Meter readings, reading dates and times, time zone information, notes and correction history.</li>
+      <li>Captured or selected evidence photos, local OCR results and technical integrity hashes.</li>
+      <li>Reminder settings, locally generated PDF evidence reports and their export information.</li>
+      <li>Encrypted backup files created by the user.</li>
+    </ul>
+
+    <h2>Local processing and purposes</h2>
+    <p>Meter Reading Log processes meter data, photos, text recognition, reminders, PDF evidence reports and backups locally on the device. The app has no internet permission, user account, cloud synchronization, advertising or analytics. App content is not transmitted to AppFabrik AI or to an AppFabrik AI server.</p>
+    <p>The data is used to document readings, display meter histories and corrections, schedule local reminders, and create PDF evidence reports and encrypted backups.</p>
+
+    <h2>Camera, photos and text recognition</h2>
+    <p>The camera opens only after a corresponding user action. Gallery content is selected through the system photo picker, and the app receives access only to the selected file. Text recognition runs locally using an on-device ML Kit model. The user must confirm recognized values.</p>
+    <p>After capture or selection, the app creates a JPEG evidence photo for local storage with a longest edge of no more than 1920 pixels and quality level 88. Capture and location metadata are not retained. The source file itself is not modified, but it is not archived as an unchanged original inside Meter Reading Log. A further reduced JPEG copy with a maximum dimension of 1600 pixels and quality level 82 may be created for PDFs.</p>
+    <p>The SHA-256 integrity hash refers to the evidence photo stored by the app. It supports local detection of later file changes and is neither an official timestamp nor a guarantee of evidentiary value.</p>
+
+    <h2>Device features and permissions</h2>
+    <p>Depending on the features used, the app accesses the camera or photo picker. Notifications, alarms and system-start events are used only to schedule reading reminders selected by the user and restore them locally after a device restart.</p>
+
+    <h2>Export, sharing and recipients</h2>
+    <p>Data leaves the private app storage only when the user saves a PDF evidence report or encrypted backup to a selected location, or sends it to another app or service through the system share sheet. The user chooses the destination and recipient. From that point, the privacy terms of the selected storage or communication provider also apply.</p>
+    <p>Meter Reading Log does not sell data or share app content for advertising, analytics or profiling.</p>
+
+    <h2>Security</h2>
+    <p>The app database, evidence photos and internally stored PDFs are held in private app storage protected by the operating system. Automatic Android cloud backups and device transfers are disabled for this data. Backups created manually in the app are encrypted with AES-256-GCM and a password selected by the user. The app does not permanently store that password. Exported PDFs are not encrypted by the backup password.</p>
+
+    <h2>Retention</h2>
+    <p>Your meter data remains stored locally in private app storage on your device until the user deletes it, clears the app data through device settings, or uninstalls the app. Meter Reading Log operates no server on which this app content is additionally retained.</p>
+    <p>PDFs and backups stored outside the app remain at the selected location until the user deletes them there. This also applies to files shared with other apps or people.</p>
+
+    <h2>Deletion</h2>
+    <ul class="list">
+      <li>Deleting a reading removes its local data and associated evidence photos. PDFs that have already been created remain separate documents and can be deleted separately.</li>
+      <li>Deleting a meter removes its readings, evidence photos, reminders and internally stored PDF evidence reports.</li>
+      <li>Deleting a PDF evidence report removes the PDF file stored inside the app.</li>
+      <li>Files stored or shared outside the app must be deleted separately at their respective location.</li>
+    </ul>
+    <p>Because Meter Reading Log has no account and no server-side storage, no account deletion or server-side deletion request is required.</p>
+
+    <h2>Contact and support</h2>
+    <p>When you contact us, we process your email address, message and voluntarily supplied information to handle your request. Depending on the request, the legal basis is Art. 6(1)(b) or Art. 6(1)(f) GDPR; our legitimate interest is responding to your enquiry. Recipients may include the email providers used for communication. Support cases are normally deleted twelve months after closure and retained longer only for legal obligations or ongoing claims.</p>
+
+    <h2>Visiting this website and external links</h2>
+    <p>This privacy policy is hosted on GitHub Pages. When you visit it, GitHub processes technical access data, particularly your IP address, to deliver and secure the website. This also happens without a GitHub account. We provide this information page based on our legitimate interest in a secure, publicly accessible privacy policy (Art. 6(1)(f) GDPR).</p>
+    <p>GitHub receives this data as the hosting provider. Data may also be processed outside the European Economic Area. Information about GitHub's processing, retention, international transfers and safeguards is available in the <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub Privacy Statement</a>.</p>
+    <p>We embed no analytics or advertising scripts and no external fonts here. This website receives no meter data, photos, PDFs or backups from the app. Opening an external link in the app loads the destination website in your browser; its privacy terms apply.</p>
+
+    <h2>Your rights</h2>
+    <p>Subject to the GDPR, you have rights including access, rectification, erasure, restriction of processing, portability and objection, and may lodge a complaint with a data protection authority. Where processing is based on consent, you may withdraw it for the future. Requests concerning data we process may be sent to <a href="mailto:contact@appfabrik-ai.de">contact@appfabrik-ai.de</a>. We cannot access app content stored exclusively on your device; you manage and delete it directly in the app.</p>
+
+    <h2>Changes</h2>
+    <p>This policy will be updated if the features or data handling of Meter Reading Log change. The last-updated date appears at the top of this page.</p>
+      </article>
+  </main>
+  <footer>
+    <span>© 2026 Wasiliy Strecker · AppFabrik AI</span>
+    <a href="mailto:contact@appfabrik-ai.de">Privacy contact</a>
+  </footer>
+</body>
+</html>
+
