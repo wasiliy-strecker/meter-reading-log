@@ -70,10 +70,16 @@ void main() {
           expect(find.text('Noch keine Ablesungen vorhanden.'), findsOneWidget);
         }
         final search = find.byKey(const ValueKey('history-search-field'));
-        final border =
-            tester.widget<TextField>(search).decoration!.border!
-                as OutlineInputBorder;
-        expect(border.borderRadius, BorderRadius.circular(18));
+        // Like the dashboard search, inherit the shared rounded input theme.
+        expect(tester.widget<TextField>(search).decoration!.border, isNull);
+        final unfocusedDecorator = tester.widget<InputDecorator>(
+          find.descendant(of: search, matching: find.byType(InputDecorator)),
+        );
+        expect(
+          (unfocusedDecorator.decoration.border! as OutlineInputBorder)
+              .borderRadius,
+          BorderRadius.circular(14),
+        );
         await tester.tap(search);
         await tester.pumpAndSettle();
         final decorator = tester.widget<InputDecorator>(
@@ -82,7 +88,7 @@ void main() {
         expect(decorator.isFocused, isTrue);
         expect(
           (decorator.decoration.border! as OutlineInputBorder).borderRadius,
-          BorderRadius.circular(18),
+          BorderRadius.circular(14),
         );
         expect(tester.takeException(), isNull);
       },

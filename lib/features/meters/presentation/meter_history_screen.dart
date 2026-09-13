@@ -280,7 +280,6 @@ class _HistorySearchField extends StatelessWidget {
                 onPressed: onClear,
                 icon: const Icon(Icons.close),
               ),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(18)),
       ),
     );
   }
