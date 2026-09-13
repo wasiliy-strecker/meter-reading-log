@@ -28,7 +28,7 @@ class SavedHistoryPdfs extends ConsumerStatefulWidget {
 
 class _SavedHistoryPdfsState extends ConsumerState<SavedHistoryPdfs>
     with AutomaticKeepAliveClientMixin {
-  static const _pageSize = 5;
+  static const _pageSize = 10;
   final _headingKey = GlobalKey();
   int _offset = 0;
   bool _expanded = false;

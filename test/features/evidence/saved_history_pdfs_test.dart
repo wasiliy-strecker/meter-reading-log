@@ -18,7 +18,7 @@ const _previous = ValueKey('history-pdfs-previous-page');
 
 void main() {
   testWidgets(
-    '100 PDFs: only five metadata rows and five async checks per page',
+    '100 PDFs: only ten metadata rows and ten async checks per page',
     (tester) async {
       final repository = _TrackingExports();
       addTearDown(repository.dispose);
@@ -41,14 +41,14 @@ void main() {
       expect(find.text('100 Nachweise'), findsOneWidget);
       expect(checked, isEmpty);
       expect(find.byType(EvidenceExportCard), findsNothing);
-      expect(repository.requests.single.limit, 5);
+      expect(repository.requests.single.limit, 10);
       await _tap(tester, _expansion);
-      for (var page = 0; page < 20; page++) {
-        expect(find.byType(EvidenceExportCard), findsNWidgets(5));
-        expect(find.text('Seite ${page + 1} von 20'), findsOneWidget);
-        expect(repository.requests.last.offset, page * 5);
-        expect(checked.length, (page + 1) * 5);
-        if (page < 19) await _tap(tester, _next);
+      for (var page = 0; page < 10; page++) {
+        expect(find.byType(EvidenceExportCard), findsNWidgets(10));
+        expect(find.text('Seite ${page + 1} von 10'), findsOneWidget);
+        expect(repository.requests.last.offset, page * 10);
+        expect(checked.length, (page + 1) * 10);
+        if (page < 9) await _tap(tester, _next);
       }
       expect(checked.toSet().length, 100);
       expect(opened, isEmpty);
@@ -57,15 +57,15 @@ void main() {
         isNull,
       );
       await _tap(tester, _previous);
-      expect(find.text('Seite 19 von 20'), findsOneWidget);
+      expect(find.text('Seite 9 von 10'), findsOneWidget);
       await tester.ensureVisible(
-        find.byKey(const ValueKey('evidence-export-export_009')),
+        find.byKey(const ValueKey('evidence-export-export_019')),
       );
       await tester.tap(
-        find.byKey(const ValueKey('evidence-export-export_009')),
+        find.byKey(const ValueKey('evidence-export-export_019')),
       );
       await tester.pumpAndSettle();
-      expect(opened, ['export_009']);
+      expect(opened, ['export_019']);
       await _tap(tester, _expansion);
       final before = checked.length;
       await repository.save(exportFixture(100));
@@ -83,7 +83,7 @@ void main() {
     (tester) async {
       final repository = _TrackingExports();
       addTearDown(repository.dispose);
-      for (var i = 0; i < 11; i++) {
+      for (var i = 0; i < 21; i++) {
         await repository.save(exportFixture(i));
       }
       final reset = ValueNotifier(0);
@@ -116,15 +116,15 @@ void main() {
       );
       await _tap(tester, const ValueKey('delete-evidence-export_000'));
       expect(find.text('Seite 2 von 2'), findsOneWidget);
-      expect(find.byType(EvidenceExportCard), findsNWidgets(5));
-      expect(repository.requests.last.offset, 5);
-      await repository.save(exportFixture(11));
+      expect(find.byType(EvidenceExportCard), findsNWidgets(10));
+      expect(repository.requests.last.offset, 10);
+      await repository.save(exportFixture(21));
       reset.value++;
       await tester.pumpAndSettle();
       expect(find.text('Seite 1 von 3'), findsOneWidget);
       expect(repository.requests.last.offset, 0);
       expect(
-        find.byKey(const ValueKey('evidence-export-export_011')),
+        find.byKey(const ValueKey('evidence-export-export_021')),
         findsOneWidget,
       );
       expect(tester.takeException(), isNull);
@@ -169,7 +169,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Lokal gespeichert'), findsOneWidget);
     expect(find.byKey(_next), findsNothing);
-    for (var i = 2; i <= 6; i++) {
+    for (var i = 2; i <= 11; i++) {
       await repository.save(exportFixture(i));
     }
     await tester.pumpAndSettle();

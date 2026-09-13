@@ -11,11 +11,11 @@ import 'package:meter_reading_log/features/meters/domain/reading_value.dart';
 import '../../support/fakes.dart';
 
 void main() {
-  for (final count in [0, 1, 2, 5, 6, 11]) {
+  for (final count in [0, 1, 9, 10, 11, 21]) {
     testWidgets(
-      '$count readings: five-item preview and always searchable full history',
+      '$count readings: ten-item preview and always searchable full history',
       (tester) async {
-        await tester.binding.setSurfaceSize(const Size(430, 2400));
+        await tester.binding.setSurfaceSize(const Size(430, 4200));
         addTearDown(() => tester.binding.setSurfaceSize(null));
         final fixture = _fixture(count);
         addTearDown(fixture.container.dispose);
@@ -29,14 +29,14 @@ void main() {
         final router = fixture.container.read(appRouterProvider);
         router.goNamed('meterDetail', pathParameters: {'id': 'meter'});
         await tester.pumpAndSettle();
-        expect(fixture.readings.lastPageLimit, 5);
+        expect(fixture.readings.lastPageLimit, 10);
         final cards = find.byWidgetPredicate(
           (w) =>
               w is Card &&
               w.key is ValueKey<String> &&
               (w.key! as ValueKey<String>).value.startsWith('reading-card-'),
         );
-        expect(cards, findsNWidgets(count < 5 ? count : 5));
+        expect(cards, findsNWidgets(count < 10 ? count : 10));
         expect(
           find.byKey(const ValueKey('history-search-field')),
           findsNothing,
@@ -47,7 +47,7 @@ void main() {
             findsOneWidget,
           );
         }
-        if (count <= 5) {
+        if (count <= 10) {
           expect(
             find.byKey(const ValueKey('open-meter-history')),
             findsNothing,
@@ -57,14 +57,14 @@ void main() {
           await tester.tap(find.byKey(const ValueKey('open-meter-history')));
         }
         await tester.pumpAndSettle();
-        expect(fixture.readings.lastPageLimit, 5);
+        expect(fixture.readings.lastPageLimit, 10);
         expect(
           find.byKey(const ValueKey('history-search-field')),
           findsOneWidget,
         );
         expect(
           find.byKey(const ValueKey('history-next-page')),
-          count > 5 ? findsOneWidget : findsNothing,
+          count > 10 ? findsOneWidget : findsNothing,
         );
         if (count == 0) {
           expect(find.text('Noch keine Ablesungen vorhanden.'), findsOneWidget);
@@ -100,7 +100,7 @@ void main() {
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(430, 1000));
       addTearDown(() => tester.binding.setSurfaceSize(null));
-      final fixture = _fixture(11);
+      final fixture = _fixture(21);
       addTearDown(fixture.container.dispose);
       await tester.pumpWidget(
         UncontrolledProviderScope(
@@ -118,21 +118,21 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('history-next-page')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('reading-card-reading_5')));
+      await tester.tap(find.byKey(const ValueKey('reading-card-reading_10')));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('history-search-field')), findsNothing);
       router.pop();
       await tester.pumpAndSettle();
       expect(tester.widget<TextField>(search).controller!.text, 'Kontrolle');
-      expect(fixture.readings.lastPageOffset, 5);
+      expect(fixture.readings.lastPageOffset, 10);
       expect(find.text('Seite 2 von 3'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('history-next-page')));
       await tester.pumpAndSettle();
-      expect(fixture.readings.lastPageOffset, 10);
+      expect(fixture.readings.lastPageOffset, 20);
       fixture.readings.items.remove('reading_0');
       fixture.container.invalidate(meterHistoryPageProvider);
       await tester.pumpAndSettle();
-      expect(fixture.readings.lastPageOffset, 5);
+      expect(fixture.readings.lastPageOffset, 10);
       expect(find.text('Seite 2 von 2'), findsOneWidget);
       await tester.enterText(search, 'Kein Treffer');
       await tester.pump(const Duration(milliseconds: 251));

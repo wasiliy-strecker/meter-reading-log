@@ -30,7 +30,7 @@ class MeterDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
-  static const _historyPreviewSize = 5;
+  static const _historyPreviewSize = 10;
 
   bool _exporting = false;
   int _historyPdfResetToken = 0;

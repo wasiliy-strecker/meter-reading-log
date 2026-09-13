@@ -19,16 +19,16 @@ PDF-Nachweise mit Fotos und Korrekturen.
   längsten Kante optimiert und ohne übernommene Aufnahme-/Standortmetadaten
 - lokale ML-Kit-OCR mit Kandidatenauswahl und verpflichtender Bestätigung
 - exakte Dezimalwerte ohne Gleitkomma-Rundungsfehler
-- fünf aktuelle Ablesungen pro Zähler; vollständiger Verlauf mit Suche nach
-  Datum, Zählerstand oder Notiz und festen Seiten mit je 5 Einträgen;
-  der Einstieg „Alle Ablesungen anzeigen“ erscheint ab 6 Ablesungen
+- zehn aktuelle Ablesungen pro Zähler; vollständiger Verlauf mit Suche nach
+  Datum, Zählerstand oder Notiz und festen Seiten mit je 10 Einträgen;
+  der Einstieg „Alle Ablesungen anzeigen“ erscheint ab 11 Ablesungen
 - neueste Ablesungen zuerst, mit Verbrauchsdifferenzen zur älteren Ablesung
 - begründete, append-only protokollierte Korrekturen
 - Ablesezeitpunkte bis Ende 2100 mit transparenter Kennzeichnung zukünftiger
   Angaben in App und PDF
 - Einzel- und Verlaufs-PDFs mit Fotos, Zeitpunkten und Korrekturen;
   Verlaufs-PDFs enthalten alle Ablesungen, neueste zuerst
-- gespeicherte Verlaufs-PDFs im aufklappbaren Bereich mit fünf Nachweisen pro
+- gespeicherte Verlaufs-PDFs im aufklappbaren Bereich mit zehn Nachweisen pro
   Seite; begrenzte Datenbankabfragen und asynchrone Dateiprüfung erst beim Aufklappen
 - optionale stündliche, tägliche, wöchentliche, monatliche oder jährliche
   Android-Erinnerungen; stündlich ab einem einstellbaren Startdatum mit Uhrzeit,

@@ -18,7 +18,7 @@ class MeterHistoryScreen extends ConsumerStatefulWidget {
 }
 
 class _MeterHistoryScreenState extends ConsumerState<MeterHistoryScreen> {
-  static const _pageSize = 5;
+  static const _pageSize = 10;
   final _searchController = TextEditingController();
   final _scrollController = ScrollController();
   Timer? _debounce;

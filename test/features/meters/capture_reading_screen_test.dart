@@ -457,7 +457,7 @@ void main() {
   );
 
   testWidgets(
-    'meter previews five readings and opens searchable fixed history pages',
+    'meter previews ten readings and opens searchable fixed history pages',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(430, 1200));
       addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -509,7 +509,7 @@ void main() {
       await tester.tap(find.text('Strom Langzeit'));
       await tester.pumpAndSettle();
 
-      expect(readings.lastPageLimit, 5);
+      expect(readings.lastPageLimit, 10);
       expect(readings.lastPageQuery, isEmpty);
       final historyPdfAction = find.text('PDF-Nachweis des Zählerverlaufs');
       final historyTitle = find.text('Zählerverlauf');
@@ -519,7 +519,7 @@ void main() {
         lessThan(tester.getTopLeft(historyTitle).dy),
       );
       expect(find.text('Gespeicherte PDF-Nachweise'), findsNothing);
-      expect(find.text('5 von 45 Ablesungen'), findsOneWidget);
+      expect(find.text('10 von 45 Ablesungen'), findsOneWidget);
       expect(find.byKey(const ValueKey('history-search-field')), findsNothing);
       final openHistory = find.byKey(const ValueKey('open-meter-history'));
       await tester.scrollUntilVisible(
@@ -529,9 +529,9 @@ void main() {
       );
       await tester.tap(openHistory);
       await tester.pumpAndSettle();
-      expect(readings.lastPageLimit, 5);
+      expect(readings.lastPageLimit, 10);
       expect(readings.lastPageOffset, 0);
-      expect(find.text('1–5 von 45 Ablesungen'), findsOneWidget);
+      expect(find.text('1–10 von 45 Ablesungen'), findsOneWidget);
       final search = find.byKey(const ValueKey('history-search-field'));
       expect(search, findsOneWidget);
 
@@ -541,7 +541,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 2));
       await tester.pumpAndSettle();
 
-      expect(readings.lastPageLimit, 5);
+      expect(readings.lastPageLimit, 10);
       expect(readings.lastPageQuery, 'SPEZIALFUND');
       expect(find.text('1 Treffer'), findsOneWidget);
       expect(
@@ -556,16 +556,16 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('history-next-page')));
       await tester.pumpAndSettle();
 
-      expect(readings.lastPageLimit, 5);
-      expect(readings.lastPageOffset, 5);
+      expect(readings.lastPageLimit, 10);
+      expect(readings.lastPageOffset, 10);
       expect(readings.lastPageQuery, isEmpty);
-      expect(find.text('6–10 von 45 Ablesungen'), findsOneWidget);
-      expect(find.text('Seite 2 von 9'), findsOneWidget);
+      expect(find.text('11–20 von 45 Ablesungen'), findsOneWidget);
+      expect(find.text('Seite 2 von 5'), findsOneWidget);
       expect(
         find.byKey(const ValueKey('reading-card-long_reading_44')),
         findsNothing,
       );
-      for (var page = 2; page < 9; page++) {
+      for (var page = 2; page < 5; page++) {
         await tester.tap(find.byKey(const ValueKey('history-next-page')));
         await tester.pumpAndSettle();
       }
@@ -581,7 +581,7 @@ void main() {
       );
       await tester.tap(find.byKey(const ValueKey('history-previous-page')));
       await tester.pumpAndSettle();
-      expect(readings.lastPageOffset, 35);
+      expect(readings.lastPageOffset, 30);
       await tester.enterText(search, 'SPEZIALFUND');
       await tester.pump(const Duration(milliseconds: 251));
       await tester.pumpAndSettle();
