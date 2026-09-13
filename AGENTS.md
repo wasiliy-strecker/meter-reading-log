@@ -70,6 +70,18 @@ Dev-Konstanten und Dev-Assets beim erneuten Verbinden korrekt:
 flutter attach --debug --app-id com.appfactory.meter_reading_log.dev -d <device-id>
 ```
 
+Bei mehreren gleichzeitig laufenden Flutter-Projekten reicht `--app-id` nicht
+als Nachweis der richtigen Verbindung. Vor dem ersten Reload/Restart die PID
+aus `getVM` der verbundenen Dart-VM mit
+`adb -s <device-id> shell pidof com.appfactory.meter_reading_log.dev` vergleichen
+und die Root-Bibliothek auf `package:meter_reading_log/` prüfen. Nach einem
+Prozesswechsel erneut prüfen. Keine Verbindungen aus verschiedenen Projekten
+an dieselbe VM hängen: Bei einem Konflikt weitere Reloads stoppen und die
+Gerätenutzung mit dem Nutzer koordinieren; fremde Agenten/Prozesse nicht beenden.
+Für eine bereits eindeutig zugeordnete VM bei Bedarf deren explizite
+`--debug-url` zum Verbinden verwenden. Einen verschwundenen Dev-Stand nach einem
+Kaltstart nicht durch erneute Änderungen der bereits korrekten UI-Logik beheben.
+
 Die Verbindung für weitere UI-Iterationen offen halten (`r` für Hot Reload).
 Änderungen an `main()`, `initState()`, Initialisierung oder von Hot Reload nicht
 unterstützte Dart-Änderungen bei Bedarf mit Hot Restart (`R`) übernehmen; das

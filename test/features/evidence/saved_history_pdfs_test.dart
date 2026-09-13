@@ -17,6 +17,50 @@ const _next = ValueKey('history-pdfs-next-page');
 const _previous = ValueKey('history-pdfs-previous-page');
 
 void main() {
+  for (final count in [6, 10, 11, 12]) {
+    testWidgets('$count PDFs: paginate only above ten records', (tester) async {
+      final repository = _TrackingExports();
+      addTearDown(repository.dispose);
+      for (var i = 0; i < count; i++) {
+        await repository.save(exportFixture(i));
+      }
+      final container = ProviderContainer(
+        overrides: [
+          evidenceExportRepositoryProvider.overrideWithValue(repository),
+          evidenceFileAvailableProvider.overrideWith((ref, path) async => true),
+        ],
+      );
+      addTearDown(container.dispose);
+      await _pump(tester, container);
+      expect(find.text('$count Nachweise'), findsOneWidget);
+      await _tap(tester, _expansion);
+      expect(repository.requests.last.limit, 10);
+      expect(repository.requests.last.offset, 0);
+      expect(
+        find.byType(EvidenceExportCard),
+        findsNWidgets(count > 10 ? 10 : count),
+      );
+      if (count <= 10) {
+        expect(find.byKey(_next), findsNothing);
+        expect(find.byKey(_previous), findsNothing);
+      } else {
+        expect(find.text('Seite 1 von 2'), findsOneWidget);
+        await _tap(tester, _next);
+        expect(repository.requests.last.offset, 10);
+        expect(find.byType(EvidenceExportCard), findsNWidgets(count - 10));
+        expect(find.text('Seite 2 von 2'), findsOneWidget);
+        expect(
+          tester.widget<OutlinedButton>(find.byKey(_next)).onPressed,
+          isNull,
+        );
+        await _tap(tester, _previous);
+        expect(find.byType(EvidenceExportCard), findsNWidgets(10));
+        expect(repository.requests.last.offset, 0);
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets(
     '100 PDFs: only ten metadata rows and ten async checks per page',
     (tester) async {

@@ -11,7 +11,7 @@ import 'package:meter_reading_log/features/meters/domain/reading_value.dart';
 import '../../support/fakes.dart';
 
 void main() {
-  for (final count in [0, 1, 9, 10, 11, 21]) {
+  for (final count in [0, 1, 6, 9, 10, 11, 21]) {
     testWidgets(
       '$count readings: ten-item preview and always searchable full history',
       (tester) async {
@@ -37,6 +37,12 @@ void main() {
               (w.key! as ValueKey<String>).value.startsWith('reading-card-'),
         );
         expect(cards, findsNWidgets(count < 10 ? count : 10));
+        if (count > 1) {
+          expect(
+            find.text('${count < 10 ? count : 10} von $count Ablesungen'),
+            findsOneWidget,
+          );
+        }
         expect(
           find.byKey(const ValueKey('history-search-field')),
           findsNothing,
