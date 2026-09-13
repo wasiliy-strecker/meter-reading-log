@@ -11,8 +11,17 @@
   ZählerstandLog und aus AI Age Estimator waren gleichzeitig mit derselben
   lokalen Dart-VM-Service-Adresse verbunden. Im privaten Dev-Code-Cache von
   ZählerstandLog lag auch ein inkrementelles AI-Age-Estimator-Kernel-Artefakt.
-  Weitere Reloads wegen dieses Konflikts gestoppt; Koordination mit dem Nutzer
-  angefragt. Noch keine abschließende Bestätigung des aktiven Geräte-Codes.
+  Weitere Reloads wegen dieses Konflikts zunächst gestoppt und die Gerätenutzung
+  mit dem Nutzer koordiniert.
+- Nach bestätigter Pause des anderen Agenten nur ZählerstandLog frisch verbunden.
+  Vor dem Hot Restart die VM-PID mit der Android-Paket-PID abgeglichen und
+  `package:meter_reading_log/main.dart` als Root-Bibliothek geprüft. Anschließend
+  direkt über die VM die geladenen Quellen aller drei Ansichten kontrolliert:
+  Vorschaugröße und beide Seitengrößen sind `10`, die Pagination-Bedingungen
+  verwenden jeweils `> 10`. Die PDF-Seiten-Bibliothek ist ebenfalls geladen.
+  Keine zweite Flutter-Attach-Verbindung vorhanden. Die Geräteaktualisierung ist
+  damit abgeschlossen; die Live-Sitzung bleibt offen. Wie bei jedem Hot Restart
+  bleibt die dauerhaft installierte APK unverändert.
 - App-lokale Agentenregeln um PID-/Root-Bibliotheksprüfung und den Umgang mit
   kollidierenden Projektverbindungen ergänzt. Fremde Prozesse nicht beendet;
   keine manuelle Navigation auf dem Smartphone durchgeführt.
