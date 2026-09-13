@@ -1,4 +1,5 @@
 import '../../evidence/domain/evidence_export.dart';
+import '../../evidence/domain/evidence_export_page.dart';
 import 'meter.dart';
 import 'meter_dashboard_item.dart';
 import 'meter_reading.dart';
@@ -40,6 +41,12 @@ abstract interface class MeterDashboardRepository {
 
 abstract interface class EvidenceExportRepository {
   Stream<List<EvidenceExportRecord>> watchForMeter(String meterId);
+  Stream<EvidenceExportPage> watchPageForMeter(
+    String meterId, {
+    required EvidenceExportKind kind,
+    required int limit,
+    int offset = 0,
+  });
   Future<List<EvidenceExportRecord>> loadAll();
   Future<List<EvidenceExportRecord>> loadForMeter(String meterId);
   Future<void> save(EvidenceExportRecord record);

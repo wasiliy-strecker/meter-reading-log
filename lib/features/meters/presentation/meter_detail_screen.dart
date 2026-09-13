@@ -12,8 +12,9 @@ import '../../../core/integrity/integrity_copy.dart';
 import '../../../core/utils/formatters.dart';
 import '../../evidence/application/evidence_report_service.dart';
 import '../../evidence/domain/evidence_export.dart';
-import '../../evidence/presentation/evidence_export_card.dart';
+import '../../evidence/presentation/evidence_list_providers.dart';
 import '../../evidence/presentation/evidence_photo_mode_sheet.dart';
+import '../../evidence/presentation/saved_history_pdfs.dart';
 import '../domain/meter.dart';
 import '../domain/meter_reading.dart';
 import 'meter_visuals.dart';
@@ -32,6 +33,7 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
   static const _historyPreviewSize = 5;
 
   bool _exporting = false;
+  int _historyPdfResetToken = 0;
   final Set<String> _deletingExportIds = {};
   @override
   Widget build(BuildContext context) {
@@ -86,15 +88,6 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
         query: '',
       )),
     );
-    final exportsAsync = ref.watch(evidenceForMeterProvider(meter.id));
-    final exports = exportsAsync.value ?? const [];
-    final historyExports = exports
-        .where((export) => export.kind == EvidenceExportKind.meterHistory)
-        .toList(growable: false);
-    final availableFiles = <String, bool>{
-      for (final export in historyExports)
-        export.id: File(export.filePath).existsSync(),
-    };
     void openMeterEditor() =>
         context.pushNamed('meterEdit', pathParameters: {'id': meter.id});
     void captureReading() =>
@@ -132,18 +125,16 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
                         exporting: _exporting,
                         onPressed: () => _exportHistory(meter),
                       ),
-                      if (historyExports.isNotEmpty) const SizedBox(height: 10),
+                      const SizedBox(height: 10),
                     ],
-                    if (historyExports.isNotEmpty)
-                      _SavedHistoryPdfs(
-                        exports: historyExports,
-                        availableFiles: availableFiles,
-                        deletingExportIds: _deletingExportIds,
-                        onOpen: _openExport,
-                        onDelete: _deleteExport,
-                      ),
-                    if (page.totalCount > 0 || historyExports.isNotEmpty)
-                      const SizedBox(height: 22),
+                    SavedHistoryPdfs(
+                      meterId: meter.id,
+                      resetPageToken: _historyPdfResetToken,
+                      deletingExportIds: _deletingExportIds,
+                      onOpen: _openExport,
+                      onDelete: _deleteExport,
+                    ),
+                    const SizedBox(height: 12),
                     Text(
                       'Zählerverlauf',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -181,7 +172,7 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (page.totalCount > 0) ...[
+                  if (page.totalCount > _historyPreviewSize) ...[
                     const SizedBox(height: 4),
                     OutlinedButton.icon(
                       key: const ValueKey('open-meter-history'),
@@ -242,7 +233,11 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
         },
       );
       if (!mounted) return;
-      setState(() => _exporting = false);
+      setState(() {
+        _exporting = false;
+        _historyPdfResetToken++;
+      });
+      ref.invalidate(evidenceExportPageProvider);
       await context.pushNamed('evidencePreview', extra: report);
     } catch (error) {
       if (mounted) {
@@ -258,6 +253,7 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
   Future<void> _openExport(EvidenceExportRecord record) async {
     final file = File(record.filePath);
     if (!await file.exists()) {
+      ref.invalidate(evidenceFileAvailableProvider(record.filePath));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           AppSnackBar(message: 'Die gespeicherte PDF-Datei fehlt.'),
@@ -285,6 +281,8 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
     try {
       await ref.read(evidenceReportServiceProvider).delete(record);
       ref.invalidate(evidenceForMeterProvider(record.meterId));
+      ref.invalidate(evidenceExportPageProvider);
+      ref.invalidate(evidenceFileAvailableProvider(record.filePath));
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -407,71 +405,6 @@ class _HistoryPdfAction extends StatelessWidget {
     );
   }
 }
-
-class _SavedHistoryPdfs extends StatelessWidget {
-  const _SavedHistoryPdfs({
-    required this.exports,
-    required this.availableFiles,
-    required this.deletingExportIds,
-    required this.onOpen,
-    required this.onDelete,
-  });
-
-  final List<EvidenceExportRecord> exports;
-  final Map<String, bool> availableFiles;
-  final Set<String> deletingExportIds;
-  final Future<void> Function(EvidenceExportRecord) onOpen;
-  final Future<void> Function(EvidenceExportRecord) onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final countLabel = exports.length == 1
-        ? '1 Nachweis'
-        : '${exports.length} Nachweise';
-    return Card(
-      key: const ValueKey('saved-history-pdfs'),
-      clipBehavior: Clip.antiAlias,
-      child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          key: const ValueKey('saved-history-pdfs-expansion'),
-          initiallyExpanded: false,
-          leading: Icon(Icons.folder_copy_outlined, color: colors.primary),
-          title: const Text(
-            'Gespeicherte PDF-Nachweise',
-            style: TextStyle(fontWeight: FontWeight.w800),
-          ),
-          subtitle: Text(countLabel),
-          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-          shape: const RoundedRectangleBorder(),
-          collapsedShape: const RoundedRectangleBorder(),
-          children: [
-            for (final export in exports)
-              EvidenceExportCard(
-                export: export,
-                title: 'Zählerverlaufsnachweis',
-                detail:
-                    '${_readingCountLabel(export.readingIds.length)}\n${export.photoMode.labelFor(export.kind)}',
-                fileAvailable: availableFiles[export.id] == true,
-                onTap: availableFiles[export.id] != true
-                    ? null
-                    : () => onOpen(export),
-                deleting: deletingExportIds.contains(export.id),
-                onDelete: () => onDelete(export),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-String _readingCountLabel(int count) => switch (count) {
-  1 => '1 Ablesung enthalten',
-  _ => '$count Ablesungen enthalten',
-};
 
 class _MeterHeader extends StatelessWidget {
   const _MeterHeader({

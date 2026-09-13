@@ -4,6 +4,7 @@ import 'package:drift/drift.dart';
 
 import '../../../core/persistence/app_database.dart';
 import '../../evidence/domain/evidence_export.dart';
+import '../../evidence/domain/evidence_export_page.dart';
 import '../domain/meter.dart';
 import '../domain/meter_dashboard_item.dart';
 import '../domain/meter_reading.dart';
@@ -523,6 +524,38 @@ class DriftEvidenceExportRepository implements EvidenceExportRepository {
   const DriftEvidenceExportRepository(this.database);
 
   final AppDatabase database;
+
+  @override
+  Stream<EvidenceExportPage> watchPageForMeter(
+    String meterId, {
+    required EvidenceExportKind kind,
+    required int limit,
+    int offset = 0,
+  }) {
+    if (limit <= 0) throw ArgumentError.value(limit, 'limit');
+    if (offset < 0) throw ArgumentError.value(offset, 'offset');
+    final table = database.evidenceExportRecords;
+    final filter = table.meterId.equals(meterId) & table.kind.equals(kind.name);
+    final pageQuery = database.select(table)
+      ..where((_) => filter)
+      ..orderBy([
+        (row) => OrderingTerm.desc(row.createdAtMillis),
+        (row) => OrderingTerm.desc(row.id),
+      ])
+      ..limit(limit, offset: offset);
+    return pageQuery.watch().asyncMap((rows) async {
+      final count = countAll();
+      final countQuery = database.selectOnly(table)
+        ..addColumns([count])
+        ..where(filter);
+      final total = (await countQuery.getSingle()).read(count) ?? 0;
+      return EvidenceExportPage(
+        exports: rows.map(_fromRow).toList(growable: false),
+        totalCount: total,
+        offset: offset,
+      );
+    });
+  }
 
   @override
   Stream<List<EvidenceExportRecord>> watchForMeter(String meterId) {

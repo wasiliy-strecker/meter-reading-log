@@ -18,7 +18,7 @@ class MeterHistoryScreen extends ConsumerStatefulWidget {
 }
 
 class _MeterHistoryScreenState extends ConsumerState<MeterHistoryScreen> {
-  static const _pageSize = 20;
+  static const _pageSize = 5;
   final _searchController = TextEditingController();
   final _scrollController = ScrollController();
   Timer? _debounce;
@@ -280,7 +280,7 @@ class _HistorySearchField extends StatelessWidget {
                 onPressed: onClear,
                 icon: const Icon(Icons.close),
               ),
-        border: const OutlineInputBorder(),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(18)),
       ),
     );
   }

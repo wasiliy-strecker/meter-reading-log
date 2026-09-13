@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:meter_reading_log/features/evidence/domain/evidence_export.dart';
+import 'package:meter_reading_log/features/evidence/domain/evidence_export_page.dart';
 import 'package:meter_reading_log/features/meters/domain/meter.dart';
 import 'package:meter_reading_log/features/meters/domain/meter_reading.dart';
 import 'package:meter_reading_log/features/meters/domain/meter_reading_page.dart';
@@ -225,6 +226,27 @@ int _newestReadingFirst(MeterReading left, MeterReading right) {
 
 class MemoryEvidenceExportRepository implements EvidenceExportRepository {
   final Map<String, EvidenceExportRecord> items = {};
+
+  @override
+  Stream<EvidenceExportPage> watchPageForMeter(
+    String meterId, {
+    required EvidenceExportKind kind,
+    required int limit,
+    int offset = 0,
+  }) {
+    final matching =
+        items.values
+            .where((item) => item.meterId == meterId && item.kind == kind)
+            .toList()
+          ..sort(compareExportsNewestFirst);
+    return Stream.value(
+      EvidenceExportPage(
+        exports: matching.skip(offset).take(limit).toList(),
+        totalCount: matching.length,
+        offset: offset,
+      ),
+    );
+  }
 
   @override
   Future<void> delete(String id) async => items.remove(id);

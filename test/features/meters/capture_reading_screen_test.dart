@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:meter_reading_log/features/evidence/presentation/evidence_list_providers.dart';
 import 'package:meter_reading_log/app/app.dart';
 import 'package:meter_reading_log/app/app_providers.dart';
 import 'package:meter_reading_log/core/files/meter_photo_repository.dart';
@@ -528,9 +529,9 @@ void main() {
       );
       await tester.tap(openHistory);
       await tester.pumpAndSettle();
-      expect(readings.lastPageLimit, 20);
+      expect(readings.lastPageLimit, 5);
       expect(readings.lastPageOffset, 0);
-      expect(find.text('1–20 von 45 Ablesungen'), findsOneWidget);
+      expect(find.text('1–5 von 45 Ablesungen'), findsOneWidget);
       final search = find.byKey(const ValueKey('history-search-field'));
       expect(search, findsOneWidget);
 
@@ -540,7 +541,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 2));
       await tester.pumpAndSettle();
 
-      expect(readings.lastPageLimit, 20);
+      expect(readings.lastPageLimit, 5);
       expect(readings.lastPageQuery, 'SPEZIALFUND');
       expect(find.text('1 Treffer'), findsOneWidget);
       expect(
@@ -555,17 +556,19 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('history-next-page')));
       await tester.pumpAndSettle();
 
-      expect(readings.lastPageLimit, 20);
-      expect(readings.lastPageOffset, 20);
+      expect(readings.lastPageLimit, 5);
+      expect(readings.lastPageOffset, 5);
       expect(readings.lastPageQuery, isEmpty);
-      expect(find.text('21–40 von 45 Ablesungen'), findsOneWidget);
-      expect(find.text('Seite 2 von 3'), findsOneWidget);
+      expect(find.text('6–10 von 45 Ablesungen'), findsOneWidget);
+      expect(find.text('Seite 2 von 9'), findsOneWidget);
       expect(
         find.byKey(const ValueKey('reading-card-long_reading_44')),
         findsNothing,
       );
-      await tester.tap(find.byKey(const ValueKey('history-next-page')));
-      await tester.pumpAndSettle();
+      for (var page = 2; page < 9; page++) {
+        await tester.tap(find.byKey(const ValueKey('history-next-page')));
+        await tester.pumpAndSettle();
+      }
       expect(readings.lastPageOffset, 40);
       expect(find.text('41–45 von 45 Ablesungen'), findsOneWidget);
       expect(
@@ -578,7 +581,7 @@ void main() {
       );
       await tester.tap(find.byKey(const ValueKey('history-previous-page')));
       await tester.pumpAndSettle();
-      expect(readings.lastPageOffset, 20);
+      expect(readings.lastPageOffset, 35);
       await tester.enterText(search, 'SPEZIALFUND');
       await tester.pump(const Duration(milliseconds: 251));
       await tester.pumpAndSettle();
@@ -659,6 +662,9 @@ void main() {
           meterRepositoryProvider.overrideWithValue(meters),
           meterReadingRepositoryProvider.overrideWithValue(readings),
           evidenceExportRepositoryProvider.overrideWithValue(exports),
+          evidenceFileAvailableProvider.overrideWith(
+            (ref, path) async => File(path).existsSync(),
+          ),
           evidenceReportServiceProvider.overrideWithValue(
             _SynchronousDeleteEvidenceReportService(exports),
           ),
@@ -778,6 +784,9 @@ void main() {
             MemoryReadingRepository(),
           ),
           evidenceExportRepositoryProvider.overrideWithValue(exports),
+          evidenceFileAvailableProvider.overrideWith(
+            (ref, path) async => File(path).existsSync(),
+          ),
         ],
         child: const MeterReadingLogApp(),
       ),
@@ -870,6 +879,9 @@ void main() {
           meterRepositoryProvider.overrideWithValue(meters),
           meterReadingRepositoryProvider.overrideWithValue(readings),
           evidenceExportRepositoryProvider.overrideWithValue(exports),
+          evidenceFileAvailableProvider.overrideWith(
+            (ref, path) async => File(path).existsSync(),
+          ),
           evidenceReportServiceProvider.overrideWithValue(
             _SynchronousDeleteEvidenceReportService(exports),
           ),

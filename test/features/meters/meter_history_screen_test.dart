@@ -11,7 +11,7 @@ import 'package:meter_reading_log/features/meters/domain/reading_value.dart';
 import '../../support/fakes.dart';
 
 void main() {
-  for (final count in [0, 1, 5, 6, 20, 21]) {
+  for (final count in [0, 1, 2, 5, 6, 11]) {
     testWidgets(
       '$count readings: five-item preview and always searchable full history',
       (tester) async {
@@ -46,6 +46,8 @@ void main() {
             find.byKey(const ValueKey('empty-readings-action')),
             findsOneWidget,
           );
+        }
+        if (count <= 5) {
           expect(
             find.byKey(const ValueKey('open-meter-history')),
             findsNothing,
@@ -55,18 +57,33 @@ void main() {
           await tester.tap(find.byKey(const ValueKey('open-meter-history')));
         }
         await tester.pumpAndSettle();
-        expect(fixture.readings.lastPageLimit, 20);
+        expect(fixture.readings.lastPageLimit, 5);
         expect(
           find.byKey(const ValueKey('history-search-field')),
           findsOneWidget,
         );
         expect(
           find.byKey(const ValueKey('history-next-page')),
-          count > 20 ? findsOneWidget : findsNothing,
+          count > 5 ? findsOneWidget : findsNothing,
         );
         if (count == 0) {
           expect(find.text('Noch keine Ablesungen vorhanden.'), findsOneWidget);
         }
+        final search = find.byKey(const ValueKey('history-search-field'));
+        final border =
+            tester.widget<TextField>(search).decoration!.border!
+                as OutlineInputBorder;
+        expect(border.borderRadius, BorderRadius.circular(18));
+        await tester.tap(search);
+        await tester.pumpAndSettle();
+        final decorator = tester.widget<InputDecorator>(
+          find.descendant(of: search, matching: find.byType(InputDecorator)),
+        );
+        expect(decorator.isFocused, isTrue);
+        expect(
+          (decorator.decoration.border! as OutlineInputBorder).borderRadius,
+          BorderRadius.circular(18),
+        );
         expect(tester.takeException(), isNull);
       },
     );
@@ -77,7 +94,7 @@ void main() {
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(430, 1000));
       addTearDown(() => tester.binding.setSurfaceSize(null));
-      final fixture = _fixture(41);
+      final fixture = _fixture(11);
       addTearDown(fixture.container.dispose);
       await tester.pumpWidget(
         UncontrolledProviderScope(
@@ -95,21 +112,21 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('history-next-page')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('reading-card-reading_20')));
+      await tester.tap(find.byKey(const ValueKey('reading-card-reading_5')));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('history-search-field')), findsNothing);
       router.pop();
       await tester.pumpAndSettle();
       expect(tester.widget<TextField>(search).controller!.text, 'Kontrolle');
-      expect(fixture.readings.lastPageOffset, 20);
+      expect(fixture.readings.lastPageOffset, 5);
       expect(find.text('Seite 2 von 3'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('history-next-page')));
       await tester.pumpAndSettle();
-      expect(fixture.readings.lastPageOffset, 40);
+      expect(fixture.readings.lastPageOffset, 10);
       fixture.readings.items.remove('reading_0');
       fixture.container.invalidate(meterHistoryPageProvider);
       await tester.pumpAndSettle();
-      expect(fixture.readings.lastPageOffset, 20);
+      expect(fixture.readings.lastPageOffset, 5);
       expect(find.text('Seite 2 von 2'), findsOneWidget);
       await tester.enterText(search, 'Kein Treffer');
       await tester.pump(const Duration(milliseconds: 251));

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import '../../evidence/domain/evidence_export.dart';
+import '../../evidence/domain/evidence_export_page.dart';
 import '../domain/meter.dart';
 import '../domain/meter_dashboard_item.dart';
 import '../domain/meter_reading.dart';
@@ -229,6 +230,39 @@ class CombinedMeterDashboardRepository implements MeterDashboardRepository {
 class InMemoryEvidenceExportRepository implements EvidenceExportRepository {
   final Map<String, EvidenceExportRecord> _items = {};
   final StreamController<void> _changes = StreamController.broadcast();
+
+  @override
+  Stream<EvidenceExportPage> watchPageForMeter(
+    String meterId, {
+    required EvidenceExportKind kind,
+    required int limit,
+    int offset = 0,
+  }) {
+    if (limit <= 0) throw ArgumentError.value(limit, 'limit');
+    if (offset < 0) throw ArgumentError.value(offset, 'offset');
+    EvidenceExportPage page() {
+      final matching =
+          _items.values
+              .where((item) => item.meterId == meterId && item.kind == kind)
+              .toList()
+            ..sort(compareExportsNewestFirst);
+      return EvidenceExportPage(
+        exports: matching.skip(offset).take(limit).toList(growable: false),
+        totalCount: matching.length,
+        offset: offset,
+      );
+    }
+
+    return Stream.multi((controller) {
+      controller.add(page());
+      final subscription = _changes.stream.listen(
+        (_) => controller.add(page()),
+        onError: controller.addError,
+        onDone: controller.close,
+      );
+      controller.onCancel = subscription.cancel;
+    });
+  }
 
   @override
   Stream<List<EvidenceExportRecord>> watchForMeter(String meterId) async* {
