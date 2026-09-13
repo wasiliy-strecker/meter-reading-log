@@ -45,11 +45,18 @@ void main() {
     );
     expect(
       find.text(
-        'Deine Daten bleiben lokal auf deinem Gerät gespeichert, bis du sie in der App löschst oder die App-Daten entfernst. Extern gespeicherte PDFs und Backups löschst du am jeweiligen Speicherort.',
+        'Deine Daten bleiben lokal auf deinem Gerät gespeichert, bis du sie in der App löschst oder die App-Daten entfernst.',
       ),
       findsOneWidget,
     );
-    expect(find.textContaining('contact@appfabrik-ai.de'), findsOneWidget);
+    expect(find.textContaining('contact@appfabrik-ai.de'), findsNothing);
+    expect(find.textContaining('Extern gespeicherte PDFs'), findsNothing);
+    expect(
+      find.text(
+        'Entwickler und Datenschutzkontakt\nWasiliy Strecker · AppFabrik AI',
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Datenschutz und Lizenz'), findsNothing);
     expect(
       find.text('Quellcode-Lizenz: Mozilla Public License 2.0'),

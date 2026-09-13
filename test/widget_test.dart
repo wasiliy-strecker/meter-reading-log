@@ -33,6 +33,16 @@ void main() {
     expect(find.text('Bezeichnung *'), findsOneWidget);
     expect(find.text('Einheit *'), findsOneWidget);
     expect(find.byType(DropdownButtonFormField<String>), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Ableseerinnerung'),
+      180,
+      scrollable: find
+          .descendant(
+            of: find.byType(ListView),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
     expect(find.text('Ableseerinnerung'), findsOneWidget);
     expect(
       tester.widget<ListView>(find.byType(ListView)).keyboardDismissBehavior,
@@ -48,6 +58,16 @@ void main() {
     await tester.tap(find.text('Zähler anlegen'));
     await tester.pumpAndSettle();
 
+    await tester.scrollUntilVisible(
+      find.text('Ableseerinnerung'),
+      180,
+      scrollable: find
+          .descendant(
+            of: find.byType(ListView),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
     await tester.tap(find.text('Ableseerinnerung'));
     await tester.pumpAndSettle();
     final timeButton = find.widgetWithText(OutlinedButton, 'Uhrzeit ändern');

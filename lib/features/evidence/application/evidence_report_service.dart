@@ -311,6 +311,13 @@ class EvidenceReportService {
             style: const pw.TextStyle(fontSize: 14, color: PdfColors.grey800),
           ),
           pw.SizedBox(height: 18),
+          pw.Text(
+            kind == EvidenceExportKind.meterHistory
+                ? 'Aktuelle Zählerangaben'
+                : 'Zählerangaben bei Erfassung',
+            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 6),
           _meterTable(reportMeter),
           pw.SizedBox(height: 12),
           _photoModeBox(photoMode),
@@ -343,6 +350,7 @@ class EvidenceReportService {
                 includeHeading: true,
                 photoMode: photoMode,
                 photoAssets: photoAssets,
+                currentMeter: reportMeter,
               ),
               pw.SizedBox(height: 20),
             ],
@@ -430,7 +438,7 @@ class EvidenceReportService {
   ) => [
     for (var index = 0; index < readings.length; index++)
       [
-        '${date.format(readings[index].capturedAt.toLocal())}'
+        '${readingTimeText(readings[index], date)}'
             '${readings[index].wasFutureAtStorage ? '\nBei Speicherung zukünftig' : ''}',
         '${readings[index].value.displayText} ${readings[index].meter.unit}',
         index == readings.length - 1
@@ -442,6 +450,47 @@ class EvidenceReportService {
       ],
   ];
 
+  @visibleForTesting
+  static String readingTimeText(MeterReading reading, DateFormat date) {
+    // The saved offset belongs to this reading, not to the exporting device.
+    final localAtCapture = reading.capturedAt.toUtc().add(
+      Duration(minutes: reading.timezoneOffsetMinutes),
+    );
+    return '${date.format(localAtCapture)} (${_offset(reading.timezoneOffsetMinutes)})';
+  }
+
+  @visibleForTesting
+  static List<List<String>> historicalMeterData(
+    MeterSnapshot original,
+    MeterSnapshot current,
+  ) => [
+    for (final field in [
+      ('Zählerart', original.type.label, current.type.label),
+      ('Bezeichnung', original.label, current.label),
+      ('Zählernummer', original.meterNumber, current.meterNumber),
+      ('Standort', original.location, current.location),
+      ('Einheit', original.unit, current.unit),
+    ])
+      if (field.$2 != field.$3)
+        [field.$1, field.$2.isEmpty ? 'Nicht angegeben' : field.$2],
+  ];
+
+  @visibleForTesting
+  static List<List<String>> revisionChangeData(
+    ReadingRevision revision,
+    String unit,
+    DateFormat date,
+  ) => [
+    for (final change in revision.changes.entries)
+      // Keep human-readable photo/OCR changes; hashes remain internal.
+      if (change.key != 'Prüfwert des Fotos (SHA-256)')
+        [
+          change.key,
+          _revisionValue(change.key, change.value.before, unit, date),
+          _revisionValue(change.key, change.value.after, unit, date),
+        ],
+  ];
+
   static List<pw.Widget> _readingSection({
     required MeterReading reading,
     required List<ReadingRevision> revisions,
@@ -449,14 +498,38 @@ class EvidenceReportService {
     required bool includeHeading,
     required EvidencePhotoMode photoMode,
     required _PdfPhotoAssets photoAssets,
+    MeterSnapshot? currentMeter,
   }) {
+    final historicalData = currentMeter == null
+        ? const <List<String>>[]
+        : historicalMeterData(reading.meter, currentMeter);
     return [
       if (includeHeading)
         pw.Text(
-          '${date.format(reading.capturedAt.toLocal())} · ${reading.value.displayText} ${reading.meter.unit}',
+          '${readingTimeText(reading, date)} · ${reading.value.displayText} ${reading.meter.unit}',
           style: pw.TextStyle(fontSize: 15, fontWeight: pw.FontWeight.bold),
         ),
       if (includeHeading) pw.SizedBox(height: 8),
+      if (historicalData.isNotEmpty) ...[
+        pw.Text(
+          'Zählerangaben bei Erfassung',
+          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+        ),
+        pw.SizedBox(height: 4),
+        pw.Text(
+          'Diese Angaben weichen von den aktuellen Zählerangaben ab.',
+          style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
+        ),
+        pw.SizedBox(height: 4),
+        pw.TableHelper.fromTextArray(
+          cellPadding: const pw.EdgeInsets.symmetric(
+            horizontal: 8,
+            vertical: 5,
+          ),
+          data: historicalData,
+        ),
+        pw.SizedBox(height: 10),
+      ],
       if (photoMode != EvidencePhotoMode.withoutPhotos) ...[
         pw.Text(
           photoMode == EvidencePhotoMode.allPhotos &&
@@ -476,10 +549,7 @@ class EvidenceReportService {
             'Bestätigter Stand',
             '${reading.value.displayText} ${reading.meter.unit}',
           ],
-          [
-            'Zeitpunkt der Ablesung',
-            '${date.format(reading.capturedAt.toLocal())} (${_offset(reading.timezoneOffsetMinutes)})',
-          ],
+          ['Zeitpunkt der Ablesung', readingTimeText(reading, date)],
           ['Gespeichert', date.format(reading.storedAt.toLocal())],
           [
             'Aktuelles Foto hinzugefügt',
@@ -501,9 +571,14 @@ class EvidenceReportService {
           ['Manuell abweichend', reading.wasManuallyCorrected ? 'Ja' : 'Nein'],
           if (reading.lowerReadingReason != null)
             ['Niedrigerer Stand', reading.lowerReadingReason!.label],
-          if (reading.note.isNotEmpty) ['Notiz', reading.note],
         ],
       ),
+      if (reading.note.isNotEmpty) ...[
+        pw.SizedBox(height: 10),
+        pw.Text('Notiz', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+        pw.SizedBox(height: 4),
+        _flowingText(reading.note),
+      ],
       if (revisions.isNotEmpty) ...[
         pw.SizedBox(height: 10),
         pw.Text(
@@ -513,7 +588,7 @@ class EvidenceReportService {
         for (final revision in ([
           ...revisions,
         ]..sort((left, right) => right.changedAt.compareTo(left.changedAt))))
-          _revisionSection(
+          ..._revisionSection(
             revision: revision,
             reading: reading,
             date: date,
@@ -524,73 +599,61 @@ class EvidenceReportService {
     ];
   }
 
-  static pw.Widget _revisionSection({
+  static List<pw.Widget> _revisionSection({
     required ReadingRevision revision,
     required MeterReading reading,
     required DateFormat date,
     required EvidencePhotoMode photoMode,
     required _PdfPhotoAssets photoAssets,
   }) {
-    final visibleChanges = visibleRevisionChanges(
-      revision,
-    ).toList(growable: false);
+    final changes = revisionChangeData(revision, reading.meter.unit, date);
     final revisionPhotos = photosForRevision(
       reading: reading,
       revision: revision,
     );
-    return pw.Container(
-      margin: const pw.EdgeInsets.only(top: 6),
-      padding: const pw.EdgeInsets.all(8),
-      decoration: pw.BoxDecoration(
-        border: pw.Border.all(color: PdfColors.grey400),
-        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+    // Free text must be a direct MultiPage child to continue on another page.
+    // A surrounding container/table cell would make long corrections overflow.
+    return [
+      pw.SizedBox(height: 8),
+      pw.Divider(color: PdfColors.grey400, thickness: 0.5),
+      pw.Text(
+        'Korrektur vom ${date.format(revision.changedAt.toLocal())}',
+        style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
       ),
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Text(
-            'Korrektur vom ${date.format(revision.changedAt.toLocal())}',
-            style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
-          ),
-          if (revision.reason.trim().isNotEmpty)
-            pw.Text(
-              'Grund: ${revision.reason.trim()}',
-              style: const pw.TextStyle(fontSize: 9),
-            ),
-          for (final change in visibleChanges) ...[
-            pw.SizedBox(height: 4),
-            pw.Text(
-              change.key,
-              style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
-            ),
-            pw.Text(
-              'Vorher: ${_revisionValue(change.key, change.value.before, reading.meter.unit, date)}',
-              style: const pw.TextStyle(fontSize: 9),
-            ),
-            pw.Text(
-              'Neu: ${_revisionValue(change.key, change.value.after, reading.meter.unit, date)}',
-              style: const pw.TextStyle(fontSize: 9),
-            ),
-          ],
-          if (revisionPhotos != null &&
-              photoMode == EvidencePhotoMode.allPhotos) ...[
-            pw.SizedBox(height: 4),
-            _revisionPhotoComparison(
-              photos: revisionPhotos,
-              date: date,
-              photoAssets: photoAssets,
-            ),
-          ] else if (revisionPhotos != null) ...[
-            pw.SizedBox(height: 4),
-            pw.Text(
-              'Nachweisfoto geändert',
-              style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
-            ),
-          ],
-        ],
-      ),
-    );
+      if (revision.reason.trim().isNotEmpty)
+        _flowingText('Grund: ${revision.reason.trim()}', fontSize: 9),
+      for (final change in changes) ...[
+        pw.SizedBox(height: 4),
+        pw.Text(
+          change[0],
+          style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+        ),
+        _flowingText('Vorher: ${change[1]}', fontSize: 9),
+        _flowingText('Neu: ${change[2]}', fontSize: 9),
+      ],
+      if (revisionPhotos != null &&
+          photoMode == EvidencePhotoMode.allPhotos) ...[
+        pw.SizedBox(height: 4),
+        _revisionPhotoComparison(
+          photos: revisionPhotos,
+          date: date,
+          photoAssets: photoAssets,
+        ),
+      ] else if (revisionPhotos != null) ...[
+        pw.SizedBox(height: 4),
+        pw.Text(
+          'Nachweisfoto geändert',
+          style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+        ),
+      ],
+    ];
   }
+
+  static pw.Widget _flowingText(String text, {double fontSize = 10}) => pw.Text(
+    text,
+    style: pw.TextStyle(fontSize: fontSize),
+    overflow: pw.TextOverflow.span,
+  );
 
   static pw.Widget _revisionPhotoComparison({
     required ReadingRevisionPhotos photos,

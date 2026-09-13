@@ -97,13 +97,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           ),
                           const SizedBox(height: 10),
                           const Text(
-                            'Deine Daten bleiben lokal auf deinem Gerät gespeichert, bis du sie in der App löschst oder die App-Daten entfernst. Extern gespeicherte PDFs und Backups löschst du am jeweiligen Speicherort.',
+                            'Deine Daten bleiben lokal auf deinem Gerät gespeichert, bis du sie in der App löschst oder die App-Daten entfernst.',
                           ),
                           const SizedBox(height: 10),
                           Text(
                             'Entwickler und Datenschutzkontakt\n'
-                            'Wasiliy Strecker · AppFabrik AI\n'
-                            'contact@appfabrik-ai.de',
+                            'Wasiliy Strecker · AppFabrik AI',
                             style: TextStyle(
                               color: Theme.of(
                                 context,

@@ -518,27 +518,46 @@ class _MeterFormState extends ConsumerState<_MeterForm>
         ),
         bottomNavigationBar: SafeArea(
           minimum: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          child: FilledButton.icon(
-            onPressed: _saving || !hasUnsavedChanges ? null : _save,
-            icon: _saving
-                ? const SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Icon(
-                    editing && !hasUnsavedChanges
-                        ? Icons.check_circle_outline
-                        : Icons.save_outlined,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (!editing) ...[
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.sizeOf(context).height * 0.3,
                   ),
-            label: Text(
-              _saving
-                  ? 'Wird gespeichert …'
-                  : editing && !hasUnsavedChanges
-                  ? 'Alles gespeichert'
-                  : editing
-                  ? 'Änderungen speichern'
-                  : 'Zähler speichern',
-            ),
+                  child: const SingleChildScrollView(
+                    key: ValueKey('first-reading-hint-viewport'),
+                    primary: false,
+                    child: _FirstReadingHint(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+              FilledButton.icon(
+                onPressed: _saving || !hasUnsavedChanges ? null : _save,
+                icon: _saving
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(
+                        editing && !hasUnsavedChanges
+                            ? Icons.check_circle_outline
+                            : Icons.save_outlined,
+                      ),
+                label: Text(
+                  _saving
+                      ? 'Wird gespeichert …'
+                      : editing && !hasUnsavedChanges
+                      ? 'Alles gespeichert'
+                      : editing
+                      ? 'Änderungen speichern'
+                      : 'Zähler speichern',
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -897,6 +916,70 @@ class _MeterFormState extends ConsumerState<_MeterForm>
               'Test-Erinnerung konnte nicht angezeigt werden.',
           };
     ScaffoldMessenger.of(context).showSnackBar(AppSnackBar(message: message));
+  }
+}
+
+class _FirstReadingHint extends StatelessWidget {
+  const _FirstReadingHint();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return DecoratedBox(
+      key: const ValueKey('first-reading-hint'),
+      decoration: BoxDecoration(
+        color: colors.primary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colors.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: colors.primary.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.info_outline_rounded,
+                size: 20,
+                color: colors.primary,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    const TextSpan(text: 'Nach dem Speichern kannst du unter '),
+                    TextSpan(
+                      text: '„Ablesen / Fotografieren“',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: colors.onSurface,
+                      ),
+                    ),
+                    const TextSpan(
+                      text:
+                          ' deinen ersten Zählerstand erfassen und protokollieren.',
+                    ),
+                  ],
+                ),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontSize: 13,
+                  height: 1.4,
+                  color: colors.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
