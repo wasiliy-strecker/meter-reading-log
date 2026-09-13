@@ -184,11 +184,12 @@ void main() {
     expect(find.text('Aktuelles Nachweisfoto'), findsOneWidget);
     expect(find.text('Neues Foto für Korrektur'), findsOneWidget);
     expect(
-      find.textContaining(
-        'Nach dem Speichern findest du diese Änderung unter „Korrekturverlauf“',
+      find.text(
+        'Nach dem Speichern findest du diese Änderung unter „Korrekturverlauf“. Dort siehst du die geänderten Angaben mit „Vorher“ und „Neu“.',
       ),
       findsOneWidget,
     );
+    expect(find.textContaining('deinen Grund'), findsNothing);
 
     await tester.ensureVisible(find.text('Neues Foto für Korrektur'));
     await tester.tap(find.text('Neues Foto für Korrektur'));

@@ -105,7 +105,7 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
               child: Padding(
                 padding: const EdgeInsets.all(14),
                 child: Text(
-                  'Nach dem Speichern findest du diese Änderung unter „Korrekturverlauf“. Dort siehst du die geänderten Angaben mit „Vorher“ und „Neu“ sowie – falls angegeben – deinen Grund.',
+                  'Nach dem Speichern findest du diese Änderung unter „Korrekturverlauf“. Dort siehst du die geänderten Angaben mit „Vorher“ und „Neu“.',
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
