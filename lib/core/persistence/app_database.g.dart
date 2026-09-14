@@ -69,23 +69,23 @@ class $MeterRecordsTable extends MeterRecords
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
-  static const VerificationMeta _createdAtMillisMeta = const VerificationMeta(
-    'createdAtMillis',
+  static const VerificationMeta _createdAtMicrosMeta = const VerificationMeta(
+    'createdAtMicros',
   );
   @override
-  late final GeneratedColumn<int> createdAtMillis = GeneratedColumn<int>(
-    'created_at_millis',
+  late final GeneratedColumn<int> createdAtMicros = GeneratedColumn<int>(
+    'created_at_micros',
     aliasedName,
     false,
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _updatedAtMillisMeta = const VerificationMeta(
-    'updatedAtMillis',
+  static const VerificationMeta _updatedAtMicrosMeta = const VerificationMeta(
+    'updatedAtMicros',
   );
   @override
-  late final GeneratedColumn<int> updatedAtMillis = GeneratedColumn<int>(
-    'updated_at_millis',
+  late final GeneratedColumn<int> updatedAtMicros = GeneratedColumn<int>(
+    'updated_at_micros',
     aliasedName,
     false,
     type: DriftSqlType.int,
@@ -110,8 +110,8 @@ class $MeterRecordsTable extends MeterRecords
     unit,
     meterNumber,
     location,
-    createdAtMillis,
-    updatedAtMillis,
+    createdAtMicros,
+    updatedAtMicros,
     reminderJson,
   ];
   @override
@@ -170,27 +170,27 @@ class $MeterRecordsTable extends MeterRecords
         location.isAcceptableOrUnknown(data['location']!, _locationMeta),
       );
     }
-    if (data.containsKey('created_at_millis')) {
+    if (data.containsKey('created_at_micros')) {
       context.handle(
-        _createdAtMillisMeta,
-        createdAtMillis.isAcceptableOrUnknown(
-          data['created_at_millis']!,
-          _createdAtMillisMeta,
+        _createdAtMicrosMeta,
+        createdAtMicros.isAcceptableOrUnknown(
+          data['created_at_micros']!,
+          _createdAtMicrosMeta,
         ),
       );
     } else if (isInserting) {
-      context.missing(_createdAtMillisMeta);
+      context.missing(_createdAtMicrosMeta);
     }
-    if (data.containsKey('updated_at_millis')) {
+    if (data.containsKey('updated_at_micros')) {
       context.handle(
-        _updatedAtMillisMeta,
-        updatedAtMillis.isAcceptableOrUnknown(
-          data['updated_at_millis']!,
-          _updatedAtMillisMeta,
+        _updatedAtMicrosMeta,
+        updatedAtMicros.isAcceptableOrUnknown(
+          data['updated_at_micros']!,
+          _updatedAtMicrosMeta,
         ),
       );
     } else if (isInserting) {
-      context.missing(_updatedAtMillisMeta);
+      context.missing(_updatedAtMicrosMeta);
     }
     if (data.containsKey('reminder_json')) {
       context.handle(
@@ -234,13 +234,13 @@ class $MeterRecordsTable extends MeterRecords
         DriftSqlType.string,
         data['${effectivePrefix}location'],
       )!,
-      createdAtMillis: attachedDatabase.typeMapping.read(
+      createdAtMicros: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
-        data['${effectivePrefix}created_at_millis'],
+        data['${effectivePrefix}created_at_micros'],
       )!,
-      updatedAtMillis: attachedDatabase.typeMapping.read(
+      updatedAtMicros: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
-        data['${effectivePrefix}updated_at_millis'],
+        data['${effectivePrefix}updated_at_micros'],
       )!,
       reminderJson: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
@@ -263,8 +263,8 @@ class StoredMeterRecord extends DataClass
   final String unit;
   final String meterNumber;
   final String location;
-  final int createdAtMillis;
-  final int updatedAtMillis;
+  final int createdAtMicros;
+  final int updatedAtMicros;
   final String? reminderJson;
   const StoredMeterRecord({
     required this.id,
@@ -273,8 +273,8 @@ class StoredMeterRecord extends DataClass
     required this.unit,
     required this.meterNumber,
     required this.location,
-    required this.createdAtMillis,
-    required this.updatedAtMillis,
+    required this.createdAtMicros,
+    required this.updatedAtMicros,
     this.reminderJson,
   });
   @override
@@ -286,8 +286,8 @@ class StoredMeterRecord extends DataClass
     map['unit'] = Variable<String>(unit);
     map['meter_number'] = Variable<String>(meterNumber);
     map['location'] = Variable<String>(location);
-    map['created_at_millis'] = Variable<int>(createdAtMillis);
-    map['updated_at_millis'] = Variable<int>(updatedAtMillis);
+    map['created_at_micros'] = Variable<int>(createdAtMicros);
+    map['updated_at_micros'] = Variable<int>(updatedAtMicros);
     if (!nullToAbsent || reminderJson != null) {
       map['reminder_json'] = Variable<String>(reminderJson);
     }
@@ -302,8 +302,8 @@ class StoredMeterRecord extends DataClass
       unit: Value(unit),
       meterNumber: Value(meterNumber),
       location: Value(location),
-      createdAtMillis: Value(createdAtMillis),
-      updatedAtMillis: Value(updatedAtMillis),
+      createdAtMicros: Value(createdAtMicros),
+      updatedAtMicros: Value(updatedAtMicros),
       reminderJson: reminderJson == null && nullToAbsent
           ? const Value.absent()
           : Value(reminderJson),
@@ -322,8 +322,8 @@ class StoredMeterRecord extends DataClass
       unit: serializer.fromJson<String>(json['unit']),
       meterNumber: serializer.fromJson<String>(json['meterNumber']),
       location: serializer.fromJson<String>(json['location']),
-      createdAtMillis: serializer.fromJson<int>(json['createdAtMillis']),
-      updatedAtMillis: serializer.fromJson<int>(json['updatedAtMillis']),
+      createdAtMicros: serializer.fromJson<int>(json['createdAtMicros']),
+      updatedAtMicros: serializer.fromJson<int>(json['updatedAtMicros']),
       reminderJson: serializer.fromJson<String?>(json['reminderJson']),
     );
   }
@@ -337,8 +337,8 @@ class StoredMeterRecord extends DataClass
       'unit': serializer.toJson<String>(unit),
       'meterNumber': serializer.toJson<String>(meterNumber),
       'location': serializer.toJson<String>(location),
-      'createdAtMillis': serializer.toJson<int>(createdAtMillis),
-      'updatedAtMillis': serializer.toJson<int>(updatedAtMillis),
+      'createdAtMicros': serializer.toJson<int>(createdAtMicros),
+      'updatedAtMicros': serializer.toJson<int>(updatedAtMicros),
       'reminderJson': serializer.toJson<String?>(reminderJson),
     };
   }
@@ -350,8 +350,8 @@ class StoredMeterRecord extends DataClass
     String? unit,
     String? meterNumber,
     String? location,
-    int? createdAtMillis,
-    int? updatedAtMillis,
+    int? createdAtMicros,
+    int? updatedAtMicros,
     Value<String?> reminderJson = const Value.absent(),
   }) => StoredMeterRecord(
     id: id ?? this.id,
@@ -360,8 +360,8 @@ class StoredMeterRecord extends DataClass
     unit: unit ?? this.unit,
     meterNumber: meterNumber ?? this.meterNumber,
     location: location ?? this.location,
-    createdAtMillis: createdAtMillis ?? this.createdAtMillis,
-    updatedAtMillis: updatedAtMillis ?? this.updatedAtMillis,
+    createdAtMicros: createdAtMicros ?? this.createdAtMicros,
+    updatedAtMicros: updatedAtMicros ?? this.updatedAtMicros,
     reminderJson: reminderJson.present ? reminderJson.value : this.reminderJson,
   );
   StoredMeterRecord copyWithCompanion(MeterRecordsCompanion data) {
@@ -374,12 +374,12 @@ class StoredMeterRecord extends DataClass
           ? data.meterNumber.value
           : this.meterNumber,
       location: data.location.present ? data.location.value : this.location,
-      createdAtMillis: data.createdAtMillis.present
-          ? data.createdAtMillis.value
-          : this.createdAtMillis,
-      updatedAtMillis: data.updatedAtMillis.present
-          ? data.updatedAtMillis.value
-          : this.updatedAtMillis,
+      createdAtMicros: data.createdAtMicros.present
+          ? data.createdAtMicros.value
+          : this.createdAtMicros,
+      updatedAtMicros: data.updatedAtMicros.present
+          ? data.updatedAtMicros.value
+          : this.updatedAtMicros,
       reminderJson: data.reminderJson.present
           ? data.reminderJson.value
           : this.reminderJson,
@@ -395,8 +395,8 @@ class StoredMeterRecord extends DataClass
           ..write('unit: $unit, ')
           ..write('meterNumber: $meterNumber, ')
           ..write('location: $location, ')
-          ..write('createdAtMillis: $createdAtMillis, ')
-          ..write('updatedAtMillis: $updatedAtMillis, ')
+          ..write('createdAtMicros: $createdAtMicros, ')
+          ..write('updatedAtMicros: $updatedAtMicros, ')
           ..write('reminderJson: $reminderJson')
           ..write(')'))
         .toString();
@@ -410,8 +410,8 @@ class StoredMeterRecord extends DataClass
     unit,
     meterNumber,
     location,
-    createdAtMillis,
-    updatedAtMillis,
+    createdAtMicros,
+    updatedAtMicros,
     reminderJson,
   );
   @override
@@ -424,8 +424,8 @@ class StoredMeterRecord extends DataClass
           other.unit == this.unit &&
           other.meterNumber == this.meterNumber &&
           other.location == this.location &&
-          other.createdAtMillis == this.createdAtMillis &&
-          other.updatedAtMillis == this.updatedAtMillis &&
+          other.createdAtMicros == this.createdAtMicros &&
+          other.updatedAtMicros == this.updatedAtMicros &&
           other.reminderJson == this.reminderJson);
 }
 
@@ -436,8 +436,8 @@ class MeterRecordsCompanion extends UpdateCompanion<StoredMeterRecord> {
   final Value<String> unit;
   final Value<String> meterNumber;
   final Value<String> location;
-  final Value<int> createdAtMillis;
-  final Value<int> updatedAtMillis;
+  final Value<int> createdAtMicros;
+  final Value<int> updatedAtMicros;
   final Value<String?> reminderJson;
   final Value<int> rowid;
   const MeterRecordsCompanion({
@@ -447,8 +447,8 @@ class MeterRecordsCompanion extends UpdateCompanion<StoredMeterRecord> {
     this.unit = const Value.absent(),
     this.meterNumber = const Value.absent(),
     this.location = const Value.absent(),
-    this.createdAtMillis = const Value.absent(),
-    this.updatedAtMillis = const Value.absent(),
+    this.createdAtMicros = const Value.absent(),
+    this.updatedAtMicros = const Value.absent(),
     this.reminderJson = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -459,16 +459,16 @@ class MeterRecordsCompanion extends UpdateCompanion<StoredMeterRecord> {
     required String unit,
     this.meterNumber = const Value.absent(),
     this.location = const Value.absent(),
-    required int createdAtMillis,
-    required int updatedAtMillis,
+    required int createdAtMicros,
+    required int updatedAtMicros,
     this.reminderJson = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        label = Value(label),
        type = Value(type),
        unit = Value(unit),
-       createdAtMillis = Value(createdAtMillis),
-       updatedAtMillis = Value(updatedAtMillis);
+       createdAtMicros = Value(createdAtMicros),
+       updatedAtMicros = Value(updatedAtMicros);
   static Insertable<StoredMeterRecord> custom({
     Expression<String>? id,
     Expression<String>? label,
@@ -476,8 +476,8 @@ class MeterRecordsCompanion extends UpdateCompanion<StoredMeterRecord> {
     Expression<String>? unit,
     Expression<String>? meterNumber,
     Expression<String>? location,
-    Expression<int>? createdAtMillis,
-    Expression<int>? updatedAtMillis,
+    Expression<int>? createdAtMicros,
+    Expression<int>? updatedAtMicros,
     Expression<String>? reminderJson,
     Expression<int>? rowid,
   }) {
@@ -488,8 +488,8 @@ class MeterRecordsCompanion extends UpdateCompanion<StoredMeterRecord> {
       if (unit != null) 'unit': unit,
       if (meterNumber != null) 'meter_number': meterNumber,
       if (location != null) 'location': location,
-      if (createdAtMillis != null) 'created_at_millis': createdAtMillis,
-      if (updatedAtMillis != null) 'updated_at_millis': updatedAtMillis,
+      if (createdAtMicros != null) 'created_at_micros': createdAtMicros,
+      if (updatedAtMicros != null) 'updated_at_micros': updatedAtMicros,
       if (reminderJson != null) 'reminder_json': reminderJson,
       if (rowid != null) 'rowid': rowid,
     });
@@ -502,8 +502,8 @@ class MeterRecordsCompanion extends UpdateCompanion<StoredMeterRecord> {
     Value<String>? unit,
     Value<String>? meterNumber,
     Value<String>? location,
-    Value<int>? createdAtMillis,
-    Value<int>? updatedAtMillis,
+    Value<int>? createdAtMicros,
+    Value<int>? updatedAtMicros,
     Value<String?>? reminderJson,
     Value<int>? rowid,
   }) {
@@ -514,8 +514,8 @@ class MeterRecordsCompanion extends UpdateCompanion<StoredMeterRecord> {
       unit: unit ?? this.unit,
       meterNumber: meterNumber ?? this.meterNumber,
       location: location ?? this.location,
-      createdAtMillis: createdAtMillis ?? this.createdAtMillis,
-      updatedAtMillis: updatedAtMillis ?? this.updatedAtMillis,
+      createdAtMicros: createdAtMicros ?? this.createdAtMicros,
+      updatedAtMicros: updatedAtMicros ?? this.updatedAtMicros,
       reminderJson: reminderJson ?? this.reminderJson,
       rowid: rowid ?? this.rowid,
     );
@@ -542,11 +542,11 @@ class MeterRecordsCompanion extends UpdateCompanion<StoredMeterRecord> {
     if (location.present) {
       map['location'] = Variable<String>(location.value);
     }
-    if (createdAtMillis.present) {
-      map['created_at_millis'] = Variable<int>(createdAtMillis.value);
+    if (createdAtMicros.present) {
+      map['created_at_micros'] = Variable<int>(createdAtMicros.value);
     }
-    if (updatedAtMillis.present) {
-      map['updated_at_millis'] = Variable<int>(updatedAtMillis.value);
+    if (updatedAtMicros.present) {
+      map['updated_at_micros'] = Variable<int>(updatedAtMicros.value);
     }
     if (reminderJson.present) {
       map['reminder_json'] = Variable<String>(reminderJson.value);
@@ -566,8 +566,8 @@ class MeterRecordsCompanion extends UpdateCompanion<StoredMeterRecord> {
           ..write('unit: $unit, ')
           ..write('meterNumber: $meterNumber, ')
           ..write('location: $location, ')
-          ..write('createdAtMillis: $createdAtMillis, ')
-          ..write('updatedAtMillis: $updatedAtMillis, ')
+          ..write('createdAtMicros: $createdAtMicros, ')
+          ..write('updatedAtMicros: $updatedAtMicros, ')
           ..write('reminderJson: $reminderJson, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -646,12 +646,12 @@ class $ReadingRecordsTable extends ReadingRecords
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _capturedAtMillisMeta = const VerificationMeta(
-    'capturedAtMillis',
+  static const VerificationMeta _capturedAtMicrosMeta = const VerificationMeta(
+    'capturedAtMicros',
   );
   @override
-  late final GeneratedColumn<int> capturedAtMillis = GeneratedColumn<int>(
-    'captured_at_millis',
+  late final GeneratedColumn<int> capturedAtMicros = GeneratedColumn<int>(
+    'captured_at_micros',
     aliasedName,
     false,
     type: DriftSqlType.int,
@@ -667,23 +667,23 @@ class $ReadingRecordsTable extends ReadingRecords
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _storedAtMillisMeta = const VerificationMeta(
-    'storedAtMillis',
+  static const VerificationMeta _storedAtMicrosMeta = const VerificationMeta(
+    'storedAtMicros',
   );
   @override
-  late final GeneratedColumn<int> storedAtMillis = GeneratedColumn<int>(
-    'stored_at_millis',
+  late final GeneratedColumn<int> storedAtMicros = GeneratedColumn<int>(
+    'stored_at_micros',
     aliasedName,
     false,
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _updatedAtMillisMeta = const VerificationMeta(
-    'updatedAtMillis',
+  static const VerificationMeta _updatedAtMicrosMeta = const VerificationMeta(
+    'updatedAtMicros',
   );
   @override
-  late final GeneratedColumn<int> updatedAtMillis = GeneratedColumn<int>(
-    'updated_at_millis',
+  late final GeneratedColumn<int> updatedAtMicros = GeneratedColumn<int>(
+    'updated_at_micros',
     aliasedName,
     false,
     type: DriftSqlType.int,
@@ -755,11 +755,11 @@ class $ReadingRecordsTable extends ReadingRecords
     type: DriftSqlType.double,
     requiredDuringInsert: false,
   );
-  static const VerificationMeta _photoAddedAtMillisMeta =
-      const VerificationMeta('photoAddedAtMillis');
+  static const VerificationMeta _photoAddedAtMicrosMeta =
+      const VerificationMeta('photoAddedAtMicros');
   @override
-  late final GeneratedColumn<int> photoAddedAtMillis = GeneratedColumn<int>(
-    'photo_added_at_millis',
+  late final GeneratedColumn<int> photoAddedAtMicros = GeneratedColumn<int>(
+    'photo_added_at_micros',
     aliasedName,
     true,
     type: DriftSqlType.int,
@@ -817,17 +817,17 @@ class $ReadingRecordsTable extends ReadingRecords
     displayValue,
     valueDigits,
     valueScale,
-    capturedAtMillis,
+    capturedAtMicros,
     timezoneOffsetMinutes,
-    storedAtMillis,
-    updatedAtMillis,
+    storedAtMicros,
+    updatedAtMicros,
     source,
     photoPath,
     photoSha256,
     ocrRawText,
     ocrCandidate,
     ocrConfidence,
-    photoAddedAtMillis,
+    photoAddedAtMicros,
     photoHistoryJson,
     lowerReadingReason,
     note,
@@ -899,16 +899,16 @@ class $ReadingRecordsTable extends ReadingRecords
     } else if (isInserting) {
       context.missing(_valueScaleMeta);
     }
-    if (data.containsKey('captured_at_millis')) {
+    if (data.containsKey('captured_at_micros')) {
       context.handle(
-        _capturedAtMillisMeta,
-        capturedAtMillis.isAcceptableOrUnknown(
-          data['captured_at_millis']!,
-          _capturedAtMillisMeta,
+        _capturedAtMicrosMeta,
+        capturedAtMicros.isAcceptableOrUnknown(
+          data['captured_at_micros']!,
+          _capturedAtMicrosMeta,
         ),
       );
     } else if (isInserting) {
-      context.missing(_capturedAtMillisMeta);
+      context.missing(_capturedAtMicrosMeta);
     }
     if (data.containsKey('timezone_offset_minutes')) {
       context.handle(
@@ -921,27 +921,27 @@ class $ReadingRecordsTable extends ReadingRecords
     } else if (isInserting) {
       context.missing(_timezoneOffsetMinutesMeta);
     }
-    if (data.containsKey('stored_at_millis')) {
+    if (data.containsKey('stored_at_micros')) {
       context.handle(
-        _storedAtMillisMeta,
-        storedAtMillis.isAcceptableOrUnknown(
-          data['stored_at_millis']!,
-          _storedAtMillisMeta,
+        _storedAtMicrosMeta,
+        storedAtMicros.isAcceptableOrUnknown(
+          data['stored_at_micros']!,
+          _storedAtMicrosMeta,
         ),
       );
     } else if (isInserting) {
-      context.missing(_storedAtMillisMeta);
+      context.missing(_storedAtMicrosMeta);
     }
-    if (data.containsKey('updated_at_millis')) {
+    if (data.containsKey('updated_at_micros')) {
       context.handle(
-        _updatedAtMillisMeta,
-        updatedAtMillis.isAcceptableOrUnknown(
-          data['updated_at_millis']!,
-          _updatedAtMillisMeta,
+        _updatedAtMicrosMeta,
+        updatedAtMicros.isAcceptableOrUnknown(
+          data['updated_at_micros']!,
+          _updatedAtMicrosMeta,
         ),
       );
     } else if (isInserting) {
-      context.missing(_updatedAtMillisMeta);
+      context.missing(_updatedAtMicrosMeta);
     }
     if (data.containsKey('source')) {
       context.handle(
@@ -997,12 +997,12 @@ class $ReadingRecordsTable extends ReadingRecords
         ),
       );
     }
-    if (data.containsKey('photo_added_at_millis')) {
+    if (data.containsKey('photo_added_at_micros')) {
       context.handle(
-        _photoAddedAtMillisMeta,
-        photoAddedAtMillis.isAcceptableOrUnknown(
-          data['photo_added_at_millis']!,
-          _photoAddedAtMillisMeta,
+        _photoAddedAtMicrosMeta,
+        photoAddedAtMicros.isAcceptableOrUnknown(
+          data['photo_added_at_micros']!,
+          _photoAddedAtMicrosMeta,
         ),
       );
     }
@@ -1074,21 +1074,21 @@ class $ReadingRecordsTable extends ReadingRecords
         DriftSqlType.int,
         data['${effectivePrefix}value_scale'],
       )!,
-      capturedAtMillis: attachedDatabase.typeMapping.read(
+      capturedAtMicros: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
-        data['${effectivePrefix}captured_at_millis'],
+        data['${effectivePrefix}captured_at_micros'],
       )!,
       timezoneOffsetMinutes: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}timezone_offset_minutes'],
       )!,
-      storedAtMillis: attachedDatabase.typeMapping.read(
+      storedAtMicros: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
-        data['${effectivePrefix}stored_at_millis'],
+        data['${effectivePrefix}stored_at_micros'],
       )!,
-      updatedAtMillis: attachedDatabase.typeMapping.read(
+      updatedAtMicros: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
-        data['${effectivePrefix}updated_at_millis'],
+        data['${effectivePrefix}updated_at_micros'],
       )!,
       source: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
@@ -1114,9 +1114,9 @@ class $ReadingRecordsTable extends ReadingRecords
         DriftSqlType.double,
         data['${effectivePrefix}ocr_confidence'],
       ),
-      photoAddedAtMillis: attachedDatabase.typeMapping.read(
+      photoAddedAtMicros: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
-        data['${effectivePrefix}photo_added_at_millis'],
+        data['${effectivePrefix}photo_added_at_micros'],
       ),
       photoHistoryJson: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
@@ -1151,17 +1151,17 @@ class StoredReadingRecord extends DataClass
   final String displayValue;
   final String valueDigits;
   final int valueScale;
-  final int capturedAtMillis;
+  final int capturedAtMicros;
   final int timezoneOffsetMinutes;
-  final int storedAtMillis;
-  final int updatedAtMillis;
+  final int storedAtMicros;
+  final int updatedAtMicros;
   final String source;
   final String photoPath;
   final String photoSha256;
   final String ocrRawText;
   final String ocrCandidate;
   final double? ocrConfidence;
-  final int? photoAddedAtMillis;
+  final int? photoAddedAtMicros;
   final String photoHistoryJson;
   final String? lowerReadingReason;
   final String note;
@@ -1173,17 +1173,17 @@ class StoredReadingRecord extends DataClass
     required this.displayValue,
     required this.valueDigits,
     required this.valueScale,
-    required this.capturedAtMillis,
+    required this.capturedAtMicros,
     required this.timezoneOffsetMinutes,
-    required this.storedAtMillis,
-    required this.updatedAtMillis,
+    required this.storedAtMicros,
+    required this.updatedAtMicros,
     required this.source,
     required this.photoPath,
     required this.photoSha256,
     required this.ocrRawText,
     required this.ocrCandidate,
     this.ocrConfidence,
-    this.photoAddedAtMillis,
+    this.photoAddedAtMicros,
     required this.photoHistoryJson,
     this.lowerReadingReason,
     required this.note,
@@ -1198,10 +1198,10 @@ class StoredReadingRecord extends DataClass
     map['display_value'] = Variable<String>(displayValue);
     map['value_digits'] = Variable<String>(valueDigits);
     map['value_scale'] = Variable<int>(valueScale);
-    map['captured_at_millis'] = Variable<int>(capturedAtMillis);
+    map['captured_at_micros'] = Variable<int>(capturedAtMicros);
     map['timezone_offset_minutes'] = Variable<int>(timezoneOffsetMinutes);
-    map['stored_at_millis'] = Variable<int>(storedAtMillis);
-    map['updated_at_millis'] = Variable<int>(updatedAtMillis);
+    map['stored_at_micros'] = Variable<int>(storedAtMicros);
+    map['updated_at_micros'] = Variable<int>(updatedAtMicros);
     map['source'] = Variable<String>(source);
     map['photo_path'] = Variable<String>(photoPath);
     map['photo_sha256'] = Variable<String>(photoSha256);
@@ -1210,8 +1210,8 @@ class StoredReadingRecord extends DataClass
     if (!nullToAbsent || ocrConfidence != null) {
       map['ocr_confidence'] = Variable<double>(ocrConfidence);
     }
-    if (!nullToAbsent || photoAddedAtMillis != null) {
-      map['photo_added_at_millis'] = Variable<int>(photoAddedAtMillis);
+    if (!nullToAbsent || photoAddedAtMicros != null) {
+      map['photo_added_at_micros'] = Variable<int>(photoAddedAtMicros);
     }
     map['photo_history_json'] = Variable<String>(photoHistoryJson);
     if (!nullToAbsent || lowerReadingReason != null) {
@@ -1230,10 +1230,10 @@ class StoredReadingRecord extends DataClass
       displayValue: Value(displayValue),
       valueDigits: Value(valueDigits),
       valueScale: Value(valueScale),
-      capturedAtMillis: Value(capturedAtMillis),
+      capturedAtMicros: Value(capturedAtMicros),
       timezoneOffsetMinutes: Value(timezoneOffsetMinutes),
-      storedAtMillis: Value(storedAtMillis),
-      updatedAtMillis: Value(updatedAtMillis),
+      storedAtMicros: Value(storedAtMicros),
+      updatedAtMicros: Value(updatedAtMicros),
       source: Value(source),
       photoPath: Value(photoPath),
       photoSha256: Value(photoSha256),
@@ -1242,9 +1242,9 @@ class StoredReadingRecord extends DataClass
       ocrConfidence: ocrConfidence == null && nullToAbsent
           ? const Value.absent()
           : Value(ocrConfidence),
-      photoAddedAtMillis: photoAddedAtMillis == null && nullToAbsent
+      photoAddedAtMicros: photoAddedAtMicros == null && nullToAbsent
           ? const Value.absent()
-          : Value(photoAddedAtMillis),
+          : Value(photoAddedAtMicros),
       photoHistoryJson: Value(photoHistoryJson),
       lowerReadingReason: lowerReadingReason == null && nullToAbsent
           ? const Value.absent()
@@ -1266,19 +1266,19 @@ class StoredReadingRecord extends DataClass
       displayValue: serializer.fromJson<String>(json['displayValue']),
       valueDigits: serializer.fromJson<String>(json['valueDigits']),
       valueScale: serializer.fromJson<int>(json['valueScale']),
-      capturedAtMillis: serializer.fromJson<int>(json['capturedAtMillis']),
+      capturedAtMicros: serializer.fromJson<int>(json['capturedAtMicros']),
       timezoneOffsetMinutes: serializer.fromJson<int>(
         json['timezoneOffsetMinutes'],
       ),
-      storedAtMillis: serializer.fromJson<int>(json['storedAtMillis']),
-      updatedAtMillis: serializer.fromJson<int>(json['updatedAtMillis']),
+      storedAtMicros: serializer.fromJson<int>(json['storedAtMicros']),
+      updatedAtMicros: serializer.fromJson<int>(json['updatedAtMicros']),
       source: serializer.fromJson<String>(json['source']),
       photoPath: serializer.fromJson<String>(json['photoPath']),
       photoSha256: serializer.fromJson<String>(json['photoSha256']),
       ocrRawText: serializer.fromJson<String>(json['ocrRawText']),
       ocrCandidate: serializer.fromJson<String>(json['ocrCandidate']),
       ocrConfidence: serializer.fromJson<double?>(json['ocrConfidence']),
-      photoAddedAtMillis: serializer.fromJson<int?>(json['photoAddedAtMillis']),
+      photoAddedAtMicros: serializer.fromJson<int?>(json['photoAddedAtMicros']),
       photoHistoryJson: serializer.fromJson<String>(json['photoHistoryJson']),
       lowerReadingReason: serializer.fromJson<String?>(
         json['lowerReadingReason'],
@@ -1297,17 +1297,17 @@ class StoredReadingRecord extends DataClass
       'displayValue': serializer.toJson<String>(displayValue),
       'valueDigits': serializer.toJson<String>(valueDigits),
       'valueScale': serializer.toJson<int>(valueScale),
-      'capturedAtMillis': serializer.toJson<int>(capturedAtMillis),
+      'capturedAtMicros': serializer.toJson<int>(capturedAtMicros),
       'timezoneOffsetMinutes': serializer.toJson<int>(timezoneOffsetMinutes),
-      'storedAtMillis': serializer.toJson<int>(storedAtMillis),
-      'updatedAtMillis': serializer.toJson<int>(updatedAtMillis),
+      'storedAtMicros': serializer.toJson<int>(storedAtMicros),
+      'updatedAtMicros': serializer.toJson<int>(updatedAtMicros),
       'source': serializer.toJson<String>(source),
       'photoPath': serializer.toJson<String>(photoPath),
       'photoSha256': serializer.toJson<String>(photoSha256),
       'ocrRawText': serializer.toJson<String>(ocrRawText),
       'ocrCandidate': serializer.toJson<String>(ocrCandidate),
       'ocrConfidence': serializer.toJson<double?>(ocrConfidence),
-      'photoAddedAtMillis': serializer.toJson<int?>(photoAddedAtMillis),
+      'photoAddedAtMicros': serializer.toJson<int?>(photoAddedAtMicros),
       'photoHistoryJson': serializer.toJson<String>(photoHistoryJson),
       'lowerReadingReason': serializer.toJson<String?>(lowerReadingReason),
       'note': serializer.toJson<String>(note),
@@ -1322,17 +1322,17 @@ class StoredReadingRecord extends DataClass
     String? displayValue,
     String? valueDigits,
     int? valueScale,
-    int? capturedAtMillis,
+    int? capturedAtMicros,
     int? timezoneOffsetMinutes,
-    int? storedAtMillis,
-    int? updatedAtMillis,
+    int? storedAtMicros,
+    int? updatedAtMicros,
     String? source,
     String? photoPath,
     String? photoSha256,
     String? ocrRawText,
     String? ocrCandidate,
     Value<double?> ocrConfidence = const Value.absent(),
-    Value<int?> photoAddedAtMillis = const Value.absent(),
+    Value<int?> photoAddedAtMicros = const Value.absent(),
     String? photoHistoryJson,
     Value<String?> lowerReadingReason = const Value.absent(),
     String? note,
@@ -1344,10 +1344,10 @@ class StoredReadingRecord extends DataClass
     displayValue: displayValue ?? this.displayValue,
     valueDigits: valueDigits ?? this.valueDigits,
     valueScale: valueScale ?? this.valueScale,
-    capturedAtMillis: capturedAtMillis ?? this.capturedAtMillis,
+    capturedAtMicros: capturedAtMicros ?? this.capturedAtMicros,
     timezoneOffsetMinutes: timezoneOffsetMinutes ?? this.timezoneOffsetMinutes,
-    storedAtMillis: storedAtMillis ?? this.storedAtMillis,
-    updatedAtMillis: updatedAtMillis ?? this.updatedAtMillis,
+    storedAtMicros: storedAtMicros ?? this.storedAtMicros,
+    updatedAtMicros: updatedAtMicros ?? this.updatedAtMicros,
     source: source ?? this.source,
     photoPath: photoPath ?? this.photoPath,
     photoSha256: photoSha256 ?? this.photoSha256,
@@ -1356,9 +1356,9 @@ class StoredReadingRecord extends DataClass
     ocrConfidence: ocrConfidence.present
         ? ocrConfidence.value
         : this.ocrConfidence,
-    photoAddedAtMillis: photoAddedAtMillis.present
-        ? photoAddedAtMillis.value
-        : this.photoAddedAtMillis,
+    photoAddedAtMicros: photoAddedAtMicros.present
+        ? photoAddedAtMicros.value
+        : this.photoAddedAtMicros,
     photoHistoryJson: photoHistoryJson ?? this.photoHistoryJson,
     lowerReadingReason: lowerReadingReason.present
         ? lowerReadingReason.value
@@ -1382,18 +1382,18 @@ class StoredReadingRecord extends DataClass
       valueScale: data.valueScale.present
           ? data.valueScale.value
           : this.valueScale,
-      capturedAtMillis: data.capturedAtMillis.present
-          ? data.capturedAtMillis.value
-          : this.capturedAtMillis,
+      capturedAtMicros: data.capturedAtMicros.present
+          ? data.capturedAtMicros.value
+          : this.capturedAtMicros,
       timezoneOffsetMinutes: data.timezoneOffsetMinutes.present
           ? data.timezoneOffsetMinutes.value
           : this.timezoneOffsetMinutes,
-      storedAtMillis: data.storedAtMillis.present
-          ? data.storedAtMillis.value
-          : this.storedAtMillis,
-      updatedAtMillis: data.updatedAtMillis.present
-          ? data.updatedAtMillis.value
-          : this.updatedAtMillis,
+      storedAtMicros: data.storedAtMicros.present
+          ? data.storedAtMicros.value
+          : this.storedAtMicros,
+      updatedAtMicros: data.updatedAtMicros.present
+          ? data.updatedAtMicros.value
+          : this.updatedAtMicros,
       source: data.source.present ? data.source.value : this.source,
       photoPath: data.photoPath.present ? data.photoPath.value : this.photoPath,
       photoSha256: data.photoSha256.present
@@ -1408,9 +1408,9 @@ class StoredReadingRecord extends DataClass
       ocrConfidence: data.ocrConfidence.present
           ? data.ocrConfidence.value
           : this.ocrConfidence,
-      photoAddedAtMillis: data.photoAddedAtMillis.present
-          ? data.photoAddedAtMillis.value
-          : this.photoAddedAtMillis,
+      photoAddedAtMicros: data.photoAddedAtMicros.present
+          ? data.photoAddedAtMicros.value
+          : this.photoAddedAtMicros,
       photoHistoryJson: data.photoHistoryJson.present
           ? data.photoHistoryJson.value
           : this.photoHistoryJson,
@@ -1433,17 +1433,17 @@ class StoredReadingRecord extends DataClass
           ..write('displayValue: $displayValue, ')
           ..write('valueDigits: $valueDigits, ')
           ..write('valueScale: $valueScale, ')
-          ..write('capturedAtMillis: $capturedAtMillis, ')
+          ..write('capturedAtMicros: $capturedAtMicros, ')
           ..write('timezoneOffsetMinutes: $timezoneOffsetMinutes, ')
-          ..write('storedAtMillis: $storedAtMillis, ')
-          ..write('updatedAtMillis: $updatedAtMillis, ')
+          ..write('storedAtMicros: $storedAtMicros, ')
+          ..write('updatedAtMicros: $updatedAtMicros, ')
           ..write('source: $source, ')
           ..write('photoPath: $photoPath, ')
           ..write('photoSha256: $photoSha256, ')
           ..write('ocrRawText: $ocrRawText, ')
           ..write('ocrCandidate: $ocrCandidate, ')
           ..write('ocrConfidence: $ocrConfidence, ')
-          ..write('photoAddedAtMillis: $photoAddedAtMillis, ')
+          ..write('photoAddedAtMicros: $photoAddedAtMicros, ')
           ..write('photoHistoryJson: $photoHistoryJson, ')
           ..write('lowerReadingReason: $lowerReadingReason, ')
           ..write('note: $note, ')
@@ -1460,17 +1460,17 @@ class StoredReadingRecord extends DataClass
     displayValue,
     valueDigits,
     valueScale,
-    capturedAtMillis,
+    capturedAtMicros,
     timezoneOffsetMinutes,
-    storedAtMillis,
-    updatedAtMillis,
+    storedAtMicros,
+    updatedAtMicros,
     source,
     photoPath,
     photoSha256,
     ocrRawText,
     ocrCandidate,
     ocrConfidence,
-    photoAddedAtMillis,
+    photoAddedAtMicros,
     photoHistoryJson,
     lowerReadingReason,
     note,
@@ -1486,17 +1486,17 @@ class StoredReadingRecord extends DataClass
           other.displayValue == this.displayValue &&
           other.valueDigits == this.valueDigits &&
           other.valueScale == this.valueScale &&
-          other.capturedAtMillis == this.capturedAtMillis &&
+          other.capturedAtMicros == this.capturedAtMicros &&
           other.timezoneOffsetMinutes == this.timezoneOffsetMinutes &&
-          other.storedAtMillis == this.storedAtMillis &&
-          other.updatedAtMillis == this.updatedAtMillis &&
+          other.storedAtMicros == this.storedAtMicros &&
+          other.updatedAtMicros == this.updatedAtMicros &&
           other.source == this.source &&
           other.photoPath == this.photoPath &&
           other.photoSha256 == this.photoSha256 &&
           other.ocrRawText == this.ocrRawText &&
           other.ocrCandidate == this.ocrCandidate &&
           other.ocrConfidence == this.ocrConfidence &&
-          other.photoAddedAtMillis == this.photoAddedAtMillis &&
+          other.photoAddedAtMicros == this.photoAddedAtMicros &&
           other.photoHistoryJson == this.photoHistoryJson &&
           other.lowerReadingReason == this.lowerReadingReason &&
           other.note == this.note &&
@@ -1510,17 +1510,17 @@ class ReadingRecordsCompanion extends UpdateCompanion<StoredReadingRecord> {
   final Value<String> displayValue;
   final Value<String> valueDigits;
   final Value<int> valueScale;
-  final Value<int> capturedAtMillis;
+  final Value<int> capturedAtMicros;
   final Value<int> timezoneOffsetMinutes;
-  final Value<int> storedAtMillis;
-  final Value<int> updatedAtMillis;
+  final Value<int> storedAtMicros;
+  final Value<int> updatedAtMicros;
   final Value<String> source;
   final Value<String> photoPath;
   final Value<String> photoSha256;
   final Value<String> ocrRawText;
   final Value<String> ocrCandidate;
   final Value<double?> ocrConfidence;
-  final Value<int?> photoAddedAtMillis;
+  final Value<int?> photoAddedAtMicros;
   final Value<String> photoHistoryJson;
   final Value<String?> lowerReadingReason;
   final Value<String> note;
@@ -1533,17 +1533,17 @@ class ReadingRecordsCompanion extends UpdateCompanion<StoredReadingRecord> {
     this.displayValue = const Value.absent(),
     this.valueDigits = const Value.absent(),
     this.valueScale = const Value.absent(),
-    this.capturedAtMillis = const Value.absent(),
+    this.capturedAtMicros = const Value.absent(),
     this.timezoneOffsetMinutes = const Value.absent(),
-    this.storedAtMillis = const Value.absent(),
-    this.updatedAtMillis = const Value.absent(),
+    this.storedAtMicros = const Value.absent(),
+    this.updatedAtMicros = const Value.absent(),
     this.source = const Value.absent(),
     this.photoPath = const Value.absent(),
     this.photoSha256 = const Value.absent(),
     this.ocrRawText = const Value.absent(),
     this.ocrCandidate = const Value.absent(),
     this.ocrConfidence = const Value.absent(),
-    this.photoAddedAtMillis = const Value.absent(),
+    this.photoAddedAtMicros = const Value.absent(),
     this.photoHistoryJson = const Value.absent(),
     this.lowerReadingReason = const Value.absent(),
     this.note = const Value.absent(),
@@ -1557,17 +1557,17 @@ class ReadingRecordsCompanion extends UpdateCompanion<StoredReadingRecord> {
     required String displayValue,
     required String valueDigits,
     required int valueScale,
-    required int capturedAtMillis,
+    required int capturedAtMicros,
     required int timezoneOffsetMinutes,
-    required int storedAtMillis,
-    required int updatedAtMillis,
+    required int storedAtMicros,
+    required int updatedAtMicros,
     required String source,
     required String photoPath,
     required String photoSha256,
     this.ocrRawText = const Value.absent(),
     this.ocrCandidate = const Value.absent(),
     this.ocrConfidence = const Value.absent(),
-    this.photoAddedAtMillis = const Value.absent(),
+    this.photoAddedAtMicros = const Value.absent(),
     this.photoHistoryJson = const Value.absent(),
     this.lowerReadingReason = const Value.absent(),
     this.note = const Value.absent(),
@@ -1579,10 +1579,10 @@ class ReadingRecordsCompanion extends UpdateCompanion<StoredReadingRecord> {
        displayValue = Value(displayValue),
        valueDigits = Value(valueDigits),
        valueScale = Value(valueScale),
-       capturedAtMillis = Value(capturedAtMillis),
+       capturedAtMicros = Value(capturedAtMicros),
        timezoneOffsetMinutes = Value(timezoneOffsetMinutes),
-       storedAtMillis = Value(storedAtMillis),
-       updatedAtMillis = Value(updatedAtMillis),
+       storedAtMicros = Value(storedAtMicros),
+       updatedAtMicros = Value(updatedAtMicros),
        source = Value(source),
        photoPath = Value(photoPath),
        photoSha256 = Value(photoSha256),
@@ -1594,17 +1594,17 @@ class ReadingRecordsCompanion extends UpdateCompanion<StoredReadingRecord> {
     Expression<String>? displayValue,
     Expression<String>? valueDigits,
     Expression<int>? valueScale,
-    Expression<int>? capturedAtMillis,
+    Expression<int>? capturedAtMicros,
     Expression<int>? timezoneOffsetMinutes,
-    Expression<int>? storedAtMillis,
-    Expression<int>? updatedAtMillis,
+    Expression<int>? storedAtMicros,
+    Expression<int>? updatedAtMicros,
     Expression<String>? source,
     Expression<String>? photoPath,
     Expression<String>? photoSha256,
     Expression<String>? ocrRawText,
     Expression<String>? ocrCandidate,
     Expression<double>? ocrConfidence,
-    Expression<int>? photoAddedAtMillis,
+    Expression<int>? photoAddedAtMicros,
     Expression<String>? photoHistoryJson,
     Expression<String>? lowerReadingReason,
     Expression<String>? note,
@@ -1618,19 +1618,19 @@ class ReadingRecordsCompanion extends UpdateCompanion<StoredReadingRecord> {
       if (displayValue != null) 'display_value': displayValue,
       if (valueDigits != null) 'value_digits': valueDigits,
       if (valueScale != null) 'value_scale': valueScale,
-      if (capturedAtMillis != null) 'captured_at_millis': capturedAtMillis,
+      if (capturedAtMicros != null) 'captured_at_micros': capturedAtMicros,
       if (timezoneOffsetMinutes != null)
         'timezone_offset_minutes': timezoneOffsetMinutes,
-      if (storedAtMillis != null) 'stored_at_millis': storedAtMillis,
-      if (updatedAtMillis != null) 'updated_at_millis': updatedAtMillis,
+      if (storedAtMicros != null) 'stored_at_micros': storedAtMicros,
+      if (updatedAtMicros != null) 'updated_at_micros': updatedAtMicros,
       if (source != null) 'source': source,
       if (photoPath != null) 'photo_path': photoPath,
       if (photoSha256 != null) 'photo_sha256': photoSha256,
       if (ocrRawText != null) 'ocr_raw_text': ocrRawText,
       if (ocrCandidate != null) 'ocr_candidate': ocrCandidate,
       if (ocrConfidence != null) 'ocr_confidence': ocrConfidence,
-      if (photoAddedAtMillis != null)
-        'photo_added_at_millis': photoAddedAtMillis,
+      if (photoAddedAtMicros != null)
+        'photo_added_at_micros': photoAddedAtMicros,
       if (photoHistoryJson != null) 'photo_history_json': photoHistoryJson,
       if (lowerReadingReason != null)
         'lower_reading_reason': lowerReadingReason,
@@ -1647,17 +1647,17 @@ class ReadingRecordsCompanion extends UpdateCompanion<StoredReadingRecord> {
     Value<String>? displayValue,
     Value<String>? valueDigits,
     Value<int>? valueScale,
-    Value<int>? capturedAtMillis,
+    Value<int>? capturedAtMicros,
     Value<int>? timezoneOffsetMinutes,
-    Value<int>? storedAtMillis,
-    Value<int>? updatedAtMillis,
+    Value<int>? storedAtMicros,
+    Value<int>? updatedAtMicros,
     Value<String>? source,
     Value<String>? photoPath,
     Value<String>? photoSha256,
     Value<String>? ocrRawText,
     Value<String>? ocrCandidate,
     Value<double?>? ocrConfidence,
-    Value<int?>? photoAddedAtMillis,
+    Value<int?>? photoAddedAtMicros,
     Value<String>? photoHistoryJson,
     Value<String?>? lowerReadingReason,
     Value<String>? note,
@@ -1671,18 +1671,18 @@ class ReadingRecordsCompanion extends UpdateCompanion<StoredReadingRecord> {
       displayValue: displayValue ?? this.displayValue,
       valueDigits: valueDigits ?? this.valueDigits,
       valueScale: valueScale ?? this.valueScale,
-      capturedAtMillis: capturedAtMillis ?? this.capturedAtMillis,
+      capturedAtMicros: capturedAtMicros ?? this.capturedAtMicros,
       timezoneOffsetMinutes:
           timezoneOffsetMinutes ?? this.timezoneOffsetMinutes,
-      storedAtMillis: storedAtMillis ?? this.storedAtMillis,
-      updatedAtMillis: updatedAtMillis ?? this.updatedAtMillis,
+      storedAtMicros: storedAtMicros ?? this.storedAtMicros,
+      updatedAtMicros: updatedAtMicros ?? this.updatedAtMicros,
       source: source ?? this.source,
       photoPath: photoPath ?? this.photoPath,
       photoSha256: photoSha256 ?? this.photoSha256,
       ocrRawText: ocrRawText ?? this.ocrRawText,
       ocrCandidate: ocrCandidate ?? this.ocrCandidate,
       ocrConfidence: ocrConfidence ?? this.ocrConfidence,
-      photoAddedAtMillis: photoAddedAtMillis ?? this.photoAddedAtMillis,
+      photoAddedAtMicros: photoAddedAtMicros ?? this.photoAddedAtMicros,
       photoHistoryJson: photoHistoryJson ?? this.photoHistoryJson,
       lowerReadingReason: lowerReadingReason ?? this.lowerReadingReason,
       note: note ?? this.note,
@@ -1712,19 +1712,19 @@ class ReadingRecordsCompanion extends UpdateCompanion<StoredReadingRecord> {
     if (valueScale.present) {
       map['value_scale'] = Variable<int>(valueScale.value);
     }
-    if (capturedAtMillis.present) {
-      map['captured_at_millis'] = Variable<int>(capturedAtMillis.value);
+    if (capturedAtMicros.present) {
+      map['captured_at_micros'] = Variable<int>(capturedAtMicros.value);
     }
     if (timezoneOffsetMinutes.present) {
       map['timezone_offset_minutes'] = Variable<int>(
         timezoneOffsetMinutes.value,
       );
     }
-    if (storedAtMillis.present) {
-      map['stored_at_millis'] = Variable<int>(storedAtMillis.value);
+    if (storedAtMicros.present) {
+      map['stored_at_micros'] = Variable<int>(storedAtMicros.value);
     }
-    if (updatedAtMillis.present) {
-      map['updated_at_millis'] = Variable<int>(updatedAtMillis.value);
+    if (updatedAtMicros.present) {
+      map['updated_at_micros'] = Variable<int>(updatedAtMicros.value);
     }
     if (source.present) {
       map['source'] = Variable<String>(source.value);
@@ -1744,8 +1744,8 @@ class ReadingRecordsCompanion extends UpdateCompanion<StoredReadingRecord> {
     if (ocrConfidence.present) {
       map['ocr_confidence'] = Variable<double>(ocrConfidence.value);
     }
-    if (photoAddedAtMillis.present) {
-      map['photo_added_at_millis'] = Variable<int>(photoAddedAtMillis.value);
+    if (photoAddedAtMicros.present) {
+      map['photo_added_at_micros'] = Variable<int>(photoAddedAtMicros.value);
     }
     if (photoHistoryJson.present) {
       map['photo_history_json'] = Variable<String>(photoHistoryJson.value);
@@ -1774,17 +1774,17 @@ class ReadingRecordsCompanion extends UpdateCompanion<StoredReadingRecord> {
           ..write('displayValue: $displayValue, ')
           ..write('valueDigits: $valueDigits, ')
           ..write('valueScale: $valueScale, ')
-          ..write('capturedAtMillis: $capturedAtMillis, ')
+          ..write('capturedAtMicros: $capturedAtMicros, ')
           ..write('timezoneOffsetMinutes: $timezoneOffsetMinutes, ')
-          ..write('storedAtMillis: $storedAtMillis, ')
-          ..write('updatedAtMillis: $updatedAtMillis, ')
+          ..write('storedAtMicros: $storedAtMicros, ')
+          ..write('updatedAtMicros: $updatedAtMicros, ')
           ..write('source: $source, ')
           ..write('photoPath: $photoPath, ')
           ..write('photoSha256: $photoSha256, ')
           ..write('ocrRawText: $ocrRawText, ')
           ..write('ocrCandidate: $ocrCandidate, ')
           ..write('ocrConfidence: $ocrConfidence, ')
-          ..write('photoAddedAtMillis: $photoAddedAtMillis, ')
+          ..write('photoAddedAtMicros: $photoAddedAtMicros, ')
           ..write('photoHistoryJson: $photoHistoryJson, ')
           ..write('lowerReadingReason: $lowerReadingReason, ')
           ..write('note: $note, ')
@@ -1821,12 +1821,12 @@ class $RevisionRecordsTable extends RevisionRecords
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _changedAtMillisMeta = const VerificationMeta(
-    'changedAtMillis',
+  static const VerificationMeta _changedAtMicrosMeta = const VerificationMeta(
+    'changedAtMicros',
   );
   @override
-  late final GeneratedColumn<int> changedAtMillis = GeneratedColumn<int>(
-    'changed_at_millis',
+  late final GeneratedColumn<int> changedAtMicros = GeneratedColumn<int>(
+    'changed_at_micros',
     aliasedName,
     false,
     type: DriftSqlType.int,
@@ -1856,7 +1856,7 @@ class $RevisionRecordsTable extends RevisionRecords
   List<GeneratedColumn> get $columns => [
     id,
     readingId,
-    changedAtMillis,
+    changedAtMicros,
     reason,
     changesJson,
   ];
@@ -1885,16 +1885,16 @@ class $RevisionRecordsTable extends RevisionRecords
     } else if (isInserting) {
       context.missing(_readingIdMeta);
     }
-    if (data.containsKey('changed_at_millis')) {
+    if (data.containsKey('changed_at_micros')) {
       context.handle(
-        _changedAtMillisMeta,
-        changedAtMillis.isAcceptableOrUnknown(
-          data['changed_at_millis']!,
-          _changedAtMillisMeta,
+        _changedAtMicrosMeta,
+        changedAtMicros.isAcceptableOrUnknown(
+          data['changed_at_micros']!,
+          _changedAtMicrosMeta,
         ),
       );
     } else if (isInserting) {
-      context.missing(_changedAtMillisMeta);
+      context.missing(_changedAtMicrosMeta);
     }
     if (data.containsKey('reason')) {
       context.handle(
@@ -1932,9 +1932,9 @@ class $RevisionRecordsTable extends RevisionRecords
         DriftSqlType.string,
         data['${effectivePrefix}reading_id'],
       )!,
-      changedAtMillis: attachedDatabase.typeMapping.read(
+      changedAtMicros: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
-        data['${effectivePrefix}changed_at_millis'],
+        data['${effectivePrefix}changed_at_micros'],
       )!,
       reason: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
@@ -1957,13 +1957,13 @@ class StoredRevisionRecord extends DataClass
     implements Insertable<StoredRevisionRecord> {
   final String id;
   final String readingId;
-  final int changedAtMillis;
+  final int changedAtMicros;
   final String reason;
   final String changesJson;
   const StoredRevisionRecord({
     required this.id,
     required this.readingId,
-    required this.changedAtMillis,
+    required this.changedAtMicros,
     required this.reason,
     required this.changesJson,
   });
@@ -1972,7 +1972,7 @@ class StoredRevisionRecord extends DataClass
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
     map['reading_id'] = Variable<String>(readingId);
-    map['changed_at_millis'] = Variable<int>(changedAtMillis);
+    map['changed_at_micros'] = Variable<int>(changedAtMicros);
     map['reason'] = Variable<String>(reason);
     map['changes_json'] = Variable<String>(changesJson);
     return map;
@@ -1982,7 +1982,7 @@ class StoredRevisionRecord extends DataClass
     return RevisionRecordsCompanion(
       id: Value(id),
       readingId: Value(readingId),
-      changedAtMillis: Value(changedAtMillis),
+      changedAtMicros: Value(changedAtMicros),
       reason: Value(reason),
       changesJson: Value(changesJson),
     );
@@ -1996,7 +1996,7 @@ class StoredRevisionRecord extends DataClass
     return StoredRevisionRecord(
       id: serializer.fromJson<String>(json['id']),
       readingId: serializer.fromJson<String>(json['readingId']),
-      changedAtMillis: serializer.fromJson<int>(json['changedAtMillis']),
+      changedAtMicros: serializer.fromJson<int>(json['changedAtMicros']),
       reason: serializer.fromJson<String>(json['reason']),
       changesJson: serializer.fromJson<String>(json['changesJson']),
     );
@@ -2007,7 +2007,7 @@ class StoredRevisionRecord extends DataClass
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
       'readingId': serializer.toJson<String>(readingId),
-      'changedAtMillis': serializer.toJson<int>(changedAtMillis),
+      'changedAtMicros': serializer.toJson<int>(changedAtMicros),
       'reason': serializer.toJson<String>(reason),
       'changesJson': serializer.toJson<String>(changesJson),
     };
@@ -2016,13 +2016,13 @@ class StoredRevisionRecord extends DataClass
   StoredRevisionRecord copyWith({
     String? id,
     String? readingId,
-    int? changedAtMillis,
+    int? changedAtMicros,
     String? reason,
     String? changesJson,
   }) => StoredRevisionRecord(
     id: id ?? this.id,
     readingId: readingId ?? this.readingId,
-    changedAtMillis: changedAtMillis ?? this.changedAtMillis,
+    changedAtMicros: changedAtMicros ?? this.changedAtMicros,
     reason: reason ?? this.reason,
     changesJson: changesJson ?? this.changesJson,
   );
@@ -2030,9 +2030,9 @@ class StoredRevisionRecord extends DataClass
     return StoredRevisionRecord(
       id: data.id.present ? data.id.value : this.id,
       readingId: data.readingId.present ? data.readingId.value : this.readingId,
-      changedAtMillis: data.changedAtMillis.present
-          ? data.changedAtMillis.value
-          : this.changedAtMillis,
+      changedAtMicros: data.changedAtMicros.present
+          ? data.changedAtMicros.value
+          : this.changedAtMicros,
       reason: data.reason.present ? data.reason.value : this.reason,
       changesJson: data.changesJson.present
           ? data.changesJson.value
@@ -2045,7 +2045,7 @@ class StoredRevisionRecord extends DataClass
     return (StringBuffer('StoredRevisionRecord(')
           ..write('id: $id, ')
           ..write('readingId: $readingId, ')
-          ..write('changedAtMillis: $changedAtMillis, ')
+          ..write('changedAtMicros: $changedAtMicros, ')
           ..write('reason: $reason, ')
           ..write('changesJson: $changesJson')
           ..write(')'))
@@ -2054,14 +2054,14 @@ class StoredRevisionRecord extends DataClass
 
   @override
   int get hashCode =>
-      Object.hash(id, readingId, changedAtMillis, reason, changesJson);
+      Object.hash(id, readingId, changedAtMicros, reason, changesJson);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is StoredRevisionRecord &&
           other.id == this.id &&
           other.readingId == this.readingId &&
-          other.changedAtMillis == this.changedAtMillis &&
+          other.changedAtMicros == this.changedAtMicros &&
           other.reason == this.reason &&
           other.changesJson == this.changesJson);
 }
@@ -2069,14 +2069,14 @@ class StoredRevisionRecord extends DataClass
 class RevisionRecordsCompanion extends UpdateCompanion<StoredRevisionRecord> {
   final Value<String> id;
   final Value<String> readingId;
-  final Value<int> changedAtMillis;
+  final Value<int> changedAtMicros;
   final Value<String> reason;
   final Value<String> changesJson;
   final Value<int> rowid;
   const RevisionRecordsCompanion({
     this.id = const Value.absent(),
     this.readingId = const Value.absent(),
-    this.changedAtMillis = const Value.absent(),
+    this.changedAtMicros = const Value.absent(),
     this.reason = const Value.absent(),
     this.changesJson = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -2084,19 +2084,19 @@ class RevisionRecordsCompanion extends UpdateCompanion<StoredRevisionRecord> {
   RevisionRecordsCompanion.insert({
     required String id,
     required String readingId,
-    required int changedAtMillis,
+    required int changedAtMicros,
     required String reason,
     required String changesJson,
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        readingId = Value(readingId),
-       changedAtMillis = Value(changedAtMillis),
+       changedAtMicros = Value(changedAtMicros),
        reason = Value(reason),
        changesJson = Value(changesJson);
   static Insertable<StoredRevisionRecord> custom({
     Expression<String>? id,
     Expression<String>? readingId,
-    Expression<int>? changedAtMillis,
+    Expression<int>? changedAtMicros,
     Expression<String>? reason,
     Expression<String>? changesJson,
     Expression<int>? rowid,
@@ -2104,7 +2104,7 @@ class RevisionRecordsCompanion extends UpdateCompanion<StoredRevisionRecord> {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (readingId != null) 'reading_id': readingId,
-      if (changedAtMillis != null) 'changed_at_millis': changedAtMillis,
+      if (changedAtMicros != null) 'changed_at_micros': changedAtMicros,
       if (reason != null) 'reason': reason,
       if (changesJson != null) 'changes_json': changesJson,
       if (rowid != null) 'rowid': rowid,
@@ -2114,7 +2114,7 @@ class RevisionRecordsCompanion extends UpdateCompanion<StoredRevisionRecord> {
   RevisionRecordsCompanion copyWith({
     Value<String>? id,
     Value<String>? readingId,
-    Value<int>? changedAtMillis,
+    Value<int>? changedAtMicros,
     Value<String>? reason,
     Value<String>? changesJson,
     Value<int>? rowid,
@@ -2122,7 +2122,7 @@ class RevisionRecordsCompanion extends UpdateCompanion<StoredRevisionRecord> {
     return RevisionRecordsCompanion(
       id: id ?? this.id,
       readingId: readingId ?? this.readingId,
-      changedAtMillis: changedAtMillis ?? this.changedAtMillis,
+      changedAtMicros: changedAtMicros ?? this.changedAtMicros,
       reason: reason ?? this.reason,
       changesJson: changesJson ?? this.changesJson,
       rowid: rowid ?? this.rowid,
@@ -2138,8 +2138,8 @@ class RevisionRecordsCompanion extends UpdateCompanion<StoredRevisionRecord> {
     if (readingId.present) {
       map['reading_id'] = Variable<String>(readingId.value);
     }
-    if (changedAtMillis.present) {
-      map['changed_at_millis'] = Variable<int>(changedAtMillis.value);
+    if (changedAtMicros.present) {
+      map['changed_at_micros'] = Variable<int>(changedAtMicros.value);
     }
     if (reason.present) {
       map['reason'] = Variable<String>(reason.value);
@@ -2158,7 +2158,7 @@ class RevisionRecordsCompanion extends UpdateCompanion<StoredRevisionRecord> {
     return (StringBuffer('RevisionRecordsCompanion(')
           ..write('id: $id, ')
           ..write('readingId: $readingId, ')
-          ..write('changedAtMillis: $changedAtMillis, ')
+          ..write('changedAtMicros: $changedAtMicros, ')
           ..write('reason: $reason, ')
           ..write('changesJson: $changesJson, ')
           ..write('rowid: $rowid')
@@ -2213,12 +2213,12 @@ class $EvidenceExportRecordsTable extends EvidenceExportRecords
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _createdAtMillisMeta = const VerificationMeta(
-    'createdAtMillis',
+  static const VerificationMeta _createdAtMicrosMeta = const VerificationMeta(
+    'createdAtMicros',
   );
   @override
-  late final GeneratedColumn<int> createdAtMillis = GeneratedColumn<int>(
-    'created_at_millis',
+  late final GeneratedColumn<int> createdAtMicros = GeneratedColumn<int>(
+    'created_at_micros',
     aliasedName,
     false,
     type: DriftSqlType.int,
@@ -2286,7 +2286,7 @@ class $EvidenceExportRecordsTable extends EvidenceExportRecords
     meterId,
     kind,
     readingIdsJson,
-    createdAtMillis,
+    createdAtMicros,
     fileName,
     filePath,
     pdfSha256,
@@ -2337,16 +2337,16 @@ class $EvidenceExportRecordsTable extends EvidenceExportRecords
     } else if (isInserting) {
       context.missing(_readingIdsJsonMeta);
     }
-    if (data.containsKey('created_at_millis')) {
+    if (data.containsKey('created_at_micros')) {
       context.handle(
-        _createdAtMillisMeta,
-        createdAtMillis.isAcceptableOrUnknown(
-          data['created_at_millis']!,
-          _createdAtMillisMeta,
+        _createdAtMicrosMeta,
+        createdAtMicros.isAcceptableOrUnknown(
+          data['created_at_micros']!,
+          _createdAtMicrosMeta,
         ),
       );
     } else if (isInserting) {
-      context.missing(_createdAtMillisMeta);
+      context.missing(_createdAtMicrosMeta);
     }
     if (data.containsKey('file_name')) {
       context.handle(
@@ -2417,9 +2417,9 @@ class $EvidenceExportRecordsTable extends EvidenceExportRecords
         DriftSqlType.string,
         data['${effectivePrefix}reading_ids_json'],
       )!,
-      createdAtMillis: attachedDatabase.typeMapping.read(
+      createdAtMicros: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
-        data['${effectivePrefix}created_at_millis'],
+        data['${effectivePrefix}created_at_micros'],
       )!,
       fileName: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
@@ -2456,7 +2456,7 @@ class StoredEvidenceExportRecord extends DataClass
   final String meterId;
   final String kind;
   final String readingIdsJson;
-  final int createdAtMillis;
+  final int createdAtMicros;
   final String fileName;
   final String filePath;
   final String pdfSha256;
@@ -2467,7 +2467,7 @@ class StoredEvidenceExportRecord extends DataClass
     required this.meterId,
     required this.kind,
     required this.readingIdsJson,
-    required this.createdAtMillis,
+    required this.createdAtMicros,
     required this.fileName,
     required this.filePath,
     required this.pdfSha256,
@@ -2481,7 +2481,7 @@ class StoredEvidenceExportRecord extends DataClass
     map['meter_id'] = Variable<String>(meterId);
     map['kind'] = Variable<String>(kind);
     map['reading_ids_json'] = Variable<String>(readingIdsJson);
-    map['created_at_millis'] = Variable<int>(createdAtMillis);
+    map['created_at_micros'] = Variable<int>(createdAtMicros);
     map['file_name'] = Variable<String>(fileName);
     map['file_path'] = Variable<String>(filePath);
     map['pdf_sha256'] = Variable<String>(pdfSha256);
@@ -2496,7 +2496,7 @@ class StoredEvidenceExportRecord extends DataClass
       meterId: Value(meterId),
       kind: Value(kind),
       readingIdsJson: Value(readingIdsJson),
-      createdAtMillis: Value(createdAtMillis),
+      createdAtMicros: Value(createdAtMicros),
       fileName: Value(fileName),
       filePath: Value(filePath),
       pdfSha256: Value(pdfSha256),
@@ -2515,7 +2515,7 @@ class StoredEvidenceExportRecord extends DataClass
       meterId: serializer.fromJson<String>(json['meterId']),
       kind: serializer.fromJson<String>(json['kind']),
       readingIdsJson: serializer.fromJson<String>(json['readingIdsJson']),
-      createdAtMillis: serializer.fromJson<int>(json['createdAtMillis']),
+      createdAtMicros: serializer.fromJson<int>(json['createdAtMicros']),
       fileName: serializer.fromJson<String>(json['fileName']),
       filePath: serializer.fromJson<String>(json['filePath']),
       pdfSha256: serializer.fromJson<String>(json['pdfSha256']),
@@ -2531,7 +2531,7 @@ class StoredEvidenceExportRecord extends DataClass
       'meterId': serializer.toJson<String>(meterId),
       'kind': serializer.toJson<String>(kind),
       'readingIdsJson': serializer.toJson<String>(readingIdsJson),
-      'createdAtMillis': serializer.toJson<int>(createdAtMillis),
+      'createdAtMicros': serializer.toJson<int>(createdAtMicros),
       'fileName': serializer.toJson<String>(fileName),
       'filePath': serializer.toJson<String>(filePath),
       'pdfSha256': serializer.toJson<String>(pdfSha256),
@@ -2545,7 +2545,7 @@ class StoredEvidenceExportRecord extends DataClass
     String? meterId,
     String? kind,
     String? readingIdsJson,
-    int? createdAtMillis,
+    int? createdAtMicros,
     String? fileName,
     String? filePath,
     String? pdfSha256,
@@ -2556,7 +2556,7 @@ class StoredEvidenceExportRecord extends DataClass
     meterId: meterId ?? this.meterId,
     kind: kind ?? this.kind,
     readingIdsJson: readingIdsJson ?? this.readingIdsJson,
-    createdAtMillis: createdAtMillis ?? this.createdAtMillis,
+    createdAtMicros: createdAtMicros ?? this.createdAtMicros,
     fileName: fileName ?? this.fileName,
     filePath: filePath ?? this.filePath,
     pdfSha256: pdfSha256 ?? this.pdfSha256,
@@ -2573,9 +2573,9 @@ class StoredEvidenceExportRecord extends DataClass
       readingIdsJson: data.readingIdsJson.present
           ? data.readingIdsJson.value
           : this.readingIdsJson,
-      createdAtMillis: data.createdAtMillis.present
-          ? data.createdAtMillis.value
-          : this.createdAtMillis,
+      createdAtMicros: data.createdAtMicros.present
+          ? data.createdAtMicros.value
+          : this.createdAtMicros,
       fileName: data.fileName.present ? data.fileName.value : this.fileName,
       filePath: data.filePath.present ? data.filePath.value : this.filePath,
       pdfSha256: data.pdfSha256.present ? data.pdfSha256.value : this.pdfSha256,
@@ -2593,7 +2593,7 @@ class StoredEvidenceExportRecord extends DataClass
           ..write('meterId: $meterId, ')
           ..write('kind: $kind, ')
           ..write('readingIdsJson: $readingIdsJson, ')
-          ..write('createdAtMillis: $createdAtMillis, ')
+          ..write('createdAtMicros: $createdAtMicros, ')
           ..write('fileName: $fileName, ')
           ..write('filePath: $filePath, ')
           ..write('pdfSha256: $pdfSha256, ')
@@ -2609,7 +2609,7 @@ class StoredEvidenceExportRecord extends DataClass
     meterId,
     kind,
     readingIdsJson,
-    createdAtMillis,
+    createdAtMicros,
     fileName,
     filePath,
     pdfSha256,
@@ -2624,7 +2624,7 @@ class StoredEvidenceExportRecord extends DataClass
           other.meterId == this.meterId &&
           other.kind == this.kind &&
           other.readingIdsJson == this.readingIdsJson &&
-          other.createdAtMillis == this.createdAtMillis &&
+          other.createdAtMicros == this.createdAtMicros &&
           other.fileName == this.fileName &&
           other.filePath == this.filePath &&
           other.pdfSha256 == this.pdfSha256 &&
@@ -2638,7 +2638,7 @@ class EvidenceExportRecordsCompanion
   final Value<String> meterId;
   final Value<String> kind;
   final Value<String> readingIdsJson;
-  final Value<int> createdAtMillis;
+  final Value<int> createdAtMicros;
   final Value<String> fileName;
   final Value<String> filePath;
   final Value<String> pdfSha256;
@@ -2650,7 +2650,7 @@ class EvidenceExportRecordsCompanion
     this.meterId = const Value.absent(),
     this.kind = const Value.absent(),
     this.readingIdsJson = const Value.absent(),
-    this.createdAtMillis = const Value.absent(),
+    this.createdAtMicros = const Value.absent(),
     this.fileName = const Value.absent(),
     this.filePath = const Value.absent(),
     this.pdfSha256 = const Value.absent(),
@@ -2663,7 +2663,7 @@ class EvidenceExportRecordsCompanion
     required String meterId,
     required String kind,
     required String readingIdsJson,
-    required int createdAtMillis,
+    required int createdAtMicros,
     required String fileName,
     required String filePath,
     required String pdfSha256,
@@ -2674,7 +2674,7 @@ class EvidenceExportRecordsCompanion
        meterId = Value(meterId),
        kind = Value(kind),
        readingIdsJson = Value(readingIdsJson),
-       createdAtMillis = Value(createdAtMillis),
+       createdAtMicros = Value(createdAtMicros),
        fileName = Value(fileName),
        filePath = Value(filePath),
        pdfSha256 = Value(pdfSha256),
@@ -2684,7 +2684,7 @@ class EvidenceExportRecordsCompanion
     Expression<String>? meterId,
     Expression<String>? kind,
     Expression<String>? readingIdsJson,
-    Expression<int>? createdAtMillis,
+    Expression<int>? createdAtMicros,
     Expression<String>? fileName,
     Expression<String>? filePath,
     Expression<String>? pdfSha256,
@@ -2697,7 +2697,7 @@ class EvidenceExportRecordsCompanion
       if (meterId != null) 'meter_id': meterId,
       if (kind != null) 'kind': kind,
       if (readingIdsJson != null) 'reading_ids_json': readingIdsJson,
-      if (createdAtMillis != null) 'created_at_millis': createdAtMillis,
+      if (createdAtMicros != null) 'created_at_micros': createdAtMicros,
       if (fileName != null) 'file_name': fileName,
       if (filePath != null) 'file_path': filePath,
       if (pdfSha256 != null) 'pdf_sha256': pdfSha256,
@@ -2712,7 +2712,7 @@ class EvidenceExportRecordsCompanion
     Value<String>? meterId,
     Value<String>? kind,
     Value<String>? readingIdsJson,
-    Value<int>? createdAtMillis,
+    Value<int>? createdAtMicros,
     Value<String>? fileName,
     Value<String>? filePath,
     Value<String>? pdfSha256,
@@ -2725,7 +2725,7 @@ class EvidenceExportRecordsCompanion
       meterId: meterId ?? this.meterId,
       kind: kind ?? this.kind,
       readingIdsJson: readingIdsJson ?? this.readingIdsJson,
-      createdAtMillis: createdAtMillis ?? this.createdAtMillis,
+      createdAtMicros: createdAtMicros ?? this.createdAtMicros,
       fileName: fileName ?? this.fileName,
       filePath: filePath ?? this.filePath,
       pdfSha256: pdfSha256 ?? this.pdfSha256,
@@ -2750,8 +2750,8 @@ class EvidenceExportRecordsCompanion
     if (readingIdsJson.present) {
       map['reading_ids_json'] = Variable<String>(readingIdsJson.value);
     }
-    if (createdAtMillis.present) {
-      map['created_at_millis'] = Variable<int>(createdAtMillis.value);
+    if (createdAtMicros.present) {
+      map['created_at_micros'] = Variable<int>(createdAtMicros.value);
     }
     if (fileName.present) {
       map['file_name'] = Variable<String>(fileName.value);
@@ -2781,7 +2781,7 @@ class EvidenceExportRecordsCompanion
           ..write('meterId: $meterId, ')
           ..write('kind: $kind, ')
           ..write('readingIdsJson: $readingIdsJson, ')
-          ..write('createdAtMillis: $createdAtMillis, ')
+          ..write('createdAtMicros: $createdAtMicros, ')
           ..write('fileName: $fileName, ')
           ..write('filePath: $filePath, ')
           ..write('pdfSha256: $pdfSha256, ')
@@ -2805,11 +2805,11 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $EvidenceExportRecordsTable(this);
   late final Index readingMeterCapturedIdx = Index(
     'reading_meter_captured_idx',
-    'CREATE INDEX reading_meter_captured_idx ON reading_records (meter_id, captured_at_millis, stored_at_millis)',
+    'CREATE INDEX reading_meter_captured_idx ON reading_records (meter_id, captured_at_micros, stored_at_micros)',
   );
   late final Index readingMeterUpdatedIdx = Index(
     'reading_meter_updated_idx',
-    'CREATE INDEX reading_meter_updated_idx ON reading_records (meter_id, updated_at_millis)',
+    'CREATE INDEX reading_meter_updated_idx ON reading_records (meter_id, updated_at_micros)',
   );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
@@ -2833,8 +2833,8 @@ typedef $$MeterRecordsTableCreateCompanionBuilder =
       required String unit,
       Value<String> meterNumber,
       Value<String> location,
-      required int createdAtMillis,
-      required int updatedAtMillis,
+      required int createdAtMicros,
+      required int updatedAtMicros,
       Value<String?> reminderJson,
       Value<int> rowid,
     });
@@ -2846,8 +2846,8 @@ typedef $$MeterRecordsTableUpdateCompanionBuilder =
       Value<String> unit,
       Value<String> meterNumber,
       Value<String> location,
-      Value<int> createdAtMillis,
-      Value<int> updatedAtMillis,
+      Value<int> createdAtMicros,
+      Value<int> updatedAtMicros,
       Value<String?> reminderJson,
       Value<int> rowid,
     });
@@ -2891,13 +2891,13 @@ class $$MeterRecordsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<int> get createdAtMillis => $composableBuilder(
-    column: $table.createdAtMillis,
+  ColumnFilters<int> get createdAtMicros => $composableBuilder(
+    column: $table.createdAtMicros,
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<int> get updatedAtMillis => $composableBuilder(
-    column: $table.updatedAtMillis,
+  ColumnFilters<int> get updatedAtMicros => $composableBuilder(
+    column: $table.updatedAtMicros,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2946,13 +2946,13 @@ class $$MeterRecordsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get createdAtMillis => $composableBuilder(
-    column: $table.createdAtMillis,
+  ColumnOrderings<int> get createdAtMicros => $composableBuilder(
+    column: $table.createdAtMicros,
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get updatedAtMillis => $composableBuilder(
-    column: $table.updatedAtMillis,
+  ColumnOrderings<int> get updatedAtMicros => $composableBuilder(
+    column: $table.updatedAtMicros,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -2991,13 +2991,13 @@ class $$MeterRecordsTableAnnotationComposer
   GeneratedColumn<String> get location =>
       $composableBuilder(column: $table.location, builder: (column) => column);
 
-  GeneratedColumn<int> get createdAtMillis => $composableBuilder(
-    column: $table.createdAtMillis,
+  GeneratedColumn<int> get createdAtMicros => $composableBuilder(
+    column: $table.createdAtMicros,
     builder: (column) => column,
   );
 
-  GeneratedColumn<int> get updatedAtMillis => $composableBuilder(
-    column: $table.updatedAtMillis,
+  GeneratedColumn<int> get updatedAtMicros => $composableBuilder(
+    column: $table.updatedAtMicros,
     builder: (column) => column,
   );
 
@@ -3048,8 +3048,8 @@ class $$MeterRecordsTableTableManager
                 Value<String> unit = const Value.absent(),
                 Value<String> meterNumber = const Value.absent(),
                 Value<String> location = const Value.absent(),
-                Value<int> createdAtMillis = const Value.absent(),
-                Value<int> updatedAtMillis = const Value.absent(),
+                Value<int> createdAtMicros = const Value.absent(),
+                Value<int> updatedAtMicros = const Value.absent(),
                 Value<String?> reminderJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => MeterRecordsCompanion(
@@ -3059,8 +3059,8 @@ class $$MeterRecordsTableTableManager
                 unit: unit,
                 meterNumber: meterNumber,
                 location: location,
-                createdAtMillis: createdAtMillis,
-                updatedAtMillis: updatedAtMillis,
+                createdAtMicros: createdAtMicros,
+                updatedAtMicros: updatedAtMicros,
                 reminderJson: reminderJson,
                 rowid: rowid,
               ),
@@ -3072,8 +3072,8 @@ class $$MeterRecordsTableTableManager
                 required String unit,
                 Value<String> meterNumber = const Value.absent(),
                 Value<String> location = const Value.absent(),
-                required int createdAtMillis,
-                required int updatedAtMillis,
+                required int createdAtMicros,
+                required int updatedAtMicros,
                 Value<String?> reminderJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => MeterRecordsCompanion.insert(
@@ -3083,8 +3083,8 @@ class $$MeterRecordsTableTableManager
                 unit: unit,
                 meterNumber: meterNumber,
                 location: location,
-                createdAtMillis: createdAtMillis,
-                updatedAtMillis: updatedAtMillis,
+                createdAtMicros: createdAtMicros,
+                updatedAtMicros: updatedAtMicros,
                 reminderJson: reminderJson,
                 rowid: rowid,
               ),
@@ -3121,17 +3121,17 @@ typedef $$ReadingRecordsTableCreateCompanionBuilder =
       required String displayValue,
       required String valueDigits,
       required int valueScale,
-      required int capturedAtMillis,
+      required int capturedAtMicros,
       required int timezoneOffsetMinutes,
-      required int storedAtMillis,
-      required int updatedAtMillis,
+      required int storedAtMicros,
+      required int updatedAtMicros,
       required String source,
       required String photoPath,
       required String photoSha256,
       Value<String> ocrRawText,
       Value<String> ocrCandidate,
       Value<double?> ocrConfidence,
-      Value<int?> photoAddedAtMillis,
+      Value<int?> photoAddedAtMicros,
       Value<String> photoHistoryJson,
       Value<String?> lowerReadingReason,
       Value<String> note,
@@ -3146,17 +3146,17 @@ typedef $$ReadingRecordsTableUpdateCompanionBuilder =
       Value<String> displayValue,
       Value<String> valueDigits,
       Value<int> valueScale,
-      Value<int> capturedAtMillis,
+      Value<int> capturedAtMicros,
       Value<int> timezoneOffsetMinutes,
-      Value<int> storedAtMillis,
-      Value<int> updatedAtMillis,
+      Value<int> storedAtMicros,
+      Value<int> updatedAtMicros,
       Value<String> source,
       Value<String> photoPath,
       Value<String> photoSha256,
       Value<String> ocrRawText,
       Value<String> ocrCandidate,
       Value<double?> ocrConfidence,
-      Value<int?> photoAddedAtMillis,
+      Value<int?> photoAddedAtMicros,
       Value<String> photoHistoryJson,
       Value<String?> lowerReadingReason,
       Value<String> note,
@@ -3203,8 +3203,8 @@ class $$ReadingRecordsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<int> get capturedAtMillis => $composableBuilder(
-    column: $table.capturedAtMillis,
+  ColumnFilters<int> get capturedAtMicros => $composableBuilder(
+    column: $table.capturedAtMicros,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3213,13 +3213,13 @@ class $$ReadingRecordsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<int> get storedAtMillis => $composableBuilder(
-    column: $table.storedAtMillis,
+  ColumnFilters<int> get storedAtMicros => $composableBuilder(
+    column: $table.storedAtMicros,
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<int> get updatedAtMillis => $composableBuilder(
-    column: $table.updatedAtMillis,
+  ColumnFilters<int> get updatedAtMicros => $composableBuilder(
+    column: $table.updatedAtMicros,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3253,8 +3253,8 @@ class $$ReadingRecordsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<int> get photoAddedAtMillis => $composableBuilder(
-    column: $table.photoAddedAtMillis,
+  ColumnFilters<int> get photoAddedAtMicros => $composableBuilder(
+    column: $table.photoAddedAtMicros,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3318,8 +3318,8 @@ class $$ReadingRecordsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get capturedAtMillis => $composableBuilder(
-    column: $table.capturedAtMillis,
+  ColumnOrderings<int> get capturedAtMicros => $composableBuilder(
+    column: $table.capturedAtMicros,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -3328,13 +3328,13 @@ class $$ReadingRecordsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get storedAtMillis => $composableBuilder(
-    column: $table.storedAtMillis,
+  ColumnOrderings<int> get storedAtMicros => $composableBuilder(
+    column: $table.storedAtMicros,
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get updatedAtMillis => $composableBuilder(
-    column: $table.updatedAtMillis,
+  ColumnOrderings<int> get updatedAtMicros => $composableBuilder(
+    column: $table.updatedAtMicros,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -3368,8 +3368,8 @@ class $$ReadingRecordsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get photoAddedAtMillis => $composableBuilder(
-    column: $table.photoAddedAtMillis,
+  ColumnOrderings<int> get photoAddedAtMicros => $composableBuilder(
+    column: $table.photoAddedAtMicros,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -3429,8 +3429,8 @@ class $$ReadingRecordsTableAnnotationComposer
     builder: (column) => column,
   );
 
-  GeneratedColumn<int> get capturedAtMillis => $composableBuilder(
-    column: $table.capturedAtMillis,
+  GeneratedColumn<int> get capturedAtMicros => $composableBuilder(
+    column: $table.capturedAtMicros,
     builder: (column) => column,
   );
 
@@ -3439,13 +3439,13 @@ class $$ReadingRecordsTableAnnotationComposer
     builder: (column) => column,
   );
 
-  GeneratedColumn<int> get storedAtMillis => $composableBuilder(
-    column: $table.storedAtMillis,
+  GeneratedColumn<int> get storedAtMicros => $composableBuilder(
+    column: $table.storedAtMicros,
     builder: (column) => column,
   );
 
-  GeneratedColumn<int> get updatedAtMillis => $composableBuilder(
-    column: $table.updatedAtMillis,
+  GeneratedColumn<int> get updatedAtMicros => $composableBuilder(
+    column: $table.updatedAtMicros,
     builder: (column) => column,
   );
 
@@ -3475,8 +3475,8 @@ class $$ReadingRecordsTableAnnotationComposer
     builder: (column) => column,
   );
 
-  GeneratedColumn<int> get photoAddedAtMillis => $composableBuilder(
-    column: $table.photoAddedAtMillis,
+  GeneratedColumn<int> get photoAddedAtMicros => $composableBuilder(
+    column: $table.photoAddedAtMicros,
     builder: (column) => column,
   );
 
@@ -3542,17 +3542,17 @@ class $$ReadingRecordsTableTableManager
                 Value<String> displayValue = const Value.absent(),
                 Value<String> valueDigits = const Value.absent(),
                 Value<int> valueScale = const Value.absent(),
-                Value<int> capturedAtMillis = const Value.absent(),
+                Value<int> capturedAtMicros = const Value.absent(),
                 Value<int> timezoneOffsetMinutes = const Value.absent(),
-                Value<int> storedAtMillis = const Value.absent(),
-                Value<int> updatedAtMillis = const Value.absent(),
+                Value<int> storedAtMicros = const Value.absent(),
+                Value<int> updatedAtMicros = const Value.absent(),
                 Value<String> source = const Value.absent(),
                 Value<String> photoPath = const Value.absent(),
                 Value<String> photoSha256 = const Value.absent(),
                 Value<String> ocrRawText = const Value.absent(),
                 Value<String> ocrCandidate = const Value.absent(),
                 Value<double?> ocrConfidence = const Value.absent(),
-                Value<int?> photoAddedAtMillis = const Value.absent(),
+                Value<int?> photoAddedAtMicros = const Value.absent(),
                 Value<String> photoHistoryJson = const Value.absent(),
                 Value<String?> lowerReadingReason = const Value.absent(),
                 Value<String> note = const Value.absent(),
@@ -3565,17 +3565,17 @@ class $$ReadingRecordsTableTableManager
                 displayValue: displayValue,
                 valueDigits: valueDigits,
                 valueScale: valueScale,
-                capturedAtMillis: capturedAtMillis,
+                capturedAtMicros: capturedAtMicros,
                 timezoneOffsetMinutes: timezoneOffsetMinutes,
-                storedAtMillis: storedAtMillis,
-                updatedAtMillis: updatedAtMillis,
+                storedAtMicros: storedAtMicros,
+                updatedAtMicros: updatedAtMicros,
                 source: source,
                 photoPath: photoPath,
                 photoSha256: photoSha256,
                 ocrRawText: ocrRawText,
                 ocrCandidate: ocrCandidate,
                 ocrConfidence: ocrConfidence,
-                photoAddedAtMillis: photoAddedAtMillis,
+                photoAddedAtMicros: photoAddedAtMicros,
                 photoHistoryJson: photoHistoryJson,
                 lowerReadingReason: lowerReadingReason,
                 note: note,
@@ -3590,17 +3590,17 @@ class $$ReadingRecordsTableTableManager
                 required String displayValue,
                 required String valueDigits,
                 required int valueScale,
-                required int capturedAtMillis,
+                required int capturedAtMicros,
                 required int timezoneOffsetMinutes,
-                required int storedAtMillis,
-                required int updatedAtMillis,
+                required int storedAtMicros,
+                required int updatedAtMicros,
                 required String source,
                 required String photoPath,
                 required String photoSha256,
                 Value<String> ocrRawText = const Value.absent(),
                 Value<String> ocrCandidate = const Value.absent(),
                 Value<double?> ocrConfidence = const Value.absent(),
-                Value<int?> photoAddedAtMillis = const Value.absent(),
+                Value<int?> photoAddedAtMicros = const Value.absent(),
                 Value<String> photoHistoryJson = const Value.absent(),
                 Value<String?> lowerReadingReason = const Value.absent(),
                 Value<String> note = const Value.absent(),
@@ -3613,17 +3613,17 @@ class $$ReadingRecordsTableTableManager
                 displayValue: displayValue,
                 valueDigits: valueDigits,
                 valueScale: valueScale,
-                capturedAtMillis: capturedAtMillis,
+                capturedAtMicros: capturedAtMicros,
                 timezoneOffsetMinutes: timezoneOffsetMinutes,
-                storedAtMillis: storedAtMillis,
-                updatedAtMillis: updatedAtMillis,
+                storedAtMicros: storedAtMicros,
+                updatedAtMicros: updatedAtMicros,
                 source: source,
                 photoPath: photoPath,
                 photoSha256: photoSha256,
                 ocrRawText: ocrRawText,
                 ocrCandidate: ocrCandidate,
                 ocrConfidence: ocrConfidence,
-                photoAddedAtMillis: photoAddedAtMillis,
+                photoAddedAtMicros: photoAddedAtMicros,
                 photoHistoryJson: photoHistoryJson,
                 lowerReadingReason: lowerReadingReason,
                 note: note,
@@ -3663,7 +3663,7 @@ typedef $$RevisionRecordsTableCreateCompanionBuilder =
     RevisionRecordsCompanion Function({
       required String id,
       required String readingId,
-      required int changedAtMillis,
+      required int changedAtMicros,
       required String reason,
       required String changesJson,
       Value<int> rowid,
@@ -3672,7 +3672,7 @@ typedef $$RevisionRecordsTableUpdateCompanionBuilder =
     RevisionRecordsCompanion Function({
       Value<String> id,
       Value<String> readingId,
-      Value<int> changedAtMillis,
+      Value<int> changedAtMicros,
       Value<String> reason,
       Value<String> changesJson,
       Value<int> rowid,
@@ -3697,8 +3697,8 @@ class $$RevisionRecordsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<int> get changedAtMillis => $composableBuilder(
-    column: $table.changedAtMillis,
+  ColumnFilters<int> get changedAtMicros => $composableBuilder(
+    column: $table.changedAtMicros,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3732,8 +3732,8 @@ class $$RevisionRecordsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get changedAtMillis => $composableBuilder(
-    column: $table.changedAtMillis,
+  ColumnOrderings<int> get changedAtMicros => $composableBuilder(
+    column: $table.changedAtMicros,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -3763,8 +3763,8 @@ class $$RevisionRecordsTableAnnotationComposer
   GeneratedColumn<String> get readingId =>
       $composableBuilder(column: $table.readingId, builder: (column) => column);
 
-  GeneratedColumn<int> get changedAtMillis => $composableBuilder(
-    column: $table.changedAtMillis,
+  GeneratedColumn<int> get changedAtMicros => $composableBuilder(
+    column: $table.changedAtMicros,
     builder: (column) => column,
   );
 
@@ -3816,14 +3816,14 @@ class $$RevisionRecordsTableTableManager
               ({
                 Value<String> id = const Value.absent(),
                 Value<String> readingId = const Value.absent(),
-                Value<int> changedAtMillis = const Value.absent(),
+                Value<int> changedAtMicros = const Value.absent(),
                 Value<String> reason = const Value.absent(),
                 Value<String> changesJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => RevisionRecordsCompanion(
                 id: id,
                 readingId: readingId,
-                changedAtMillis: changedAtMillis,
+                changedAtMicros: changedAtMicros,
                 reason: reason,
                 changesJson: changesJson,
                 rowid: rowid,
@@ -3832,14 +3832,14 @@ class $$RevisionRecordsTableTableManager
               ({
                 required String id,
                 required String readingId,
-                required int changedAtMillis,
+                required int changedAtMicros,
                 required String reason,
                 required String changesJson,
                 Value<int> rowid = const Value.absent(),
               }) => RevisionRecordsCompanion.insert(
                 id: id,
                 readingId: readingId,
-                changedAtMillis: changedAtMillis,
+                changedAtMicros: changedAtMicros,
                 reason: reason,
                 changesJson: changesJson,
                 rowid: rowid,
@@ -3879,7 +3879,7 @@ typedef $$EvidenceExportRecordsTableCreateCompanionBuilder =
       required String meterId,
       required String kind,
       required String readingIdsJson,
-      required int createdAtMillis,
+      required int createdAtMicros,
       required String fileName,
       required String filePath,
       required String pdfSha256,
@@ -3893,7 +3893,7 @@ typedef $$EvidenceExportRecordsTableUpdateCompanionBuilder =
       Value<String> meterId,
       Value<String> kind,
       Value<String> readingIdsJson,
-      Value<int> createdAtMillis,
+      Value<int> createdAtMicros,
       Value<String> fileName,
       Value<String> filePath,
       Value<String> pdfSha256,
@@ -3931,8 +3931,8 @@ class $$EvidenceExportRecordsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<int> get createdAtMillis => $composableBuilder(
-    column: $table.createdAtMillis,
+  ColumnFilters<int> get createdAtMicros => $composableBuilder(
+    column: $table.createdAtMicros,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3991,8 +3991,8 @@ class $$EvidenceExportRecordsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get createdAtMillis => $composableBuilder(
-    column: $table.createdAtMillis,
+  ColumnOrderings<int> get createdAtMicros => $composableBuilder(
+    column: $table.createdAtMicros,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -4045,8 +4045,8 @@ class $$EvidenceExportRecordsTableAnnotationComposer
     builder: (column) => column,
   );
 
-  GeneratedColumn<int> get createdAtMillis => $composableBuilder(
-    column: $table.createdAtMillis,
+  GeneratedColumn<int> get createdAtMicros => $composableBuilder(
+    column: $table.createdAtMicros,
     builder: (column) => column,
   );
 
@@ -4118,7 +4118,7 @@ class $$EvidenceExportRecordsTableTableManager
                 Value<String> meterId = const Value.absent(),
                 Value<String> kind = const Value.absent(),
                 Value<String> readingIdsJson = const Value.absent(),
-                Value<int> createdAtMillis = const Value.absent(),
+                Value<int> createdAtMicros = const Value.absent(),
                 Value<String> fileName = const Value.absent(),
                 Value<String> filePath = const Value.absent(),
                 Value<String> pdfSha256 = const Value.absent(),
@@ -4130,7 +4130,7 @@ class $$EvidenceExportRecordsTableTableManager
                 meterId: meterId,
                 kind: kind,
                 readingIdsJson: readingIdsJson,
-                createdAtMillis: createdAtMillis,
+                createdAtMicros: createdAtMicros,
                 fileName: fileName,
                 filePath: filePath,
                 pdfSha256: pdfSha256,
@@ -4144,7 +4144,7 @@ class $$EvidenceExportRecordsTableTableManager
                 required String meterId,
                 required String kind,
                 required String readingIdsJson,
-                required int createdAtMillis,
+                required int createdAtMicros,
                 required String fileName,
                 required String filePath,
                 required String pdfSha256,
@@ -4156,7 +4156,7 @@ class $$EvidenceExportRecordsTableTableManager
                 meterId: meterId,
                 kind: kind,
                 readingIdsJson: readingIdsJson,
-                createdAtMillis: createdAtMillis,
+                createdAtMicros: createdAtMicros,
                 fileName: fileName,
                 filePath: filePath,
                 pdfSha256: pdfSha256,

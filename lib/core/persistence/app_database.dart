@@ -16,8 +16,8 @@ class MeterRecords extends Table {
   TextColumn get unit => text()();
   TextColumn get meterNumber => text().withDefault(const Constant(''))();
   TextColumn get location => text().withDefault(const Constant(''))();
-  IntColumn get createdAtMillis => integer()();
-  IntColumn get updatedAtMillis => integer()();
+  IntColumn get createdAtMicros => integer()();
+  IntColumn get updatedAtMicros => integer()();
   TextColumn get reminderJson => text().nullable()();
 
   @override
@@ -27,11 +27,11 @@ class MeterRecords extends Table {
 @DataClassName('StoredReadingRecord')
 @TableIndex(
   name: 'reading_meter_captured_idx',
-  columns: {#meterId, #capturedAtMillis, #storedAtMillis},
+  columns: {#meterId, #capturedAtMicros, #storedAtMicros},
 )
 @TableIndex(
   name: 'reading_meter_updated_idx',
-  columns: {#meterId, #updatedAtMillis},
+  columns: {#meterId, #updatedAtMicros},
 )
 class ReadingRecords extends Table {
   TextColumn get id => text()();
@@ -40,17 +40,17 @@ class ReadingRecords extends Table {
   TextColumn get displayValue => text()();
   TextColumn get valueDigits => text()();
   IntColumn get valueScale => integer()();
-  IntColumn get capturedAtMillis => integer()();
+  IntColumn get capturedAtMicros => integer()();
   IntColumn get timezoneOffsetMinutes => integer()();
-  IntColumn get storedAtMillis => integer()();
-  IntColumn get updatedAtMillis => integer()();
+  IntColumn get storedAtMicros => integer()();
+  IntColumn get updatedAtMicros => integer()();
   TextColumn get source => text()();
   TextColumn get photoPath => text()();
   TextColumn get photoSha256 => text()();
   TextColumn get ocrRawText => text().withDefault(const Constant(''))();
   TextColumn get ocrCandidate => text().withDefault(const Constant(''))();
   RealColumn get ocrConfidence => real().nullable()();
-  IntColumn get photoAddedAtMillis => integer().nullable()();
+  IntColumn get photoAddedAtMicros => integer().nullable()();
   TextColumn get photoHistoryJson => text().withDefault(const Constant('[]'))();
   TextColumn get lowerReadingReason => text().nullable()();
   TextColumn get note => text().withDefault(const Constant(''))();
@@ -64,7 +64,7 @@ class ReadingRecords extends Table {
 class RevisionRecords extends Table {
   TextColumn get id => text()();
   TextColumn get readingId => text()();
-  IntColumn get changedAtMillis => integer()();
+  IntColumn get changedAtMicros => integer()();
   TextColumn get reason => text()();
   TextColumn get changesJson => text()();
 
@@ -78,7 +78,7 @@ class EvidenceExportRecords extends Table {
   TextColumn get meterId => text()();
   TextColumn get kind => text()();
   TextColumn get readingIdsJson => text()();
-  IntColumn get createdAtMillis => integer()();
+  IntColumn get createdAtMicros => integer()();
   TextColumn get fileName => text()();
   TextColumn get filePath => text()();
   TextColumn get pdfSha256 => text()();
@@ -105,20 +105,19 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.withExecutor(super.executor);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (migrator) => migrator.createAll(),
-    onUpgrade: (migrator, from, to) async {
+    onUpgrade: (migrator, from, to) => transaction(() async {
+      // Upgrade older schemas using their original column names first.
       if (from < 2) {
-        await migrator.addColumn(
-          readingRecords,
-          readingRecords.photoAddedAtMillis,
+        await customStatement(
+          'ALTER TABLE reading_records ADD COLUMN photo_added_at_millis INTEGER',
         );
-        await migrator.addColumn(
-          readingRecords,
-          readingRecords.photoHistoryJson,
+        await customStatement(
+          "ALTER TABLE reading_records ADD COLUMN photo_history_json TEXT NOT NULL DEFAULT '[]'",
         );
       }
       if (from < 3) {
@@ -127,18 +126,40 @@ class AppDatabase extends _$AppDatabase {
           evidenceExportRecords.photoMode,
         );
       }
-      if (from < 4) {
+      if (from < 5) {
+        const timestamps = {
+          'meter_records': ['created_at', 'updated_at'],
+          'reading_records': [
+            'captured_at',
+            'stored_at',
+            'updated_at',
+            'photo_added_at',
+          ],
+          'revision_records': ['changed_at'],
+          'evidence_export_records': ['created_at'],
+        };
+        for (final table in timestamps.entries) {
+          for (final column in table.value) {
+            // SQLite also updates existing index definitions on rename.
+            await customStatement(
+              'ALTER TABLE ${table.key} RENAME COLUMN ${column}_millis TO ${column}_micros',
+            );
+            await customStatement(
+              'UPDATE ${table.key} SET ${column}_micros = ${column}_micros * 1000',
+            );
+          }
+        }
         await customStatement(
           'CREATE INDEX IF NOT EXISTS reading_meter_captured_idx '
           'ON reading_records '
-          '(meter_id, captured_at_millis, stored_at_millis)',
+          '(meter_id, captured_at_micros, stored_at_micros)',
         );
         await customStatement(
           'CREATE INDEX IF NOT EXISTS reading_meter_updated_idx '
-          'ON reading_records (meter_id, updated_at_millis)',
+          'ON reading_records (meter_id, updated_at_micros)',
         );
       }
-    },
+    }),
   );
 }
 

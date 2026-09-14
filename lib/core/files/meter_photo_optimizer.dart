@@ -4,8 +4,13 @@ import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:image/image.dart' as img;
 import 'package:universal_io/io.dart';
 
+typedef NativeMeterPhotoCompressor =
+    Future<bool> Function(String sourcePath, String targetPath);
+
 class MeterPhotoOptimizer {
-  const MeterPhotoOptimizer();
+  const MeterPhotoOptimizer({this.nativeCompressor});
+
+  final NativeMeterPhotoCompressor? nativeCompressor;
 
   static const maxDimension = 1920;
   static const jpegQuality = 88;
@@ -17,19 +22,22 @@ class MeterPhotoOptimizer {
     final target = File(targetPath);
     if (await target.exists()) await target.delete();
 
-    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+    if (nativeCompressor != null ||
+        (!kIsWeb && (Platform.isAndroid || Platform.isIOS))) {
       try {
-        final compressed = await FlutterImageCompress.compressAndGetFile(
+        final compressed = await (nativeCompressor ?? _compressNative)(
           sourcePath,
           targetPath,
-          minWidth: maxDimension,
-          minHeight: maxDimension,
-          quality: jpegQuality,
-          autoCorrectionAngle: true,
-          format: CompressFormat.jpeg,
-          keepExif: false,
         );
-        if (compressed != null && await _isUsable(target)) return true;
+        if (compressed &&
+            await compute(_boundNativeMeterPhoto, <String, Object>{
+              'sourcePath': targetPath,
+              'targetPath': '$targetPath.bounded.jpg',
+              'maxDimension': maxDimension,
+              'jpegQuality': jpegQuality,
+            }, debugLabel: 'meter-photo-bounds')) {
+          return true;
+        }
       } on MissingPluginException {
         // Unit tests and unsupported platforms use the Dart fallback below.
       } on Object {
@@ -49,8 +57,40 @@ class MeterPhotoOptimizer {
     }
   }
 
-  static Future<bool> _isUsable(File file) async {
-    return await file.exists() && await file.length() > 0;
+  static Future<bool> _compressNative(
+    String sourcePath,
+    String targetPath,
+  ) async {
+    return await FlutterImageCompress.compressAndGetFile(
+          sourcePath,
+          targetPath,
+          minWidth: maxDimension,
+          minHeight: maxDimension,
+          quality: jpegQuality,
+          autoCorrectionAngle: true,
+          format: CompressFormat.jpeg,
+          keepExif: false,
+        ) !=
+        null;
+  }
+}
+
+Future<bool> _boundNativeMeterPhoto(Map<String, Object> input) async {
+  final source = File(input['sourcePath']! as String);
+  if (!await source.exists()) return false;
+  final decoded = img.decodeImage(await source.readAsBytes());
+  if (decoded == null) return false;
+  final maxDimension = input['maxDimension']! as int;
+  if (decoded.width <= maxDimension && decoded.height <= maxDimension) {
+    return true;
+  }
+  final bounded = File(input['targetPath']! as String);
+  try {
+    if (!await _optimizeMeterPhotoWithDart(input)) return false;
+    await bounded.rename(source.path);
+    return true;
+  } finally {
+    if (await bounded.exists()) await bounded.delete();
   }
 }
 

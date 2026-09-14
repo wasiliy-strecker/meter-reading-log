@@ -32,6 +32,8 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
   final _value = TextEditingController();
   final _note = TextEditingController();
   late final MeterPhotoCaptureRepository _photos;
+  late final MeterOcrRepository _ocrRepository;
+  bool _ocrFailed = false;
   StoredMeterPhoto? _photo;
   MeterOcrResult? _ocr;
   String _selectedCandidate = '';
@@ -49,6 +51,7 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
     _initialCapturedAt = DateTime.now();
     _capturedAt = _initialCapturedAt;
     _photos = ref.read(meterPhotoCaptureRepositoryProvider);
+    _ocrRepository = ref.read(meterOcrRepositoryProvider);
     WidgetsBinding.instance.addPostFrameCallback((_) => _recoverLostCapture());
   }
 
@@ -188,6 +191,13 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
                 ),
                 const SizedBox(height: 12),
               ],
+              if (_ocrFailed)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 12),
+                  child: Text(
+                    'Texterkennung fehlgeschlagen. Bitte den Zählerstand vom Foto ablesen und manuell eingeben.',
+                  ),
+                ),
               MeterUnitField(
                 meterType: meter.type,
                 value: selectedUnit,
@@ -298,10 +308,8 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
   Future<void> _capture(ReadingSource source) async {
     setState(() => _working = true);
     try {
-      final photo = await ref
-          .read(meterPhotoCaptureRepositoryProvider)
-          .capture(source);
-      if (photo == null || !mounted) return;
+      final photo = await _photos.capture(source);
+      if (photo == null) return;
       await _processPhoto(photo);
     } catch (error) {
       if (mounted) {
@@ -316,31 +324,48 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
 
   Future<void> _recoverLostCapture() async {
     try {
-      final photo = await ref
-          .read(meterPhotoCaptureRepositoryProvider)
-          .recoverLostCapture();
-      if (photo != null && mounted) await _processPhoto(photo);
+      final photo = await _photos.recoverLostCapture();
+      if (photo != null) {
+        if (mounted) setState(() => _working = true);
+        await _processPhoto(photo);
+      }
     } on Object {
       return;
+    } finally {
+      if (mounted) setState(() => _working = false);
     }
   }
 
   Future<void> _processPhoto(StoredMeterPhoto photo) async {
-    final old = _photo;
-    final ocr = await ref
-        .read(meterOcrRepositoryProvider)
-        .recognize(photo.path);
-    if (old != null) {
-      await ref.read(meterPhotoCaptureRepositoryProvider).delete(old.path);
+    if (!mounted) {
+      await _photos.delete(photo.path);
+      return;
     }
+    MeterOcrResult ocr;
+    var failed = false;
+    try {
+      ocr = await _ocrRepository.recognize(photo.path);
+    } on Object {
+      ocr = const MeterOcrResult(rawText: '', candidates: [], confidence: 0);
+      failed = true;
+    }
+    if (!mounted) {
+      await _photos.delete(photo.path);
+      return;
+    }
+    final old = _photo;
     final first = ocr.candidates.firstOrNull;
     setState(() {
       _photo = photo;
       _ocr = ocr;
+      _ocrFailed = failed;
       _capturedAt = photo.capturedAt;
       _selectedCandidate = first?.rawText ?? '';
       _value.text = first?.value.displayText ?? '';
     });
+    if (old != null && old.path != photo.path) {
+      await _photos.delete(old.path);
+    }
   }
 
   Future<void> _replacePhoto() async {

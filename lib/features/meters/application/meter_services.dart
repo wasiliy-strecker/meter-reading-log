@@ -8,6 +8,8 @@ import '../../../core/integrity/integrity_service.dart';
 import '../../../core/ocr/meter_ocr_repository.dart';
 import '../../../core/reminders/local_notification_reminder_repository.dart';
 import '../../../core/utils/id_generator.dart';
+import '../../evidence/application/evidence_report_service.dart';
+import '../../evidence/domain/evidence_export.dart';
 import '../domain/meter.dart';
 import '../domain/meter_reading.dart';
 import '../domain/meter_repositories.dart';
@@ -93,6 +95,8 @@ class MeterReadingService {
   const MeterReadingService({
     required this.meters,
     required this.readings,
+    required this.exports,
+    required this.evidenceReports,
     required this.photos,
     required this.reminders,
     this.integrity = const IntegrityService(),
@@ -101,6 +105,8 @@ class MeterReadingService {
 
   final MeterRepository meters;
   final MeterReadingRepository readings;
+  final EvidenceExportRepository exports;
+  final EvidenceReportService evidenceReports;
   final MeterPhotoCaptureRepository photos;
   final MeterReminderRepository reminders;
   final IntegrityService integrity;
@@ -169,10 +175,20 @@ class MeterReadingService {
         after: value.displayText,
       );
     }
-    if (existing.capturedAt.toLocal() != capturedAt) {
+    final timeChanged = !existing.capturedAt.isAtSameMomentAs(capturedAt);
+    final timezoneOffset = timeChanged
+        ? capturedAt.timeZoneOffset.inMinutes
+        : existing.timezoneOffsetMinutes;
+    if (timeChanged) {
       changes['Zeitpunkt der Ablesung'] = ReadingChange(
-        before: existing.capturedAt.toLocal().toIso8601String(),
-        after: capturedAt.toIso8601String(),
+        before: existing.capturedAt.toUtc().toIso8601String(),
+        after: capturedAt.toUtc().toIso8601String(),
+      );
+    }
+    if (timezoneOffset != existing.timezoneOffsetMinutes) {
+      changes['Zeitzone der Ablesung'] = ReadingChange(
+        before: _utcOffset(existing.timezoneOffsetMinutes),
+        after: _utcOffset(timezoneOffset),
       );
     }
     if (existing.note != note.trim()) {
@@ -221,7 +237,7 @@ class MeterReadingService {
     var updated = existing.copyWith(
       value: value,
       capturedAt: capturedAt.toUtc(),
-      timezoneOffsetMinutes: capturedAt.timeZoneOffset.inMinutes,
+      timezoneOffsetMinutes: timezoneOffset,
       updatedAt: changedAt,
       source: replacementPhoto?.source,
       photoPath: replacementPhoto?.path,
@@ -255,6 +271,13 @@ class MeterReadingService {
   }
 
   Future<void> delete(MeterReading reading) async {
+    // Remove PDFs before the reading so a failed deletion remains retryable.
+    for (final export in await exports.loadForMeter(reading.meterId)) {
+      if (export.kind == EvidenceExportKind.singleReading &&
+          export.readingIds.contains(reading.id)) {
+        await evidenceReports.delete(export);
+      }
+    }
     for (final path in reading.allPhotoPaths) {
       await photos.delete(path);
     }
@@ -307,4 +330,12 @@ MeterReading? _latestReading(List<MeterReading> readings) {
   return readings.reduce(
     (left, right) => left.capturedAt.isAfter(right.capturedAt) ? left : right,
   );
+}
+
+String _utcOffset(int minutes) {
+  final sign = minutes < 0 ? '-' : '+';
+  final absolute = minutes.abs();
+  final hours = (absolute ~/ 60).toString().padLeft(2, '0');
+  final remainder = (absolute % 60).toString().padLeft(2, '0');
+  return 'UTC$sign$hours:$remainder';
 }

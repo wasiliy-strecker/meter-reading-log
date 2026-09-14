@@ -56,7 +56,7 @@ class MeterReadingCandidateExtractor {
       for (final match in pattern.allMatches(line.text)) {
         final raw = match.group(0)?.trim() ?? '';
         final value = ReadingValue.tryParse(raw);
-        if (value == null || raw.replaceAll(RegExp(r'\D'), '').length < 2) {
+        if (value == null) {
           continue;
         }
         final digitCount = raw.replaceAll(RegExp(r'\D'), '').length;

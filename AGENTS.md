@@ -13,9 +13,10 @@ Zählerfotos und OCR-Inhalte sind privat. Keine `INTERNET`-Berechtigung,
 Analytics, Remote-OCR, AI-Dienste, Konten, Kundendokumente oder Geheimnisse
 hinzufügen. Nur synthetische Fixtures gehören in Tests.
 
-Änderungen an gespeicherten Ablesungen müssen eine `ReadingRevision` mit Grund
-erzeugen. Foto-, Manifest- und PDF-Hashing darf nicht stillschweigend entfernt
-oder durch nicht deterministische Serialisierung geschwächt werden. Die App
+Änderungen an gespeicherten Ablesungen müssen eine `ReadingRevision` erzeugen.
+Der Korrekturgrund ist optional. Foto-, Manifest- und PDF-Hashing darf nicht
+stillschweigend entfernt oder durch nicht deterministische Serialisierung
+geschwächt werden. Die App
 darf lokale Prüfsummen nicht als amtlichen Zeitstempel oder garantierte
 Beweiskraft bezeichnen.
 

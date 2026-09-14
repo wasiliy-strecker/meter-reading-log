@@ -62,6 +62,7 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
   String _selectedCandidate = '';
   bool _processingPhoto = false;
   bool _saving = false;
+  bool _ocrFailed = false;
   bool _saved = false;
   bool _discardDialogOpen = false;
   bool _allowPop = false;
@@ -115,6 +116,13 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
             const SizedBox(height: 14),
             _buildPhotoCorrection(context),
             const SizedBox(height: 14),
+            if (_ocrFailed)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 12),
+                child: Text(
+                  'Texterkennung fehlgeschlagen. Bitte den Zählerstand vom neuen Foto ablesen und manuell prüfen.',
+                ),
+              ),
             TextFormField(
               controller: _value,
               decoration: InputDecoration(
@@ -126,7 +134,7 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
               ),
               onChanged: (_) => setState(() {}),
               onTapOutside: (_) => FocusScope.of(context).unfocus(),
-              validator: (value) => ReadingValue.tryParse(value ?? '') == null
+              validator: (value) => _valueForInput(value ?? '') == null
                   ? 'Bitte einen gültigen Zählerstand eingeben.'
                   : null,
             ),
@@ -395,7 +403,7 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
     setState(() => _processingPhoto = true);
     try {
       final photo = await _photos.capture(source);
-      if (photo != null && mounted) await _processReplacementPhoto(photo);
+      if (photo != null) await _processReplacementPhoto(photo);
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -410,8 +418,8 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
   Future<void> _recoverLostCapture() async {
     try {
       final photo = await _photos.recoverLostCapture();
-      if (photo != null && mounted) {
-        setState(() => _processingPhoto = true);
+      if (photo != null) {
+        if (mounted) setState(() => _processingPhoto = true);
         await _processReplacementPhoto(photo);
       }
     } on Object {
@@ -422,12 +430,17 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
   }
 
   Future<void> _processReplacementPhoto(StoredMeterPhoto photo) async {
+    if (!mounted) {
+      await _photos.delete(photo.path);
+      return;
+    }
     MeterOcrResult ocr;
+    var failed = false;
     try {
       ocr = await _ocrRepository.recognize(photo.path);
-    } catch (_) {
-      await _photos.delete(photo.path);
-      rethrow;
+    } on Object {
+      ocr = const MeterOcrResult(rawText: '', candidates: [], confidence: 0);
+      failed = true;
     }
     final previousPending = _replacementPhoto;
     final first = ocr.candidates.firstOrNull;
@@ -438,6 +451,7 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
     setState(() {
       _replacementPhoto = photo;
       _replacementOcr = ocr;
+      _ocrFailed = failed;
       _selectedCandidate = first?.rawText ?? '';
       if (first != null) _value.text = first.value.displayText;
     });
@@ -472,6 +486,15 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
     }
   }
 
+  ReadingValue? _valueForInput(String input) {
+    // A note/photo correction must preserve the numeric meaning of legacy
+    // display text accepted by an older parser, unless the user edits it.
+    if (input.trim() == widget.reading.value.displayText.trim()) {
+      return widget.reading.value;
+    }
+    return ReadingValue.tryParse(input);
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     final confirmed = await confirmFutureReadingTime(context, _capturedAt);
@@ -482,7 +505,7 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
           .read(meterReadingServiceProvider)
           .update(
             existing: widget.reading,
-            value: ReadingValue.tryParse(_value.text)!,
+            value: _valueForInput(_value.text)!,
             capturedAt: _capturedAt,
             note: _note.text,
             reason: _reason.text,

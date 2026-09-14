@@ -89,6 +89,8 @@ final meterServiceProvider = Provider<MeterService>(
 
 final meterReadingServiceProvider = Provider<MeterReadingService>(
   (ref) => MeterReadingService(
+    exports: ref.watch(evidenceExportRepositoryProvider),
+    evidenceReports: ref.watch(evidenceReportServiceProvider),
     meters: ref.watch(meterRepositoryProvider),
     readings: ref.watch(meterReadingRepositoryProvider),
     photos: ref.watch(meterPhotoCaptureRepositoryProvider),

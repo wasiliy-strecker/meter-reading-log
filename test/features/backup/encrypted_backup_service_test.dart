@@ -13,9 +13,226 @@ import 'package:meter_reading_log/features/meters/domain/meter_reading.dart';
 import 'package:meter_reading_log/features/meters/domain/reading_value.dart';
 
 import '../../support/fakes.dart';
+import '../../support/reading_fixtures.dart';
+import 'package:meter_reading_log/core/persistence/app_database.dart';
+import 'package:meter_reading_log/features/meters/data/drift_meter_repositories.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test(
+    'encrypted SQLite backup round-trip preserves precise reading and revision manifests',
+    () async {
+      final temp = await Directory.systemTemp.createTemp(
+        'sqlite_backup_integrity_',
+      );
+      addTearDown(() => temp.delete(recursive: true));
+      final sourceDb = AppDatabase.memory();
+      var sourceClosed = false;
+      addTearDown(() async {
+        if (!sourceClosed) await sourceDb.close();
+      });
+      const integrity = IntegrityService();
+      final photo = File('${temp.path}/source.jpg');
+      await photo.writeAsBytes([1, 2, 3]);
+      var reading = readingFixture().copyWith(
+        photoPath: photo.path,
+        photoSha256: await integrity.sha256Bytes([1, 2, 3]),
+        photoHistory: [],
+      );
+      reading = reading.copyWith(
+        manifestSha256: await integrity.readingManifestHash(reading),
+      );
+      final sourceReadings = DriftMeterReadingRepository(sourceDb);
+      await DriftMeterRepository(sourceDb).save(meterFixture());
+      await sourceReadings.save(reading);
+      final revision = ReadingRevision(
+        id: 'precise-revision',
+        readingId: reading.id,
+        changedAt: preciseTime,
+        reason: '',
+        changes: const {},
+      );
+      await sourceReadings.saveRevision(revision);
+      EncryptedBackupService service(AppDatabase db) => EncryptedBackupService(
+        meters: DriftMeterRepository(db),
+        readings: DriftMeterReadingRepository(db),
+        exports: DriftEvidenceExportRepository(db),
+        reminders: NoopMeterReminderRepository(),
+        kdfIterations: 1000,
+        temporaryDirectoryProvider: () async => temp,
+        documentsDirectoryProvider: () async => temp,
+      );
+      final backup = await service(sourceDb).create('123456');
+      await sourceDb.close();
+      sourceClosed = true;
+      final targetDb = AppDatabase.memory();
+      addTearDown(targetDb.close);
+      await service(targetDb).restore(backup.path, '123456');
+      final restored = (await DriftMeterReadingRepository(
+        targetDb,
+      ).findById(reading.id))!;
+      expect(
+        integrity.normalizedReadingData(restored),
+        integrity.normalizedReadingData(reading),
+      );
+      expect(
+        await integrity.readingManifestHash(restored),
+        reading.manifestSha256,
+      );
+      expect(
+        (await DriftMeterReadingRepository(
+          targetDb,
+        ).loadRevisions(reading.id)).single.toJson(),
+        revision.toJson(),
+      );
+    },
+  );
+
+  for (final newerLocal in [false, true]) {
+    test(
+      'restore repairs current and archived photos while preserving ${newerLocal ? 'newer' : 'identical'} local metadata',
+      () async {
+        final temp = await Directory.systemTemp.createTemp('backup_repair_');
+        addTearDown(() => temp.delete(recursive: true));
+        const integrity = IntegrityService();
+        final photo = File('${temp.path}/photo.jpg');
+        final oldPhoto = File('${temp.path}/old.jpg');
+        await photo.writeAsBytes([1, 2, 3]);
+        await oldPhoto.writeAsBytes([4, 5, 6]);
+        final incoming =
+            _reading(
+              _meter(),
+              photo.path,
+              await integrity.sha256Bytes([1, 2, 3]),
+            ).copyWith(
+              photoHistory: [
+                ReadingPhotoVersion(
+                  id: 'old',
+                  path: oldPhoto.path,
+                  sha256: await integrity.sha256Bytes([4, 5, 6]),
+                  source: ReadingSource.gallery,
+                  addedAt: DateTime.utc(2026, 8, 1),
+                  ocrRawText: '',
+                  ocrCandidate: '',
+                ),
+              ],
+            );
+        final meters = MemoryMeterRepository()..items[_meter().id] = _meter();
+        final readings = MemoryReadingRepository()
+          ..items[incoming.id] = incoming;
+        final service = EncryptedBackupService(
+          meters: meters,
+          readings: readings,
+          exports: MemoryEvidenceExportRepository(),
+          reminders: NoopMeterReminderRepository(),
+          kdfIterations: 1000,
+          temporaryDirectoryProvider: () async => temp,
+          documentsDirectoryProvider: () async => temp,
+        );
+        final backup = await service.create('123456');
+        final local = newerLocal
+            ? incoming.copyWith(
+                note: 'Neue lokale Notiz',
+                updatedAt: incoming.updatedAt.add(const Duration(days: 1)),
+              )
+            : incoming;
+        readings.items[incoming.id] = local;
+        await readings.saveRevision(
+          ReadingRevision(
+            id: 'local-revision',
+            readingId: incoming.id,
+            changedAt: local.updatedAt,
+            reason: '',
+            changes: const {},
+          ),
+        );
+        await photo.delete();
+        await oldPhoto.delete();
+        final result = await service.restore(backup.path, '123456');
+        final restored = readings.items[incoming.id]!;
+        expect(result.readings, 0);
+        expect(result.repairedPhotos, 2);
+        expect(
+          integrity.normalizedReadingData(restored),
+          integrity.normalizedReadingData(local),
+        );
+        expect(restored.manifestSha256, local.manifestSha256);
+        expect(await File(restored.photoPath).readAsBytes(), [1, 2, 3]);
+        expect(await File(restored.photoHistory.single.path).readAsBytes(), [
+          4,
+          5,
+          6,
+        ]);
+        expect(readings.revisions[incoming.id]!.single.id, 'local-revision');
+        final filesBefore = await Directory(
+          '${temp.path}/meter_photos',
+        ).list().length;
+        expect(
+          (await service.restore(backup.path, '123456')).repairedPhotos,
+          0,
+        );
+        expect(
+          await Directory('${temp.path}/meter_photos').list().length,
+          filesBefore,
+        );
+        // A newer local photo cannot be replaced by unrelated bytes in this backup.
+        readings.items[incoming.id] = restored.copyWith(
+          photoPath: '${temp.path}/missing-new.jpg',
+          photoSha256: 'f' * 64,
+        );
+        expect(
+          (await service.restore(backup.path, '123456')).repairedPhotos,
+          0,
+        );
+        expect(readings.items[incoming.id]!.photoSha256, 'f' * 64);
+        expect(
+          await File(readings.items[incoming.id]!.photoPath).exists(),
+          isFalse,
+        );
+      },
+    );
+  }
+
+  test(
+    'importing a disabled reminder cancels the already scheduled alarm',
+    () async {
+      final temp = await Directory.systemTemp.createTemp(
+        'backup_cancel_reminder_',
+      );
+      addTearDown(() => temp.delete(recursive: true));
+      final meters = MemoryMeterRepository()
+        ..items[_meter().id] = _meter().copyWith(
+          updatedAt: DateTime.utc(2026, 9, 2),
+        );
+      final reminders = _TrackingReminders();
+      final service = EncryptedBackupService(
+        meters: meters,
+        readings: MemoryReadingRepository(),
+        exports: MemoryEvidenceExportRepository(),
+        reminders: reminders,
+        kdfIterations: 1000,
+        temporaryDirectoryProvider: () async => temp,
+        documentsDirectoryProvider: () async => temp,
+      );
+      final backup = await service.create('123456');
+      final active = _meter().copyWith(
+        reminder: const ReadingReminderSchedule(
+          interval: ReminderInterval.daily,
+          day: 1,
+          hour: 12,
+          minute: 0,
+        ),
+      );
+      await meters.save(active);
+      await reminders.schedule(active);
+      expect(reminders.active, contains(active.id));
+      await service.restore(backup.path, '123456');
+      expect(meters.items[active.id]!.reminder, isNull);
+      expect(reminders.cancelled, [active.id]);
+      expect(reminders.active, isEmpty);
+    },
+  );
 
   test(
     'hourly reminder start survives an encrypted backup and rescheduling',
@@ -452,3 +669,19 @@ MeterReading _reading(Meter meter, String photoPath, String photoHash) =>
       ocrConfidence: 0.9,
       manifestSha256: 'manifest',
     );
+
+class _TrackingReminders extends NoopMeterReminderRepository {
+  final active = <String>{};
+  final cancelled = <String>[];
+  @override
+  Future<void> cancel(String meterId) async {
+    active.remove(meterId);
+    cancelled.add(meterId);
+  }
+
+  @override
+  Future<void> schedule(Meter meter, {MeterReading? latestReading}) async {
+    active.add(meter.id);
+    await super.schedule(meter, latestReading: latestReading);
+  }
+}

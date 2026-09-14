@@ -7,6 +7,7 @@ import '../../../app/widgets/app_snack_bar.dart';
 import '../../../core/utils/formatters.dart';
 import '../application/backup_file_exporter.dart';
 import '../application/backup_file_picker.dart';
+import '../application/backup_restore_providers.dart';
 import '../application/encrypted_backup_service.dart';
 
 typedef ExternalUrlLauncher = Future<bool> Function(Uri uri);
@@ -449,12 +450,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           false;
       if (!confirmed) return;
       setState(() => _workingMessage = 'Backup wird wiederhergestellt …');
-      final result = await service.restore(path, password);
-      ref.invalidate(metersProvider);
-      ref.invalidate(meterDashboardItemsProvider);
+      final result = await ref.read(backupRestoreActionProvider)(
+        path,
+        password,
+      );
       if (mounted) {
         _showMessage(
-          '${result.meters} Zähler und ${result.readings} Ablesungen wiederhergestellt; ${result.skipped} neuere Einträge übersprungen.',
+          '${result.meters} Zähler und ${result.readings} Ablesungen wiederhergestellt; ${result.repairedPhotos} fehlende Fotos ergänzt. ${result.skipped} unveränderte oder neuere lokale Einträge beibehalten.',
         );
       }
     } on BackupException catch (error) {

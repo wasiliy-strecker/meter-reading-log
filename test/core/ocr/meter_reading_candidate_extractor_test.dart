@@ -2,6 +2,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:meter_reading_log/core/ocr/meter_ocr_repository.dart';
 
 void main() {
+  test('keeps single-digit candidates including zero and decimal variants', () {
+    for (final text in ['0', '1', '7', '9', '01', '7,0']) {
+      final result = const MeterReadingCandidateExtractor().extract([
+        OcrCandidateLine(text: text, confidence: 0.99, height: 40),
+      ]);
+      expect(result, hasLength(1), reason: text);
+      expect(result.single.value.displayText, text);
+    }
+  });
+
   test('ranks a large dense meter reading before smaller numbers', () {
     final result = const MeterReadingCandidateExtractor().extract(const [
       OcrCandidateLine(text: 'Zähler 12345678', confidence: 0.8, height: 14),

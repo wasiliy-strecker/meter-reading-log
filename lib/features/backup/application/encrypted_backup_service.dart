@@ -117,12 +117,14 @@ class BackupImportResult {
     required this.readings,
     required this.exports,
     required this.skipped,
+    this.repairedPhotos = 0,
   });
 
   final int meters;
   final int readings;
   final int exports;
   final int skipped;
+  final int repairedPhotos;
 }
 
 typedef BackupDirectoryProvider = Future<Directory> Function();
@@ -322,6 +324,7 @@ class EncryptedBackupService {
     var readingCount = 0;
     var exportCount = 0;
     var skipped = 0;
+    var repairedPhotos = 0;
 
     for (final raw in payload['meters'] as List) {
       final meter = Meter.fromJson(Map<String, dynamic>.from(raw as Map));
@@ -341,6 +344,13 @@ class EncryptedBackupService {
       );
       final existing = await readings.findById(reading.id);
       if (existing != null && !reading.updatedAt.isAfter(existing.updatedAt)) {
+        repairedPhotos += await _repairMissingPhotos(
+          existing,
+          reading,
+          files,
+          documents,
+          stagedAssets,
+        );
         skipped += 1;
         continue;
       }
@@ -425,7 +435,10 @@ class EncryptedBackupService {
     }
 
     for (final meter in await meters.loadAll()) {
-      if (meter.reminder == null) continue;
+      if (meter.reminder == null) {
+        await reminders.cancel(meter.id);
+        continue;
+      }
       final meterReadings = await readings.loadForMeter(meter.id);
       final latestReading = meterReadings.isEmpty
           ? null
@@ -440,7 +453,69 @@ class EncryptedBackupService {
       readings: readingCount,
       exports: exportCount,
       skipped: skipped,
+      repairedPhotos: repairedPhotos,
     );
+  }
+
+  Future<int> _repairMissingPhotos(
+    MeterReading existing,
+    MeterReading incoming,
+    Map<String, Map<String, dynamic>> files,
+    Directory documents,
+    Map<String, String>? stagedAssets,
+  ) async {
+    // Only repair bytes already referenced by local data. An older backup
+    // must never replace a newer value, photo hash or correction history.
+    final candidates = <String, Map<String, dynamic>>{};
+    void addCandidate(String hash, String key) {
+      final portable = files[key];
+      if (portable != null && portable['sha256'] == hash) {
+        candidates[hash] = portable;
+      }
+    }
+
+    addCandidate(incoming.photoSha256, 'photo:${incoming.id}');
+    for (final version in incoming.photoHistory) {
+      addCandidate(version.sha256, 'photoVersion:${version.id}');
+    }
+    final repairedPaths = <String>[];
+    Future<String> repair(String path, String hash) async {
+      if (await File(path).exists()) return path;
+      final portable = candidates[hash];
+      if (portable == null) return path;
+      final restored = await _restoreFile(
+        portable,
+        Directory(p.join(documents.path, 'meter_photos')),
+        stagedAssets: stagedAssets,
+      );
+      repairedPaths.add(restored);
+      return restored;
+    }
+
+    try {
+      final photoPath = await repair(existing.photoPath, existing.photoSha256);
+      final history = <ReadingPhotoVersion>[];
+      for (final version in existing.photoHistory) {
+        history.add(
+          version.copyWith(path: await repair(version.path, version.sha256)),
+        );
+      }
+      if (repairedPaths.isNotEmpty) {
+        await readings.save(
+          existing.copyWith(photoPath: photoPath, photoHistory: history),
+        );
+      }
+      return repairedPaths.length;
+    } catch (_) {
+      for (final path in repairedPaths) {
+        try {
+          await File(path).delete();
+        } on FileSystemException {
+          // Preserve the original import error.
+        }
+      }
+      rethrow;
+    }
   }
 
   Future<Map<String, dynamic>> _portableFileReference({

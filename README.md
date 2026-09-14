@@ -23,11 +23,14 @@ PDF-Nachweise mit Fotos und Korrekturen.
   Datum, Zählerstand oder Notiz und festen Seiten mit je 10 Einträgen;
   der Einstieg „Alle Ablesungen anzeigen“ erscheint ab 11 Ablesungen
 - neueste Ablesungen zuerst, mit Verbrauchsdifferenzen zur älteren Ablesung
-- begründete, append-only protokollierte Korrekturen
+- append-only protokollierte Korrekturen mit optionalem Grund
 - Ablesezeitpunkte bis Ende 2100 mit transparenter Kennzeichnung zukünftiger
   Angaben in App und PDF
 - Einzel- und Verlaufs-PDFs mit Fotos, Zeitpunkten und Korrekturen;
   Verlaufs-PDFs enthalten alle Ablesungen, neueste zuerst
+- Beim Löschen einer Ablesung werden ihre Einzel-PDFs mitgelöscht; vorhandene
+  Verlaufs-PDFs bleiben erhalten. Das Löschen eines Zählers entfernt alle
+  zugehörigen Ablesungen, Fotos und PDFs. Extern gespeicherte Kopien bleiben erhalten.
 - gespeicherte Verlaufs-PDFs im aufklappbaren Bereich mit zehn Nachweisen pro
   Seite; begrenzte Datenbankabfragen und asynchrone Dateiprüfung erst beim Aufklappen
 - optionale stündliche, tägliche, wöchentliche, monatliche oder jährliche
@@ -86,6 +89,16 @@ Die Flutter-Projekte in der App Factory bleiben unabhängig. ZählerstandLog
 enthält kopierte und auf die Zählerdomäne angepasste Architektur-, OCR-,
 Reporting-, Reminder- und Backup-Muster aus dem AI Contract Manager, aber keine
 gemeinsame Runtime-Abhängigkeit.
+
+### Datenbankkompatibilität
+
+Ab Schema 5 speichert SQLite Zeitstempel mit Mikrosekunden, damit Manifest-Prüfsummen
+nach dem Speichern und beim Backup-Roundtrip stabil bleiben. Die Migration aus
+Schema 1–4 übernimmt vorhandene Zeiten, Werte, Foto-/PDF-Pfade und Prüfsummen.
+Bereits früher verlorene Mikrosekunden können nicht rekonstruiert werden;
+vorhandene Manifest-Prüfsummen werden deshalb nicht nachträglich neu berechnet.
+Das verschlüsselte Backupformat bleibt kompatibel. Eine Notizkorrektur behält
+auch bei älteren Zahlenschreibweisen den gespeicherten Zahlenwert bei.
 
 ## Entwicklung
 

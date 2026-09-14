@@ -9,6 +9,77 @@ import 'package:meter_reading_log/core/integrity/integrity_service.dart';
 import 'package:meter_reading_log/features/meters/domain/meter_reading.dart';
 
 void main() {
+  test(
+    'rotated photo respects the longest-edge limit and removes orientation metadata',
+    () async {
+      final temp = await Directory.systemTemp.createTemp('rotated_photo_');
+      addTearDown(() => temp.delete(recursive: true));
+      final source = File('${temp.path}/source.jpg');
+      final original = img.Image(width: 2400, height: 1600)
+        ..exif.imageIfd.orientation = 6;
+      await source.writeAsBytes(img.encodeJpg(original));
+      final target = File('${temp.path}/target.jpg');
+      expect(
+        await const MeterPhotoOptimizer().optimize(
+          sourcePath: source.path,
+          targetPath: target.path,
+        ),
+        isTrue,
+      );
+      final decoded = img.decodeImage(await target.readAsBytes())!;
+      expect((decoded.width, decoded.height), (1280, 1920));
+      expect(decoded.exif.imageIfd.orientation, isNull);
+    },
+  );
+
+  for (final size in [(2560, 1920), (1920, 2560), (800, 600)]) {
+    test(
+      'bounds native output ${size.$1} x ${size.$2} before storage and hashing',
+      () async {
+        final temp = await Directory.systemTemp.createTemp(
+          'native_photo_bounds_',
+        );
+        addTearDown(() => temp.delete(recursive: true));
+        final nativeBytes = img.encodeJpg(
+          img.Image(width: size.$1, height: size.$2),
+        );
+        final source = File('${temp.path}/source.jpg');
+        await source.writeAsBytes(nativeBytes);
+        var calls = 0;
+        final optimizer = MeterPhotoOptimizer(
+          nativeCompressor: (sourcePath, targetPath) async {
+            calls++;
+            await File(targetPath).writeAsBytes(nativeBytes);
+            return true;
+          },
+        );
+        final repository = DeviceMeterPhotoCaptureRepository(
+          integrity: const IntegrityService(),
+          optimizer: optimizer,
+          photoPicker: (_) async => XFile(source.path),
+          documentsDirectoryProvider: () async => temp,
+        );
+        final photo = (await repository.capture(ReadingSource.gallery))!;
+        final bytes = await File(photo.path).readAsBytes();
+        final decoded = img.decodeImage(bytes)!;
+        expect(calls, 1);
+        expect(decoded.width, lessThanOrEqualTo(1920));
+        expect(decoded.height, lessThanOrEqualTo(1920));
+        expect(
+          decoded.width / decoded.height,
+          closeTo(size.$1 / size.$2, 0.002),
+        );
+        if (size.$1 == 800) expect((decoded.width, decoded.height), (800, 600));
+        expect(photo.sha256, await const IntegrityService().sha256Bytes(bytes));
+        expect(await source.readAsBytes(), nativeBytes);
+        expect(
+          (await Directory('${temp.path}/meter_photos').list().toList()),
+          hasLength(1),
+        );
+      },
+    );
+  }
+
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('new meter photos are normalized before hashing and storage', () async {

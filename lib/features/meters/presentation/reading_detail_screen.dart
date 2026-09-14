@@ -31,6 +31,7 @@ class ReadingDetailScreen extends ConsumerStatefulWidget {
 
 class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
   bool _exporting = false;
+  bool _deletingReading = false;
   final Set<String> _deletingExportIds = {};
 
   @override
@@ -110,11 +111,13 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
           ],
           const SizedBox(height: 16),
           _ReadingActions(
-            onEdit: () => context.pushNamed(
-              'readingEdit',
-              pathParameters: {'id': reading.id},
-            ),
-            onDelete: () => _delete(reading),
+            onEdit: _deletingReading
+                ? null
+                : () => context.pushNamed(
+                    'readingEdit',
+                    pathParameters: {'id': reading.id},
+                  ),
+            onDelete: _deletingReading ? null : () => _delete(reading),
           ),
           const SizedBox(height: 18),
           _InfoCard(reading: reading),
@@ -154,7 +157,7 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
   }
 
   Future<void> _export(MeterReading reading) async {
-    if (_exporting) return;
+    if (_exporting || _deletingReading) return;
     final photoMode = await showEvidencePhotoModeSheet(
       context,
       kind: EvidenceExportKind.singleReading,
@@ -213,7 +216,7 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
   }
 
   Future<void> _deleteExport(EvidenceExportRecord record) async {
-    if (_deletingExportIds.contains(record.id)) return;
+    if (_deletingReading || _deletingExportIds.contains(record.id)) return;
     final confirmed = await confirmDestructiveAction(
       context,
       title: 'Einzelnachweis löschen?',
@@ -247,20 +250,38 @@ class _ReadingDetailScreenState extends ConsumerState<ReadingDetailScreen> {
   }
 
   Future<void> _delete(MeterReading reading) async {
+    if (_deletingReading || _exporting || _deletingExportIds.isNotEmpty) return;
     final confirmed = await confirmDestructiveAction(
       context,
       title: 'Ablesung löschen?',
       message:
-          'Ablesung, alle Foto-Versionen und der Korrekturverlauf werden dauerhaft gelöscht. Bereits erzeugte PDF-Nachweise bleiben als eigenständige Dateien erhalten.',
+          'Ablesung, alle Foto-Versionen, der Korrekturverlauf und ihre Einzel-PDFs werden dauerhaft gelöscht. Bereits erzeugte Verlaufs-PDFs bleiben erhalten.',
     );
-    if (!confirmed) return;
-    await ref.read(meterReadingServiceProvider).delete(reading);
-    if (mounted) {
+    if (!confirmed || !mounted) return;
+    setState(() => _deletingReading = true);
+    try {
+      await ref.read(meterReadingServiceProvider).delete(reading);
+      if (!mounted) return;
+      ref.invalidate(readingByIdProvider(reading.id));
+      ref.invalidate(revisionsForReadingProvider(reading.id));
+      ref.invalidate(evidenceForMeterProvider(reading.meterId));
       if (context.canPop()) {
         context.pop();
       } else {
         context.goNamed('meterDetail', pathParameters: {'id': reading.meterId});
       }
+    } catch (_) {
+      if (mounted) {
+        ref.invalidate(evidenceForMeterProvider(reading.meterId));
+        ScaffoldMessenger.of(context).showSnackBar(
+          AppSnackBar(
+            message:
+                'Ablesung konnte nicht vollständig gelöscht werden. Bitte versuche es erneut.',
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _deletingReading = false);
     }
   }
 }
@@ -321,8 +342,8 @@ class _SinglePdfAction extends StatelessWidget {
 class _ReadingActions extends StatelessWidget {
   const _ReadingActions({required this.onEdit, required this.onDelete});
 
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {

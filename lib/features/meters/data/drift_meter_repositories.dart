@@ -51,8 +51,8 @@ class DriftMeterRepository implements MeterRepository {
             unit: meter.unit,
             meterNumber: Value(meter.meterNumber),
             location: Value(meter.location),
-            createdAtMillis: meter.createdAt.toUtc().millisecondsSinceEpoch,
-            updatedAtMillis: meter.updatedAt.toUtc().millisecondsSinceEpoch,
+            createdAtMicros: meter.createdAt.toUtc().microsecondsSinceEpoch,
+            updatedAtMicros: meter.updatedAt.toUtc().microsecondsSinceEpoch,
             reminderJson: Value(
               meter.reminder == null
                   ? null
@@ -78,12 +78,12 @@ class DriftMeterRepository implements MeterRepository {
       unit: row.unit,
       meterNumber: row.meterNumber,
       location: row.location,
-      createdAt: DateTime.fromMillisecondsSinceEpoch(
-        row.createdAtMillis,
+      createdAt: DateTime.fromMicrosecondsSinceEpoch(
+        row.createdAtMicros,
         isUtc: true,
       ),
-      updatedAt: DateTime.fromMillisecondsSinceEpoch(
-        row.updatedAtMillis,
+      updatedAt: DateTime.fromMicrosecondsSinceEpoch(
+        row.updatedAtMicros,
         isUtc: true,
       ),
       reminder: reminder == null
@@ -103,7 +103,7 @@ class DriftMeterReadingRepository implements MeterReadingRepository {
   @override
   Stream<List<MeterReading>> watchAll() {
     final query = database.select(database.readingRecords)
-      ..orderBy([(row) => OrderingTerm.desc(row.capturedAtMillis)]);
+      ..orderBy([(row) => OrderingTerm.desc(row.capturedAtMicros)]);
     return query.watch().map((rows) => rows.map(_readingFromRow).toList());
   }
 
@@ -111,7 +111,7 @@ class DriftMeterReadingRepository implements MeterReadingRepository {
   Stream<List<MeterReading>> watchForMeter(String meterId) {
     final query = database.select(database.readingRecords)
       ..where((row) => row.meterId.equals(meterId))
-      ..orderBy([(row) => OrderingTerm.desc(row.capturedAtMillis)]);
+      ..orderBy([(row) => OrderingTerm.desc(row.capturedAtMicros)]);
     return query.watch().map((rows) => rows.map(_readingFromRow).toList());
   }
 
@@ -133,8 +133,8 @@ class DriftMeterReadingRepository implements MeterReadingRepository {
             (searchPredicate ?? const Constant(true)),
       )
       ..orderBy([
-        (row) => OrderingTerm.desc(row.capturedAtMillis),
-        (row) => OrderingTerm.desc(row.storedAtMillis),
+        (row) => OrderingTerm.desc(row.capturedAtMicros),
+        (row) => OrderingTerm.desc(row.storedAtMicros),
         (row) => OrderingTerm.desc(row.id),
       ])
       ..limit(limit + 1, offset: offset);
@@ -164,7 +164,7 @@ class DriftMeterReadingRepository implements MeterReadingRepository {
   @override
   Future<List<MeterReading>> loadAll() async {
     final query = database.select(database.readingRecords)
-      ..orderBy([(row) => OrderingTerm.desc(row.capturedAtMillis)]);
+      ..orderBy([(row) => OrderingTerm.desc(row.capturedAtMicros)]);
     return (await query.get()).map(_readingFromRow).toList();
   }
 
@@ -172,7 +172,7 @@ class DriftMeterReadingRepository implements MeterReadingRepository {
   Future<List<MeterReading>> loadForMeter(String meterId) async {
     final query = database.select(database.readingRecords)
       ..where((row) => row.meterId.equals(meterId))
-      ..orderBy([(row) => OrderingTerm.desc(row.capturedAtMillis)]);
+      ..orderBy([(row) => OrderingTerm.desc(row.capturedAtMicros)]);
     return (await query.get()).map(_readingFromRow).toList();
   }
 
@@ -195,7 +195,7 @@ class DriftMeterReadingRepository implements MeterReadingRepository {
     final uppercasePattern = '%${escapedLikePattern(query.toUpperCase())}%';
     const formattedLocalDate = CustomExpression<String>(
       "strftime('%d.%m.%Y', "
-      '"reading_records"."captured_at_millis" / 1000, '
+      '"reading_records"."captured_at_micros" / 1000000, '
       "'unixepoch', 'localtime')",
     );
     final readings = database.readingRecords;
@@ -225,8 +225,8 @@ class DriftMeterReadingRepository implements MeterReadingRepository {
     final query = database.select(database.readingRecords)
       ..where((row) => row.meterId.equals(meterId))
       ..orderBy([
-        (row) => OrderingTerm.desc(row.capturedAtMillis),
-        (row) => OrderingTerm.desc(row.storedAtMillis),
+        (row) => OrderingTerm.desc(row.capturedAtMicros),
+        (row) => OrderingTerm.desc(row.storedAtMicros),
         (row) => OrderingTerm.desc(row.id),
       ])
       ..limit(1);
@@ -256,9 +256,9 @@ class DriftMeterReadingRepository implements MeterReadingRepository {
             RevisionRecordsCompanion.insert(
               id: revision.id,
               readingId: revision.readingId,
-              changedAtMillis: revision.changedAt
+              changedAtMicros: revision.changedAt
                   .toUtc()
-                  .millisecondsSinceEpoch,
+                  .microsecondsSinceEpoch,
               reason: revision.reason,
               changesJson: jsonEncode(
                 revision.changes.map(
@@ -274,15 +274,15 @@ class DriftMeterReadingRepository implements MeterReadingRepository {
   Future<List<ReadingRevision>> loadRevisions(String readingId) async {
     final query = database.select(database.revisionRecords)
       ..where((row) => row.readingId.equals(readingId))
-      ..orderBy([(row) => OrderingTerm.asc(row.changedAtMillis)]);
+      ..orderBy([(row) => OrderingTerm.asc(row.changedAtMicros)]);
     final rows = await query.get();
     return rows.map((row) {
       final rawChanges = jsonDecode(row.changesJson) as Map<String, dynamic>;
       return ReadingRevision(
         id: row.id,
         readingId: row.readingId,
-        changedAt: DateTime.fromMillisecondsSinceEpoch(
-          row.changedAtMillis,
+        changedAt: DateTime.fromMicrosecondsSinceEpoch(
+          row.changedAtMicros,
           isUtc: true,
         ),
         reason: row.reason,
@@ -304,7 +304,7 @@ class DriftMeterReadingRepository implements MeterReadingRepository {
           RevisionRecordsCompanion.insert(
             id: revision.id,
             readingId: revision.readingId,
-            changedAtMillis: revision.changedAt.toUtc().millisecondsSinceEpoch,
+            changedAtMicros: revision.changedAt.toUtc().microsecondsSinceEpoch,
             reason: revision.reason,
             changesJson: jsonEncode(
               revision.changes.map(
@@ -335,18 +335,18 @@ class DriftMeterReadingRepository implements MeterReadingRepository {
       displayValue: reading.value.displayText,
       valueDigits: reading.value.digits,
       valueScale: reading.value.scale,
-      capturedAtMillis: reading.capturedAt.toUtc().millisecondsSinceEpoch,
+      capturedAtMicros: reading.capturedAt.toUtc().microsecondsSinceEpoch,
       timezoneOffsetMinutes: reading.timezoneOffsetMinutes,
-      storedAtMillis: reading.storedAt.toUtc().millisecondsSinceEpoch,
-      updatedAtMillis: reading.updatedAt.toUtc().millisecondsSinceEpoch,
+      storedAtMicros: reading.storedAt.toUtc().microsecondsSinceEpoch,
+      updatedAtMicros: reading.updatedAt.toUtc().microsecondsSinceEpoch,
       source: reading.source.name,
       photoPath: reading.photoPath,
       photoSha256: reading.photoSha256,
       ocrRawText: Value(reading.ocrRawText),
       ocrCandidate: Value(reading.ocrCandidate),
       ocrConfidence: Value(reading.ocrConfidence),
-      photoAddedAtMillis: Value(
-        reading.photoAddedAt?.toUtc().millisecondsSinceEpoch,
+      photoAddedAtMicros: Value(
+        reading.photoAddedAt?.toUtc().microsecondsSinceEpoch,
       ),
       photoHistoryJson: Value(
         jsonEncode(
@@ -371,17 +371,17 @@ class DriftMeterReadingRepository implements MeterReadingRepository {
         digits: row.valueDigits,
         scale: row.valueScale,
       ),
-      capturedAt: DateTime.fromMillisecondsSinceEpoch(
-        row.capturedAtMillis,
+      capturedAt: DateTime.fromMicrosecondsSinceEpoch(
+        row.capturedAtMicros,
         isUtc: true,
       ),
       timezoneOffsetMinutes: row.timezoneOffsetMinutes,
-      storedAt: DateTime.fromMillisecondsSinceEpoch(
-        row.storedAtMillis,
+      storedAt: DateTime.fromMicrosecondsSinceEpoch(
+        row.storedAtMicros,
         isUtc: true,
       ),
-      updatedAt: DateTime.fromMillisecondsSinceEpoch(
-        row.updatedAtMillis,
+      updatedAt: DateTime.fromMicrosecondsSinceEpoch(
+        row.updatedAtMicros,
         isUtc: true,
       ),
       source: ReadingSource.values.byName(row.source),
@@ -390,10 +390,10 @@ class DriftMeterReadingRepository implements MeterReadingRepository {
       ocrRawText: row.ocrRawText,
       ocrCandidate: row.ocrCandidate,
       ocrConfidence: row.ocrConfidence,
-      photoAddedAt: row.photoAddedAtMillis == null
+      photoAddedAt: row.photoAddedAtMicros == null
           ? null
-          : DateTime.fromMillisecondsSinceEpoch(
-              row.photoAddedAtMillis!,
+          : DateTime.fromMicrosecondsSinceEpoch(
+              row.photoAddedAtMicros!,
               isUtc: true,
             ),
       photoHistory: (jsonDecode(row.photoHistoryJson) as List)
@@ -437,12 +437,12 @@ class DriftMeterDashboardRepository implements MeterDashboardRepository {
       unit: row.read<String>('dashboard_unit'),
       meterNumber: row.read<String>('dashboard_meter_number'),
       location: row.read<String>('dashboard_location'),
-      createdAt: DateTime.fromMillisecondsSinceEpoch(
-        row.read<int>('dashboard_created_at_millis'),
+      createdAt: DateTime.fromMicrosecondsSinceEpoch(
+        row.read<int>('dashboard_created_at_micros'),
         isUtc: true,
       ),
-      updatedAt: DateTime.fromMillisecondsSinceEpoch(
-        row.read<int>('dashboard_meter_updated_at_millis'),
+      updatedAt: DateTime.fromMicrosecondsSinceEpoch(
+        row.read<int>('dashboard_meter_updated_at_micros'),
         isUtc: true,
       ),
       reminder: reminderJson == null
@@ -471,8 +471,8 @@ class DriftMeterDashboardRepository implements MeterDashboardRepository {
       meter: meter,
       latestValue: latestValue,
       latestUnit: latestValue == null ? null : latestUnit,
-      lastEdited: DateTime.fromMillisecondsSinceEpoch(
-        row.read<int>('dashboard_last_edited_millis'),
+      lastEdited: DateTime.fromMicrosecondsSinceEpoch(
+        row.read<int>('dashboard_last_edited_micros'),
         isUtc: true,
       ),
     );
@@ -487,24 +487,24 @@ SELECT
   meter.unit AS dashboard_unit,
   meter.meter_number AS dashboard_meter_number,
   meter.location AS dashboard_location,
-  meter.created_at_millis AS dashboard_created_at_millis,
-  meter.updated_at_millis AS dashboard_meter_updated_at_millis,
+  meter.created_at_micros AS dashboard_created_at_micros,
+  meter.updated_at_micros AS dashboard_meter_updated_at_micros,
   meter.reminder_json AS dashboard_reminder_json,
   latest.display_value AS dashboard_latest_display_value,
   latest.value_digits AS dashboard_latest_digits,
   latest.value_scale AS dashboard_latest_scale,
   latest.meter_snapshot_json AS dashboard_latest_meter_snapshot_json,
   MAX(
-    meter.updated_at_millis,
+    meter.updated_at_micros,
     COALESCE(
       (
-        SELECT MAX(history.updated_at_millis)
+        SELECT MAX(history.updated_at_micros)
         FROM reading_records AS history
         WHERE history.meter_id = meter.id
       ),
-      meter.updated_at_millis
+      meter.updated_at_micros
     )
-  ) AS dashboard_last_edited_millis
+  ) AS dashboard_last_edited_micros
 FROM meter_records AS meter
 LEFT JOIN reading_records AS latest
   ON latest.id = (
@@ -512,8 +512,8 @@ LEFT JOIN reading_records AS latest
     FROM reading_records AS candidate
     WHERE candidate.meter_id = meter.id
     ORDER BY
-      candidate.captured_at_millis DESC,
-      candidate.stored_at_millis DESC,
+      candidate.captured_at_micros DESC,
+      candidate.stored_at_micros DESC,
       candidate.id DESC
     LIMIT 1
   )
@@ -539,7 +539,7 @@ class DriftEvidenceExportRepository implements EvidenceExportRepository {
     final pageQuery = database.select(table)
       ..where((_) => filter)
       ..orderBy([
-        (row) => OrderingTerm.desc(row.createdAtMillis),
+        (row) => OrderingTerm.desc(row.createdAtMicros),
         (row) => OrderingTerm.desc(row.id),
       ])
       ..limit(limit, offset: offset);
@@ -561,14 +561,14 @@ class DriftEvidenceExportRepository implements EvidenceExportRepository {
   Stream<List<EvidenceExportRecord>> watchForMeter(String meterId) {
     final query = database.select(database.evidenceExportRecords)
       ..where((row) => row.meterId.equals(meterId))
-      ..orderBy([(row) => OrderingTerm.desc(row.createdAtMillis)]);
+      ..orderBy([(row) => OrderingTerm.desc(row.createdAtMicros)]);
     return query.watch().map((rows) => rows.map(_fromRow).toList());
   }
 
   @override
   Future<List<EvidenceExportRecord>> loadAll() async {
     final query = database.select(database.evidenceExportRecords)
-      ..orderBy([(row) => OrderingTerm.desc(row.createdAtMillis)]);
+      ..orderBy([(row) => OrderingTerm.desc(row.createdAtMicros)]);
     return (await query.get()).map(_fromRow).toList();
   }
 
@@ -576,7 +576,7 @@ class DriftEvidenceExportRepository implements EvidenceExportRepository {
   Future<List<EvidenceExportRecord>> loadForMeter(String meterId) async {
     final query = database.select(database.evidenceExportRecords)
       ..where((row) => row.meterId.equals(meterId))
-      ..orderBy([(row) => OrderingTerm.desc(row.createdAtMillis)]);
+      ..orderBy([(row) => OrderingTerm.desc(row.createdAtMicros)]);
     return (await query.get()).map(_fromRow).toList();
   }
 
@@ -590,7 +590,7 @@ class DriftEvidenceExportRepository implements EvidenceExportRepository {
             meterId: record.meterId,
             kind: record.kind.name,
             readingIdsJson: jsonEncode(record.readingIds),
-            createdAtMillis: record.createdAt.toUtc().millisecondsSinceEpoch,
+            createdAtMicros: record.createdAt.toUtc().microsecondsSinceEpoch,
             fileName: record.fileName,
             filePath: record.filePath,
             pdfSha256: record.pdfSha256,
@@ -613,8 +613,8 @@ class DriftEvidenceExportRepository implements EvidenceExportRepository {
       meterId: row.meterId,
       kind: EvidenceExportKind.values.byName(row.kind),
       readingIds: (jsonDecode(row.readingIdsJson) as List).cast<String>(),
-      createdAt: DateTime.fromMillisecondsSinceEpoch(
-        row.createdAtMillis,
+      createdAt: DateTime.fromMicrosecondsSinceEpoch(
+        row.createdAtMicros,
         isUtc: true,
       ),
       fileName: row.fileName,

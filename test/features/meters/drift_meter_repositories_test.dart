@@ -266,7 +266,7 @@ void main() {
     const readingCount = 5000;
     final meter = _meter();
     await meters.save(meter);
-    final baseMillis = DateTime.utc(2020, 1, 1).millisecondsSinceEpoch;
+    final baseMicros = DateTime.utc(2020, 1, 1).microsecondsSinceEpoch;
     await database.batch((batch) {
       batch.insertAll(database.readingRecords, [
         for (var index = 0; index < readingCount; index++)
@@ -279,10 +279,10 @@ void main() {
             displayValue: '$index,0',
             valueDigits: '${index}0',
             valueScale: 1,
-            capturedAtMillis: baseMillis + index,
+            capturedAtMicros: baseMicros + index,
             timezoneOffsetMinutes: 60,
-            storedAtMillis: baseMillis + index,
-            updatedAtMillis: baseMillis + index,
+            storedAtMicros: baseMicros + index,
+            updatedAtMicros: baseMicros + index,
             source: ReadingSource.camera.name,
             photoPath: '/tmp/photo.jpg',
             photoSha256: 'a' * 64,
@@ -324,7 +324,7 @@ void main() {
     () async {
       const meterCount = 500;
       const readingsPerMeter = 20;
-      final baseMillis = DateTime.utc(2026, 1, 1).millisecondsSinceEpoch;
+      final baseMicros = DateTime.utc(2026, 1, 1).microsecondsSinceEpoch;
       await database.batch((batch) {
         batch.insertAll(database.meterRecords, [
           for (var meterIndex = 0; meterIndex < meterCount; meterIndex++)
@@ -335,8 +335,8 @@ void main() {
               unit: 'kWh',
               meterNumber: Value('N$meterIndex'),
               location: const Value('Test'),
-              createdAtMillis: baseMillis,
-              updatedAtMillis: baseMillis,
+              createdAtMicros: baseMicros,
+              updatedAtMicros: baseMicros,
             ),
         ]);
         batch.insertAll(database.readingRecords, [
@@ -360,10 +360,10 @@ void main() {
                 displayValue: '$readingIndex,0',
                 valueDigits: '${readingIndex}0',
                 valueScale: 1,
-                capturedAtMillis: baseMillis + readingIndex,
+                capturedAtMicros: baseMicros + readingIndex,
                 timezoneOffsetMinutes: 60,
-                storedAtMillis: baseMillis + readingIndex,
-                updatedAtMillis: baseMillis + readingIndex,
+                storedAtMicros: baseMicros + readingIndex,
+                updatedAtMicros: baseMicros + readingIndex,
                 source: ReadingSource.camera.name,
                 photoPath: '/tmp/photo.jpg',
                 photoSha256: 'a' * 64,

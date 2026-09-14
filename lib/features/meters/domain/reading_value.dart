@@ -26,44 +26,50 @@ class ReadingValue implements Comparable<ReadingValue> {
   String get germanFormatted => canonical.replaceAll('.', ',');
 
   static ReadingValue? tryParse(String input) {
-    var value = input.trim().replaceAll(RegExp(r'\s+'), '');
-    value = value.replaceAll("'", '');
-    if (value.isEmpty || !RegExp(r'\d').hasMatch(value)) {
+    final value = input
+        .trim()
+        .replaceAll('’', "'")
+        .replaceAll(RegExp(r'[\u00a0\u202f]'), ' ');
+    if (value.isEmpty || !RegExp(r"^[0-9., ']+$").hasMatch(value)) {
       return null;
     }
-
-    value = value.replaceAll(RegExp(r'[^0-9,.-]'), '');
-    if (value.startsWith('-')) {
-      return null;
+    final commas = ','.allMatches(value).length;
+    final dots = '.'.allMatches(value).length;
+    String? decimal;
+    if (commas > 0 && dots > 0) {
+      decimal = value.lastIndexOf(',') > value.lastIndexOf('.') ? ',' : '.';
+      if (decimal.allMatches(value).length != 1) return null;
+    } else if (commas == 1) {
+      decimal = ',';
+    } else if (dots == 1) {
+      decimal = '.';
     }
-    value = value.replaceAll('-', '');
-
-    final comma = value.lastIndexOf(',');
-    final dot = value.lastIndexOf('.');
-    final decimalIndex = comma > dot ? comma : dot;
-    var scale = 0;
-    String digits;
-    if (decimalIndex >= 0) {
-      scale = value.length - decimalIndex - 1;
-      if (scale == 0) {
-        return null;
-      }
-      digits =
-          '${value.substring(0, decimalIndex)}'
-                  '${value.substring(decimalIndex + 1)}'
-              .replaceAll(RegExp(r'[^0-9]'), '');
-    } else {
-      digits = value.replaceAll(RegExp(r'[^0-9]'), '');
-    }
-    if (digits.isEmpty) {
-      return null;
-    }
-    final normalizedDigits = digits.replaceFirst(RegExp(r'^0+(?=\d)'), '');
+    final split = decimal == null ? -1 : value.lastIndexOf(decimal);
+    final integer = split < 0 ? value : value.substring(0, split);
+    final fraction = split < 0 ? '' : value.substring(split + 1);
+    if (split >= 0 && !RegExp(r'^[0-9]+$').hasMatch(fraction)) return null;
+    final integerDigits = _parseIntegerGroup(integer.isEmpty ? '0' : integer);
+    if (integerDigits == null) return null;
+    final digits = '$integerDigits$fraction';
     return ReadingValue(
       displayText: input.trim(),
-      digits: normalizedDigits,
-      scale: scale,
+      digits: digits.replaceFirst(RegExp(r'^0+(?=\d)'), ''),
+      scale: fraction.length,
     );
+  }
+
+  static String? _parseIntegerGroup(String value) {
+    if (RegExp(r'^[0-9]+$').hasMatch(value)) return value;
+    final separators = RegExp(
+      r"[., ']",
+    ).allMatches(value).map((match) => match.group(0)!).toSet();
+    if (separators.length != 1) return null;
+    final separator = separators.single;
+    final grouped = RegExp(
+      '^[0-9]{1,3}(?:${RegExp.escape(separator)}[0-9]{3})+\$',
+    );
+    if (!grouped.hasMatch(value)) return null;
+    return value.replaceAll(separator, '');
   }
 
   ReadingValue difference(ReadingValue other) {

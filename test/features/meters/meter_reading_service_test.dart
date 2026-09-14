@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:meter_reading_log/features/evidence/application/evidence_report_service.dart';
 import 'package:meter_reading_log/core/files/evidence_photo_asset_repository.dart';
 import 'package:meter_reading_log/core/files/meter_photo_repository.dart';
 import 'package:meter_reading_log/core/ocr/meter_ocr_repository.dart';
@@ -18,7 +19,10 @@ void main() {
       final photos = _TrackingPhotoRepository();
       final reminders = NoopMeterReminderRepository();
       final evidencePhotos = _TrackingEvidencePhotos();
+      final exports = MemoryEvidenceExportRepository();
       final service = MeterReadingService(
+        exports: exports,
+        evidenceReports: EvidenceReportService(exports: exports),
         meters: meters,
         readings: repository,
         photos: photos,
