@@ -170,7 +170,10 @@ class _MeterHistoryScreenState extends ConsumerState<MeterHistoryScreen> {
                               onPressed: !pageAsync.isLoading && _offset > 0
                                   ? () => _showPage(_offset - _pageSize)
                                   : null,
-                              child: const Text('Zurück'),
+                              child: const Text(
+                                'Zurück',
+                                textAlign: TextAlign.center,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -180,7 +183,10 @@ class _MeterHistoryScreenState extends ConsumerState<MeterHistoryScreen> {
                               onPressed: !pageAsync.isLoading && page.hasMore
                                   ? () => _showPage(_offset + _pageSize)
                                   : null,
-                              child: const Text('Weiter'),
+                              child: const Text(
+                                'Weiter',
+                                textAlign: TextAlign.center,
+                              ),
                             ),
                           ),
                         ],

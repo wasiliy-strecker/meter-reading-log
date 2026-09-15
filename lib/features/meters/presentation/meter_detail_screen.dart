@@ -181,7 +181,10 @@ class _MeterDetailScreenState extends ConsumerState<MeterDetailScreen> {
                         pathParameters: {'id': meter.id},
                       ),
                       icon: const Icon(Icons.manage_search_outlined),
-                      label: const Text('Alle Ablesungen anzeigen'),
+                      label: const Text(
+                        'Alle Ablesungen anzeigen',
+                        textAlign: TextAlign.center,
+                      ),
                     ),
                   ],
                 ],
@@ -337,7 +340,10 @@ class _MeterActions extends StatelessWidget {
         OutlinedButton.icon(
           onPressed: onEdit,
           icon: const Icon(Icons.edit_outlined),
-          label: const Text('Zähler & Erinnerung bearbeiten'),
+          label: const Text(
+            'Zähler & Erinnerung bearbeiten',
+            textAlign: TextAlign.center,
+          ),
         ),
         const SizedBox(height: 8),
         OutlinedButton.icon(
@@ -347,7 +353,7 @@ class _MeterActions extends StatelessWidget {
           ),
           onPressed: onDelete,
           icon: const Icon(Icons.delete_outline),
-          label: const Text('Zähler löschen'),
+          label: const Text('Zähler löschen', textAlign: TextAlign.center),
         ),
       ],
     );

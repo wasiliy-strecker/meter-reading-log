@@ -167,16 +167,18 @@ class _MeterListState extends ConsumerState<_MeterList> {
                 onTapOutside: (_) => FocusScope.of(context).unfocus(),
               ),
               const SizedBox(height: 12),
-              Row(
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                runSpacing: 8,
                 children: [
-                  Expanded(
-                    child: Text(
-                      query.isEmpty
-                          ? '${entries.length} Zähler'
-                          : '${entries.length} Treffer',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+                  Text(
+                    query.isEmpty
+                        ? '${entries.length} Zähler'
+                        : '${entries.length} Treffer',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
                   MenuAnchor(
@@ -185,7 +187,7 @@ class _MeterListState extends ConsumerState<_MeterList> {
                           ? controller.close()
                           : controller.open(),
                       icon: const Icon(Icons.sort, size: 19),
-                      label: Text(_sort.label),
+                      label: Text(_sort.label, textAlign: TextAlign.center),
                     ),
                     menuChildren: [
                       for (final option in _MeterSort.values)
@@ -521,7 +523,7 @@ class _ErrorState extends StatelessWidget {
       child: FilledButton.icon(
         onPressed: onRetry,
         icon: const Icon(Icons.refresh),
-        label: const Text('Erneut laden'),
+        label: const Text('Erneut laden', textAlign: TextAlign.center),
       ),
     );
   }

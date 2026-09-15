@@ -109,7 +109,10 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
                     ? null
                     : () => _capture(ReadingSource.camera),
                 icon: const Icon(Icons.photo_camera_outlined),
-                label: const Text('Zähler fotografieren'),
+                label: const Text(
+                  'Zähler fotografieren',
+                  textAlign: TextAlign.center,
+                ),
               ),
               const SizedBox(height: 10),
               OutlinedButton.icon(
@@ -117,7 +120,10 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
                     ? null
                     : () => _capture(ReadingSource.gallery),
                 icon: const Icon(Icons.photo_library_outlined),
-                label: const Text('Foto aus Galerie'),
+                label: const Text(
+                  'Foto aus Galerie',
+                  textAlign: TextAlign.center,
+                ),
               ),
               if (_working) ...[
                 const SizedBox(height: 20),
@@ -151,7 +157,10 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
                 child: OutlinedButton.icon(
                   onPressed: _working ? null : _replacePhoto,
                   icon: const Icon(Icons.change_circle_outlined),
-                  label: const Text('Neues Foto aufnehmen oder auswählen'),
+                  label: const Text(
+                    'Neues Foto aufnehmen oder auswählen',
+                    textAlign: TextAlign.center,
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -247,7 +256,10 @@ class _CaptureReadingScreenState extends ConsumerState<CaptureReadingScreen> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.verified_outlined),
-                label: const Text('Ablesung bestätigen und speichern'),
+                label: const Text(
+                  'Ablesung bestätigen und speichern',
+                  textAlign: TextAlign.center,
+                ),
               ),
             ],
           ],

@@ -29,7 +29,10 @@ Future<bool> confirmFutureReadingTime(
             ),
             FilledButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Trotzdem speichern'),
+              child: const Text(
+                'Trotzdem speichern',
+                textAlign: TextAlign.center,
+              ),
             ),
           ],
         ),
@@ -93,7 +96,10 @@ class EditableReadingTimeCard extends StatelessWidget {
               child: OutlinedButton.icon(
                 onPressed: onPressed,
                 icon: const Icon(Icons.edit_calendar_outlined),
-                label: const Text('Datum & Uhrzeit ändern'),
+                label: const Text(
+                  'Datum & Uhrzeit ändern',
+                  textAlign: TextAlign.center,
+                ),
               ),
             ),
           ],

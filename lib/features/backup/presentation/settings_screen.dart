@@ -117,7 +117,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               key: const ValueKey('open-privacy-policy'),
                               onPressed: _openPrivacyPolicy,
                               icon: const Icon(Icons.open_in_new_rounded),
-                              label: const Text('Datenschutzerklärung öffnen'),
+                              label: const Text(
+                                'Datenschutzerklärung öffnen',
+                                textAlign: TextAlign.center,
+                              ),
                             ),
                           ),
                         ],
@@ -442,7 +445,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
                 FilledButton(
                   onPressed: () => Navigator.pop(context, true),
-                  child: const Text('Wiederherstellen'),
+                  child: const Text(
+                    'Wiederherstellen',
+                    textAlign: TextAlign.center,
+                  ),
                 ),
               ],
             ),
@@ -684,7 +690,7 @@ class _BackupPasswordDialogState extends State<_BackupPasswordDialog> {
             if (widget.confirm && _first.text != _second.text) return;
             Navigator.pop(context, _first.text);
           },
-          child: const Text('Weiter'),
+          child: const Text('Weiter', textAlign: TextAlign.center),
         ),
       ],
     );

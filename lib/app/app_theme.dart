@@ -24,9 +24,18 @@ class AppTheme {
 
   static ThemeData _base(ColorScheme scheme) {
     const buttonShape = StadiumBorder();
-    return ThemeData(
-      useMaterial3: true,
-      colorScheme: scheme,
+    final theme = ThemeData(useMaterial3: true, colorScheme: scheme);
+    final actionButtonStyle = ButtonStyle(
+      minimumSize: const WidgetStatePropertyAll(Size(0, 50)),
+      padding: const WidgetStatePropertyAll(
+        EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      ),
+      textStyle: WidgetStatePropertyAll(
+        theme.textTheme.labelLarge?.copyWith(fontSize: 16),
+      ),
+      shape: const WidgetStatePropertyAll(buttonShape),
+    );
+    return theme.copyWith(
       scaffoldBackgroundColor: scheme.surface,
       appBarTheme: AppBarTheme(
         centerTitle: false,
@@ -47,18 +56,9 @@ class AppTheme {
         fillColor: scheme.surfaceContainerLowest,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
       ),
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          minimumSize: const Size(0, 50),
-          shape: buttonShape,
-        ),
-      ),
-      outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(shape: buttonShape),
-      ),
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(shape: buttonShape),
-      ),
+      filledButtonTheme: FilledButtonThemeData(style: actionButtonStyle),
+      outlinedButtonTheme: OutlinedButtonThemeData(style: actionButtonStyle),
+      elevatedButtonTheme: ElevatedButtonThemeData(style: actionButtonStyle),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(shape: buttonShape),
       ),

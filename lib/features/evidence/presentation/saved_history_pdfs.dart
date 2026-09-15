@@ -154,7 +154,10 @@ class _SavedHistoryPdfsState extends ConsumerState<SavedHistoryPdfs>
                                         ? () => _showPage(_offset - _pageSize)
                                         : null,
                                     icon: const Icon(Icons.chevron_left),
-                                    label: const Text('Zurück'),
+                                    label: const Text(
+                                      'Zurück',
+                                      textAlign: TextAlign.center,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(width: 8),
@@ -167,7 +170,10 @@ class _SavedHistoryPdfsState extends ConsumerState<SavedHistoryPdfs>
                                         ? () => _showPage(_offset + _pageSize)
                                         : null,
                                     icon: const Icon(Icons.chevron_right),
-                                    label: const Text('Weiter'),
+                                    label: const Text(
+                                      'Weiter',
+                                      textAlign: TextAlign.center,
+                                    ),
                                   ),
                                 ),
                               ],

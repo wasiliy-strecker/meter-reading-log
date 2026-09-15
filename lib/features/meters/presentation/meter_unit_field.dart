@@ -181,7 +181,10 @@ class _MeterUnitPickerSheetState extends State<_MeterUnitPickerSheet> {
           OutlinedButton.icon(
             onPressed: _chooseCustomUnit,
             icon: const Icon(Icons.edit_outlined),
-            label: const Text('Eigene Einheit eingeben'),
+            label: const Text(
+              'Eigene Einheit eingeben',
+              textAlign: TextAlign.center,
+            ),
           ),
         ],
       ),

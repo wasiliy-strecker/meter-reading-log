@@ -354,7 +354,7 @@ class _ReadingActions extends StatelessWidget {
         OutlinedButton.icon(
           onPressed: onEdit,
           icon: const Icon(Icons.edit_outlined),
-          label: const Text('Korrigieren'),
+          label: const Text('Korrigieren', textAlign: TextAlign.center),
         ),
         const SizedBox(height: 8),
         OutlinedButton.icon(
@@ -364,7 +364,7 @@ class _ReadingActions extends StatelessWidget {
           ),
           onPressed: onDelete,
           icon: const Icon(Icons.delete_outline),
-          label: const Text('Ablesung löschen'),
+          label: const Text('Ablesung löschen', textAlign: TextAlign.center),
         ),
       ],
     );

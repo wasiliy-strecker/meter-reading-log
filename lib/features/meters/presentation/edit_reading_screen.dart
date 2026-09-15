@@ -168,7 +168,10 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.save_outlined),
-              label: const Text('Korrektur protokollieren'),
+              label: const Text(
+                'Korrektur protokollieren',
+                textAlign: TextAlign.center,
+              ),
             ),
           ],
         ),
@@ -350,6 +353,7 @@ class _EditReadingFormState extends ConsumerState<_EditReadingForm> {
             hasReplacement
                 ? 'Korrekturfoto ändern'
                 : 'Neues Foto für Korrektur',
+            textAlign: TextAlign.center,
           ),
         ),
         if (_processingPhoto) ...[

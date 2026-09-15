@@ -44,7 +44,10 @@ class EvidencePreviewScreen extends StatelessWidget {
                             onLayout: (_) async => report.bytes,
                           ),
                           icon: const Icon(Icons.print_outlined),
-                          label: const Text('Drucken'),
+                          label: const Text(
+                            'Drucken',
+                            textAlign: TextAlign.center,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -64,7 +67,10 @@ class EvidencePreviewScreen extends StatelessWidget {
                             ),
                           ),
                           icon: const Icon(Icons.ios_share_outlined),
-                          label: const Text('Teilen'),
+                          label: const Text(
+                            'Teilen',
+                            textAlign: TextAlign.center,
+                          ),
                         ),
                       ),
                     ],

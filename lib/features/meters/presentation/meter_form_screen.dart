@@ -364,7 +364,10 @@ class _MeterFormState extends ConsumerState<_MeterForm>
                             key: const ValueKey('hourly-pick-date'),
                             onPressed: _saving ? null : _pickHourlyDate,
                             icon: const Icon(Icons.calendar_month_outlined),
-                            label: const Text('Datum ändern'),
+                            label: const Text(
+                              'Datum ändern',
+                              textAlign: TextAlign.center,
+                            ),
                           ),
                           const SizedBox(height: 12),
                           Text(
@@ -382,7 +385,10 @@ class _MeterFormState extends ConsumerState<_MeterForm>
                             key: const ValueKey('hourly-pick-time'),
                             onPressed: _saving ? null : _pickHourlyTime,
                             icon: const Icon(Icons.schedule_outlined),
-                            label: const Text('Uhrzeit ändern'),
+                            label: const Text(
+                              'Uhrzeit ändern',
+                              textAlign: TextAlign.center,
+                            ),
                           ),
                           const SizedBox(height: 8),
                           Text(
@@ -414,7 +420,10 @@ class _MeterFormState extends ConsumerState<_MeterForm>
                             child: OutlinedButton.icon(
                               onPressed: _saving ? null : _pickReminderTime,
                               icon: const Icon(Icons.schedule_outlined),
-                              label: const Text('Uhrzeit ändern'),
+                              label: const Text(
+                                'Uhrzeit ändern',
+                                textAlign: TextAlign.center,
+                              ),
                             ),
                           ),
                         ],
@@ -486,6 +495,7 @@ class _MeterFormState extends ConsumerState<_MeterForm>
                               icon: const Icon(Icons.open_in_new_outlined),
                               label: const Text(
                                 '„Alarme & Erinnerungen“ öffnen',
+                                textAlign: TextAlign.center,
                               ),
                             ),
                           ),
@@ -505,7 +515,10 @@ class _MeterFormState extends ConsumerState<_MeterForm>
                                     ),
                                   )
                                 : const Icon(Icons.notification_add_outlined),
-                            label: const Text('Erinnerung jetzt testen'),
+                            label: const Text(
+                              'Erinnerung jetzt testen',
+                              textAlign: TextAlign.center,
+                            ),
                           ),
                         ),
                       ],
@@ -555,6 +568,7 @@ class _MeterFormState extends ConsumerState<_MeterForm>
                       : editing
                       ? 'Änderungen speichern'
                       : 'Zähler speichern',
+                  textAlign: TextAlign.center,
                 ),
               ),
             ],
